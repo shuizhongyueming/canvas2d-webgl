@@ -7,7 +7,8 @@
 ## 规格与记录
 
 - [规格快照](docs/specs/canvas2d-webgl.md)：功能边界、验收要求、待决策项。
-- [GitHub Issues](https://github.com/shuizhongyueming/canvas2d-webgl/issues)：规格变更、wayfinder 地图和决策票。
+- [Spec issue](https://github.com/shuizhongyueming/canvas2d-webgl/issues/1) 与 [Wayfinder 决策地图](https://github.com/shuizhongyueming/canvas2d-webgl/issues/2)。
+- [GitHub 管理约定](docs/issue-tracker.md)：决策票、依赖和规格同步方式。
 - [设计访谈](docs/design/grill.md)：已确认输入与修正历史。
 - [术语表](GLOSSARY.md)。
 - [可行性报告](docs/research/canvas2d-webgl-feasibility.md)与[现成方案核验](docs/research/existing-canvas2d-webgl.md)：历史研究，不能视为已实现能力；与最新确认不一致时以规格为准。
