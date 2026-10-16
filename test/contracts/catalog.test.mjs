@@ -17,3 +17,17 @@ test('API and interaction acceptance IDs do not collide or contain executable pl
   assert.ok(interactionCases.some(c => c.id === 'ACC-03.source-in-outside-source'));
   for (const entry of all) assert.equal('run' in entry, false);
 });
+
+test('both catalogs expose immutable requirement arrays to a shared consumer', () => {
+  const all = [...apiCases, ...interactionCases];
+  for (const entry of all) {
+    assert.ok(Array.isArray(entry.requirements), `${entry.id}: requirements must be an array`);
+    assert.ok(entry.requirements.length > 0, `${entry.id}: missing requirements`);
+    assert.ok(entry.requirements.every(id => typeof id === 'string' && id.length > 0));
+    assert.equal('requirement' in entry, false);
+    assert.throws(() => entry.requirements.push('unexpected'), TypeError);
+  }
+  const covering = requirement => all.filter(entry => entry.requirements.includes(requirement)).map(entry => entry.id);
+  assert.ok(covering('context.drawImage').includes('context.drawImage.arity-3'));
+  assert.ok(covering('IMG-02').includes('IMG-02.same-task-mutations'));
+});

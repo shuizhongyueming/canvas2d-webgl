@@ -6,10 +6,12 @@ export interface TestHooks {
   whenPresented(generation: number): Promise<void>;
   resourceCounts(): Readonly<Record<string, number>>;
 }
-export interface CaseDefinition {
+export interface CaseMetadata {
   readonly id: string;
   readonly requirements: readonly string[];
   readonly kind: 'semantic' | 'render' | 'combined';
+}
+export interface CaseDefinition extends CaseMetadata {
   readonly seed: number;
   readonly width: number;
   readonly height: number;

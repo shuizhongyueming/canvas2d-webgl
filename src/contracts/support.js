@@ -125,12 +125,13 @@ export function lookupMember(target, name) {
 
 /** Stable minimum case inventory. Add finer cases; never recycle an existing ID. */
 export const REQUIRED_CASES = freeze(SUPPORT_MATRIX.flatMap(row => {
-  const cases = [{ id: `${row.id}.contract`, requirement: row.id, kind: 'semantic' }];
-  for (const arity of row.arities || []) cases.push({ id: `${row.id}.arity-${arity}`, requirement: row.id, kind: 'semantic' });
-  for (const value of row.values || []) cases.push({ id: `${row.id}.value-${encodeURIComponent(value)}`, requirement: row.id, kind: 'semantic' });
-  for (const source of row.sources || []) cases.push({ id: `${row.id}.source-${source}`, requirement: row.id, kind: 'semantic' });
+  /** @type {import('../../types/internal/testing.js').CaseMetadata[]} */
+  const cases = [{ id: `${row.id}.contract`, requirements: [row.id], kind: 'semantic' }];
+  for (const arity of row.arities || []) cases.push({ id: `${row.id}.arity-${arity}`, requirements: [row.id], kind: 'semantic' });
+  for (const value of row.values || []) cases.push({ id: `${row.id}.value-${encodeURIComponent(value)}`, requirements: [row.id], kind: 'semantic' });
+  for (const source of row.sources || []) cases.push({ id: `${row.id}.source-${source}`, requirements: [row.id], kind: 'semantic' });
   if (['drawImage', 'fillRect', 'clearRect', 'strokeRect', 'fill', 'stroke', 'clip', 'fillText', 'strokeText'].includes(row.name) && row.target === 'context') {
-    cases.push({ id: `${row.id}.render`, requirement: row.id, kind: 'render' });
+    cases.push({ id: `${row.id}.render`, requirements: [row.id], kind: 'render' });
   }
   return cases;
 }));

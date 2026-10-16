@@ -17,7 +17,7 @@ test('every declared contract has unique stable cases, none claiming implementat
   assert.equal(new Set(REQUIRED_CASES.map(r => r.id)).size, REQUIRED_CASES.length);
   for (const row of SUPPORT_MATRIX) {
     assert.equal(row.implementation, undefined);
-    assert.ok(REQUIRED_CASES.some(c => c.requirement === row.id));
+    assert.ok(REQUIRED_CASES.some(c => c.requirements.includes(row.id)));
   }
   assert.throws(() => { lookupMember('context', 'drawImage').arities.push(7); }, TypeError);
 });
