@@ -18,3 +18,11 @@
 6. 新出现的具体问题另建决策子票；尚不清晰的问题保留在地图 Not yet specified。地图不列一份重复的开放票清单。
 
 本次建图没有授权继续实现渲染库。后续实施须依据用户进一步指令，另行拆解实现工作；本地图中的决策票不能当作默认编码授权。
+
+## 实施工作管理
+
+[开发计划：首版接口实现、分层测试与多 agent 并发交付](https://github.com/shuizhongyueming/canvas2d-webgl/issues/9)是独立实施入口，使用 `implementation:plan` / `implementation:task` 标签，不能把实施票贴成 wayfinder 决策票。延后平台票另加 `implementation:deferred`。
+
+实施票同样使用 sub-issues 与原生 dependencies。依赖表示前置票已经合并；用户后续启动 agent 后，先认领并评论分支/工作目录，再用独立 worktree 工作。开放、无 blocker、无 assignee、非 deferred 才可领取。PR 合并、测试与本票需要的人工+AI评审齐备后才关闭；没有运行或仍待评审的票保持开放。
+
+共同接口、文件归属、测试层次与完成门槛见[实施计划](plans/development.md)。已批准方案若被反例推翻，另建决策票作为受影响实施票的 blocker，不由实施 agent 自行改规格。本轮只创建开发计划，未执行任何实施票。
