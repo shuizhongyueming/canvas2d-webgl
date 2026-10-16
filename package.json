@@ -1,0 +1,35 @@
+{
+  "name": "canvas2d-webgl",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Canvas 2D compatibility contracts for a WebGL 1 renderer",
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "types/index.d.ts",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "check": "tsc -p tsconfig.json",
+    "test": "npm run test:unit",
+    "test:unit": "node scripts/unit.mjs",
+    "test:browser": "node scripts/testing.mjs browser",
+    "test:report": "node scripts/testing.mjs report",
+    "test:acceptance": "node scripts/testing.mjs acceptance",
+    "verify": "npm run check && npm run build && npm run test:unit"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
+  }
+}

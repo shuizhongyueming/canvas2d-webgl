@@ -1,0 +1,26 @@
+name: Foundation contracts (not rendering acceptance)
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run verify
+      - name: Confirm browser driver is explicitly unavailable
+        run: |
+          set +e
+          npm run test:browser
+          status=$?
+          set -e
+          test "$status" -eq 2
+      - name: Report limited scope
+        run: echo 'Contract tooling only. No compatibility rendering or platform acceptance was executed.' >> "$GITHUB_STEP_SUMMARY"
