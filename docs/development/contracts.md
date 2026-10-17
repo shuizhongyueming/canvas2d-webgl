@@ -6,24 +6,24 @@
 
 这是工程与协作契约，不是可用渲染器。公开入口 `createCompatCanvas` 始终同步抛 `not-implemented`；任何目标属性都不会被读取或修改。真实创建入口由公开画布票实现。不要将契约单测通过当成 Canvas 兼容性通过。
 
-- JavaScript ESM + JSDoc，开发机 Node >=22；Node 版本不代表 vivo 的 JS 运行时要求。
-- `npm ci --ignore-scripts` 安装锁定的类型检查开发依赖；生产代码无 npm 运行依赖。
-- `npm run check` 检查 JS/JSDoc、内部声明和公开类型约束；`npm run build` 将 runtime JS 放入 dist，不降级语法或植入平台 polyfill。
-- `npm run test:unit` 递归发现 `test/**/*.test.mjs`，空目录退出 2。当前仅执行工程契约测试。
-- `npm run verify` = 类型检查 + 构建 + 单测。CI 的 job 名和总结明确限定为 foundation contracts。
-- package 只导出 `createCompatCanvas`，类型入口为 `types/index.d.ts`；测试钩子、内部声明和测试脚本没有 package 子路径导出。当前 private，不做发布。
+- strict TypeScript + ESM，开发机 Node >=22；Node 版本不代表 vivo 的 JS 运行时要求。
+- `npm ci --ignore-scripts` 安装锁定的类型检查和测试开发依赖；生产代码无 npm 运行依赖。
+- `npm run check` 检查 TypeScript 源码、共享契约和公开类型约束；`npm run build` 用 tsc 编译为 ES2020 ESM JS 与 .d.ts 放入 dist，并编译浏览器用例；不植入平台 polyfill。
+- `npm run test:unit` 递归发现 `test/**/*.test.mjs`，空目录退出 2。包含工程契约及测试设施纯逻辑回归。
+- `npm run verify` = 类型检查 + 构建（含生成类型的消费检查）+ 单测。CI 同时运行真实 Chromium 设施自检，仍不代表兼容性验收。
+- package 只导出 `createCompatCanvas`，类型入口为生成的 `dist/index.d.ts`；测试钩子、内部声明和测试脚本没有 package 子路径导出。当前 private，不做发布。
 
 ## 文件与接口所有权
 
 | 文件/目录 | 后续 owner |
 | --- | --- |
-| `types/index.d.ts`, `src/index.js` | 公开画布票接线；改变公开声明须核对规格 |
-| `src/contracts/support.js` | 支持矩阵公共契约；不能由某个特性扩大范围 |
-| `src/contracts/errors.js` | 稳定错误及初始化回滚；能力检测模块消费 |
-| `src/contracts/features.js` | context 组装机制；状态/context 票消费 |
-| `types/internal/contracts.d.ts` | 下列共享数据/模块接口；消费者共同协调变更 |
-| `types/internal/testing.d.ts` | 测试设施票消费并实现驱动，GPU票实现钩子 |
-| `test/cases/manifest/index.js` | 最低 API/交互验收目录，声明不等于已执行 |
+| `src/api.ts`, `src/index.ts` | 公开画布票接线；改变公开声明须核对规格 |
+| `src/contracts/support.ts` | 支持矩阵公共契约；不能由某个特性扩大范围 |
+| `src/contracts/errors.ts` | 稳定错误及初始化回滚；能力检测模块消费 |
+| `src/contracts/features.ts` | context 组装机制；状态/context 票消费 |
+| `src/internal/contracts.ts` | 下列共享数据/模块接口；消费者共同协调变更 |
+| `test/types/testing.ts` | 测试设施票消费并实现驱动，GPU票实现钩子 |
+| `test/cases/manifest/index.ts` | 最低 API/交互验收目录，声明不等于已执行 |
 | `scripts/testing.mjs`, `test/harness/`, `test/report/` | 测试设施票接管真实运行器和报告 |
 | `.github/workflows/contracts.yml` | 测试设施票后续增加真实浏览器门槛，届时移除“驱动必须缺失”的基础阶段检查 |
 
@@ -35,7 +35,7 @@
 
 ## 数据约定
 
-代码级结构见 `types/internal/contracts.d.ts`，以下内容同样是接口的一部分。
+代码级结构见 `src/internal/contracts.ts`，以下内容同样是接口的一部分。
 
 - `Matrix` 为 `[a,b,c,d,e,f]`，Canvas 列向量变换，设备像素左上原点、y向下。几何和纹理坐标转换只在设备入口处理，不在各特性重复翻转。
 - `Color` 是直通 sRGB `[r,g,b,a]`，每通道 0..1。GPU场景纹理为预乘alpha，上传/着色只预乘一次。`RasterSource.alpha` 描述输入颜色语义，不推断浏览器画布内部的存储格式；原生canvas上传通过WebGL unpack约定转换。
@@ -77,24 +77,24 @@
 
 `SUPPORT_MATRIX` 逐项声明target/name/kind/owner/policy、受支持的参数数量、取值、图像来源和原生默认值；它不记录实现进度。默认lineJoin=miter、textAlign=start、textBaseline=alphabetic不表示允许写入矩阵外合法值。
 
-`REQUIRED_CASES` 按成员合同、重载、取值、来源及绘制结果分配最低case ID。ID由成员和具体值生成，不能重用或更改含义；新增组合可另加case，不能删最低目录以消除失败。`test/cases/manifest/index.js` 补充跨特性case ID。它们是验收需求目录，**没有可运行用例，不能计为通过**。
+`REQUIRED_CASES` 按成员合同、重载、取值、来源及绘制结果分配最低case ID。ID由成员和具体值生成，不能重用或更改含义；新增组合可另加case，不能删最低目录以消除失败。`test/cases/manifest/index.ts` 补充跨特性case ID。它们是验收需求目录，**没有可运行用例，不能计为通过**。
 
 - 工程单测：`test/**/*.test.mjs`，Node内置test runner自动发现，文件排序稳定，不跟随符号链接。
-- 后续浏览器用例：`test/cases/<feature>/*.case.js`，命名导出 `cases: CaseDefinition[]`；设施票递归发现、检查重复id与未知requirement，核对最低目录并单列missing。
+- 后续浏览器用例：`test/cases/<feature>/*.case.ts`，命名导出 `cases: CaseDefinition[]`；设施票递归发现、检查重复id与未知requirement，核对最低目录并单列missing。
 - `CaseDefinition.requirements` 引用矩阵的member id（例如`context.drawImage`）或规格id（例如`IMG-02`）；一个case可覆盖多个要求。case id仍须唯一，必需目录中的ID必须被显式实现。
 - 两个adapter独立运行同一case，不共享参考像素或被测算法。语义差异也使用明确断言/观测值。模板type中的unknown需由测试设施adapter提供原生/兼容具体类型，不能直接断言为全量CanvasRenderingContext2D而隐藏不支持API。
 
 ## 测试CLI和观测协议
 
-本票定义协议，真实驱动由[测试设施票](https://github.com/shuizhongyueming/canvas2d-webgl/issues/11)实施。选择可替换的真实Chromium浏览器driver，当前本机验证优先ego-browser；CI可配置独立Chromium driver，须真实执行WebGL 1并记录差异环境，不将个人浏览器会话作为CI依赖。
+真实驱动及操作说明见[测试设施](testing.md)。选择可替换的真实Chromium浏览器driver，当前本机验证优先ego-browser；CI可配置独立Chromium driver，须真实执行WebGL 1并记录差异环境，不将个人浏览器会话作为CI依赖。
 
 | 命令 | 后续固定输入 | 后续输出与退出语义 |
 | --- | --- | --- |
 | `test:browser` | `--output <dir>`；可选`--case <id>` | TestRun JSON、原生/实际/差异图；0采集完成且语义无失败，不代表像素验收通过 |
 | `test:report` | `--run <run.json>` | 可查看渲染对与逐case状态的报告；不自动接受评审 |
-| `test:acceptance` | `--run <run.json> --reviews <reviews.json>` | 核对必需集合、真实compat运行、语义和评审；仅全量通过才退出0 |
+| `test:acceptance` | `--run <run.json> [--reviews <reviews.json>]` | 核对必需集合、真实compat运行、语义和评审；仅全量通过才退出0 |
 
-通用退出码：0本命令完成、1失败/非法输入、2阻塞/未执行/待评审。当前这三个命令都输出 `execution: blocked, reason: driver-not-implemented` 并退出2，不解析参数或生成伪运行报告。工程单测会验证这一点；设施票接管时将其改为真实驱动的缺GPU/缺评审等边界测试，并调整CI。
+通用退出码：0本命令完成、1失败/非法输入、2阻塞/未执行/待评审。三个入口已实现；browser 需 --output，report/acceptance 需 --run。缺评审时 acceptance 退出2；报告生成成功不代表验收成功。
 
 `TestHooks.readScene`只通过测试侧适配器获取实例关联，不能挂在公开canvas/context、options或package exports；取样不改变公开API。返回直通RGBA8、sRGB、左上行优先，alpha=0时RGB归零；GPU内部预乘读回的转换是钩子的责任。
 
@@ -104,4 +104,4 @@
 
 ## 后续接续
 
-本票PR评审合并后才能解除依赖。下一批是测试设施与七场景文档；后续状态、GPU、raster、paint票按上述接口落地。无需重新创建工程或测试注册表；若发现签名不足，应先在票中标明消费者及最小变更，再协调公共契约，不能静默重命名。
+工程契约已合并，测试设施接续见 testing.md；后续状态、GPU、raster、paint票按上述接口落地。无需重新创建工程或测试注册表；若发现签名不足，应先在票中标明消费者及最小变更，再协调公共契约，不能静默重命名。

@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { SUPPORT_MATRIX } from '../../src/contracts/support.js';
-import { apiCases, interactionCases } from '../cases/manifest/index.js';
+import { SUPPORT_MATRIX } from '../../dist/contracts/support.js';
+import { apiCases, interactionCases } from '../../.build/test/cases/manifest/index.js';
 
 test('DOM declaration inventory and runtime unsupported catalog cannot drift apart', async () => {
   const source = await readFile(new URL('../types/dom-catalog.ts', import.meta.url), 'utf8');

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SUPPORT_MATRIX, lookupMember, REQUIRED_CASES } from '../../src/contracts/support.js';
+import { SUPPORT_MATRIX, lookupMember, REQUIRED_CASES } from '../../dist/contracts/support.js';
 
 test('approved overloads and exclusions remain distinct from unknown spellings', () => {
   assert.deepEqual(lookupMember('context', 'drawImage').arities, [3, 5, 9]);

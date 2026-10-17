@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createCompatCanvas } from '../../src/index.js';
-import { createCompatError, ERROR_CODES, rollbackInitialization } from '../../src/contracts/errors.js';
+import { createCompatCanvas } from '../../dist/index.js';
+import { createCompatError, ERROR_CODES, rollbackInitialization } from '../../dist/contracts/errors.js';
 
 test('unimplemented factory fails explicitly without touching the target', () => {
   const target = new Proxy({}, { get() { throw Error('Target was touched'); } });

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { contextDescriptors } from '../../src/contracts/features.js';
+import { contextDescriptors } from '../../dist/contracts/features.js';
 
 test('registered feature dispatches with its receiver while unknown names stay absent', () => {
   const descriptors = contextDescriptors([{ id: 'rect', members: { fillRect: { value() { return this; } } } }]);
