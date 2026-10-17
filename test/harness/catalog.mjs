@@ -1,9 +1,10 @@
+import { assertCurrentBuild } from "../../scripts/build-state.mjs";
 import { readFile } from "node:fs/promises";
 import { relative } from "node:path";
 import { pathToFileURL } from "node:url";
 import { discover } from "../../scripts/discover.mjs";
-import { SUPPORT_MATRIX } from "../../src/contracts/support.js";
-import { apiCases, interactionCases } from "../cases/manifest/index.js";
+import { SUPPORT_MATRIX } from "../../dist/contracts/support.js";
+import { apiCases, interactionCases } from "../../.build/test/cases/manifest/index.js";
 export const requiredCatalog = [...apiCases, ...interactionCases];
 export function validateCases(cases, requirements, required = requiredCatalog) {
   const ids = new Set();
@@ -44,6 +45,7 @@ export function validateCases(cases, requirements, required = requiredCatalog) {
   return cases;
 }
 export async function loadCatalog(root, selfTest = false) {
+  await assertCurrentBuild(root);
   const spec = await readFile(`${root}/docs/specs/canvas2d-webgl.md`, "utf8");
   const requirements = new Set(
     [
@@ -52,17 +54,18 @@ export async function loadCatalog(root, selfTest = false) {
     ].map((x) => (typeof x === "string" ? x : x[0])),
   );
   const paths = selfTest
-    ? [`${root}/test/fixtures/infrastructure.case.js`]
-    : await discover(`${root}/test/cases`, ".case.js");
+    ? [`${root}/test/fixtures/infrastructure.case.ts`]
+    : await discover(`${root}/test/cases`, ".case.ts");
   const definitions = [];
   for (const path of paths) {
-    const module = await import(pathToFileURL(path));
+    const compiled = `${root}/.build/${relative(root, path).replace(/\.ts$/, ".js")}`;
+    const module = await import(pathToFileURL(compiled));
     if (!Array.isArray(module.cases))
       throw Error(`Missing cases export: ${path}`);
     for (const c of module.cases)
       definitions.push({
         ...c,
-        module: "/" + relative(root, path).split("\\").join("/"),
+        module: "/" + relative(root, compiled).split("\\").join("/"),
       });
   }
   validateCases(definitions, requirements);

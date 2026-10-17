@@ -1,4 +1,4 @@
-import type { CompatContext, CompatCanvas } from "../index.js";
+import type { CompatContext, CompatCanvas } from "../../src/api.js";
 /** Test-only protocol; never re-export from the public declaration or package exports. */
 export interface TestHooks {
   /** Scene FBO, RGBA8 straight sRGB, top-left row first; alpha=0 canonical RGB=0. */
@@ -12,11 +12,8 @@ export interface TestHooks {
   whenPresented(generation: number): Promise<void>;
   resourceCounts(): Readonly<Record<string, number>>;
 }
-export interface CaseMetadata {
-  readonly id: string;
-  readonly requirements: readonly string[];
-  readonly kind: "semantic" | "render" | "combined";
-}
+import type { CaseMetadata } from "../../src/contracts/support.js";
+export type { CaseMetadata } from "../../src/contracts/support.js";
 export interface CaseDefinition extends CaseMetadata {
   readonly seed: number;
   readonly width: number;

@@ -14,10 +14,10 @@ npm run test:browser -- --self-test --output test-results/local
 npm run test:report -- --run <run.json>
 npm run test:acceptance -- --run <run.json> --reviews <reviews.json>
 # 真实浏览器故障回归；本机默认不指定 GPU 后端。
-node scripts/harness-smoke.mjs
+npm run test:smoke
 # CI 明确选择 SwiftShader WebGL；环境字段记录实际 renderer，绝不重试降级。
-node scripts/harness-smoke.mjs --software
-# 后续特性实现后，自动发现 test/cases/**/*.case.js。
+npm run test:smoke -- --software
+# 后续特性实现后，自动发现 test/cases/**/*.case.ts。
 npm run test:browser -- --output test-results/compat
 npm run test:browser -- --output test-results/compat --case context.fillRect.render
 ```
@@ -30,11 +30,11 @@ npm run test:browser -- --output test-results/compat --case context.fillRect.ren
 
 ## 特性 agent 的接入方式
 
-每个特性在自己目录新增 `*.case.js`，导出 `cases` 数组，按 `types/internal/testing.d.ts` 的 `CaseDefinition` 提供：稳定 id、已批准 requirements、kind、尺寸、seed、fonts 及 `run(adapter)`。递归发现不跟随符号链接；重复 ID、未知 requirement、非法尺寸，以及降低必需 case 的 kind/requirements 均报错。最低目录没有实现的项明确标为 missing-implementation，不生成通过桩。
+每个特性在自己目录新增 `*.case.ts`，导出 `cases` 数组，按 `test/types/testing.ts` 的 `CaseDefinition` 提供：稳定 id、已批准 requirements、kind、尺寸、seed、fonts 及 `run(adapter)`。递归发现不跟随符号链接；重复 ID、未知 requirement、非法尺寸，以及降低必需 case 的 kind/requirements 均报错。最低目录没有实现的项明确标为 missing-implementation，不生成通过桩。
 
-```js
-/** @type {import('../../../types/internal/testing.js').CaseDefinition[]} */
-export const cases = [{
+```ts
+import type { CaseDefinition } from '../../types/testing.js';
+export const cases: CaseDefinition[] = [{
   id: 'context.fillRect.render', requirements: ['context.fillRect'],
   kind: 'render', width: 64, height: 64, seed: 1, fonts: [],
   run({context}) { context.fillStyle = '#123456'; context.fillRect(4, 4, 40, 40); },
@@ -52,7 +52,7 @@ export const cases = [{
 
 ## GPU / facade agent 接线
 
-`test/harness/bridge.js` 的 `hooksFor(compatCanvas)` 是唯一测试侧接线点。GPU/facade owner 将其替换成私有实例映射 lookup 的 import；不修改公开 canvas/context/options，不在 package exports 新增测试 API。当前明确抛 test-hooks-unavailable。工厂仍从真实 `src/index.js` 导入，不能以 fixture 工厂或全原生实现冒充兼容库。
+`test/harness/bridge.js` 的 `hooksFor(compatCanvas)` 是唯一测试侧接线点。GPU/facade owner 将其替换成私有实例映射 lookup 的 import；不修改公开 canvas/context/options，不在 package exports 新增测试 API。当前明确抛 test-hooks-unavailable。工厂从真实 `src/index.ts` 的编译产物 `dist/index.js` 导入，不能以 fixture 工厂或全原生实现冒充兼容库。
 
 钩子 readScene 返回直通 RGBA8 sRGB、左上行优先、alpha=0 RGB=0；whenPresented 只等待已排队提交，不触发提交。generation 变化/lost/dispose 应 reject。测试模块读取 scene，浏览器 driver 另用合成器截图读取目标元素显示，两类证据互不替代。截图有白色页面背景，场景 PNG 保留透明度；reference/actual 使用同一背景，不把两种不同表面直接做差分。
 
@@ -82,3 +82,11 @@ npm run test:acceptance -- --run <run.json> --reviews <reviews.json>
 新增 self.display-difference 仅在 actual 页面覆盖 4×3 的品红色 DOM 块，scene 应相同、display 应有 12 个差异像素，且分别核对 reference/actual 颜色，避免产物接反也通过。self.render-error 在抛错前绘制红色矩形，回归直接核对两张场景 PNG 的已绘制及未绘制位置。
 
 采集在写文件之前校验输出路径：仓内仅允许被 Git 忽略的 test-results/，路径先解析符号链接；仓外目录可用。报告包含导入的人工/AI身份、日期、verdict和notes，即使记录过期也显示原文供排查，但有效性仍由门禁判断，不因展示记录而放行。
+
+## TypeScript 用例与构建
+
+运行库 `src/**/*.ts`、共享接口及浏览器用例 `test/cases/**/*.case.ts` 均进入 strict 类型检查，并开启 noUncheckedIndexedAccess、noImplicitOverride、verbatimModuleSyntax。Node 工程脚本和测试驱动仍使用 .mjs / .js，不作为生产实现模板。类型导入使用 import type；相对 ESM import 保持 .js 后缀，TypeScript 编译时解析到 .ts 文件。
+
+`npm run build` 清理旧产物，将运行库编译到 dist，测试用例编译到 .build/test。类型入口 dist/index.d.ts 从实现生成，另用包入口消费测试验证正反类型约束，不维护第二份公开声明。产物目录均被忽略。
+
+使用 npm run test:unit / test:browser / test:report / test:acceptance / test:smoke 会先构建；直接调用底层 node 脚本前需自行 npm run build。采集和报告入口检查源快照及编译产物 hash，发现缺失、过期或被修改的编译产物立即失败，避免用旧 JS 验证新 TS。修改源码/用例/协作文档后应重新构建。

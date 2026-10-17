@@ -14,13 +14,13 @@ export async function serve(root) {
         return;
       }
       const name = decodeURIComponent(url.pathname);
-      if (!/^\/(src|test)\//.test(name)) {
+      if (!/^\/(dist|test|\.build)\//.test(name)) {
         res.writeHead(404).end();
         return;
       }
       const path = await realpath(resolve(base, "." + name));
       if (
-        !["src", "test"].some((dir) =>
+        !["dist", "test", ".build"].some((dir) =>
           path.startsWith(resolve(base, dir) + sep),
         )
       )

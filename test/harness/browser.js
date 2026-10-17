@@ -1,4 +1,4 @@
-import { createCompatCanvas } from "../../src/index.js";
+import { createCompatCanvas } from "../../dist/index.js";
 import { hooksFor } from "./bridge.js";
 export function blocked(message) {
   return Object.assign(new Error(message), { code: "harness-blocked" });

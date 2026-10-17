@@ -117,7 +117,7 @@ try {
     const result = await page.evaluate(async () => {
       const { execute } = await import("/test/harness/browser.js");
       return execute({
-        module: "/test/fixtures/infrastructure.case.js",
+        module: "/.build/test/fixtures/infrastructure.case.js",
         id: "self.native-pair",
         mode: "compat",
       });

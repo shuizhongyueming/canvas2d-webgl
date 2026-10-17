@@ -6,24 +6,24 @@
 
 这是工程与协作契约，不是可用渲染器。公开入口 `createCompatCanvas` 始终同步抛 `not-implemented`；任何目标属性都不会被读取或修改。真实创建入口由公开画布票实现。不要将契约单测通过当成 Canvas 兼容性通过。
 
-- JavaScript ESM + JSDoc，开发机 Node >=22；Node 版本不代表 vivo 的 JS 运行时要求。
+- strict TypeScript + ESM，开发机 Node >=22；Node 版本不代表 vivo 的 JS 运行时要求。
 - `npm ci --ignore-scripts` 安装锁定的类型检查和测试开发依赖；生产代码无 npm 运行依赖。
-- `npm run check` 检查 JS/JSDoc、内部声明和公开类型约束；`npm run build` 将 runtime JS 放入 dist，不降级语法或植入平台 polyfill。
+- `npm run check` 检查 TypeScript 源码、共享契约和公开类型约束；`npm run build` 用 tsc 编译为 ES2020 ESM JS 与 .d.ts 放入 dist，并编译浏览器用例；不植入平台 polyfill。
 - `npm run test:unit` 递归发现 `test/**/*.test.mjs`，空目录退出 2。包含工程契约及测试设施纯逻辑回归。
-- `npm run verify` = 类型检查 + 构建 + 单测。CI 同时运行真实 Chromium 设施自检，仍不代表兼容性验收。
-- package 只导出 `createCompatCanvas`，类型入口为 `types/index.d.ts`；测试钩子、内部声明和测试脚本没有 package 子路径导出。当前 private，不做发布。
+- `npm run verify` = 类型检查 + 构建（含生成类型的消费检查）+ 单测。CI 同时运行真实 Chromium 设施自检，仍不代表兼容性验收。
+- package 只导出 `createCompatCanvas`，类型入口为生成的 `dist/index.d.ts`；测试钩子、内部声明和测试脚本没有 package 子路径导出。当前 private，不做发布。
 
 ## 文件与接口所有权
 
 | 文件/目录 | 后续 owner |
 | --- | --- |
-| `types/index.d.ts`, `src/index.js` | 公开画布票接线；改变公开声明须核对规格 |
-| `src/contracts/support.js` | 支持矩阵公共契约；不能由某个特性扩大范围 |
-| `src/contracts/errors.js` | 稳定错误及初始化回滚；能力检测模块消费 |
-| `src/contracts/features.js` | context 组装机制；状态/context 票消费 |
-| `types/internal/contracts.d.ts` | 下列共享数据/模块接口；消费者共同协调变更 |
-| `types/internal/testing.d.ts` | 测试设施票消费并实现驱动，GPU票实现钩子 |
-| `test/cases/manifest/index.js` | 最低 API/交互验收目录，声明不等于已执行 |
+| `src/api.ts`, `src/index.ts` | 公开画布票接线；改变公开声明须核对规格 |
+| `src/contracts/support.ts` | 支持矩阵公共契约；不能由某个特性扩大范围 |
+| `src/contracts/errors.ts` | 稳定错误及初始化回滚；能力检测模块消费 |
+| `src/contracts/features.ts` | context 组装机制；状态/context 票消费 |
+| `src/internal/contracts.ts` | 下列共享数据/模块接口；消费者共同协调变更 |
+| `test/types/testing.ts` | 测试设施票消费并实现驱动，GPU票实现钩子 |
+| `test/cases/manifest/index.ts` | 最低 API/交互验收目录，声明不等于已执行 |
 | `scripts/testing.mjs`, `test/harness/`, `test/report/` | 测试设施票接管真实运行器和报告 |
 | `.github/workflows/contracts.yml` | 测试设施票后续增加真实浏览器门槛，届时移除“驱动必须缺失”的基础阶段检查 |
 
@@ -35,7 +35,7 @@
 
 ## 数据约定
 
-代码级结构见 `types/internal/contracts.d.ts`，以下内容同样是接口的一部分。
+代码级结构见 `src/internal/contracts.ts`，以下内容同样是接口的一部分。
 
 - `Matrix` 为 `[a,b,c,d,e,f]`，Canvas 列向量变换，设备像素左上原点、y向下。几何和纹理坐标转换只在设备入口处理，不在各特性重复翻转。
 - `Color` 是直通 sRGB `[r,g,b,a]`，每通道 0..1。GPU场景纹理为预乘alpha，上传/着色只预乘一次。`RasterSource.alpha` 描述输入颜色语义，不推断浏览器画布内部的存储格式；原生canvas上传通过WebGL unpack约定转换。
@@ -77,10 +77,10 @@
 
 `SUPPORT_MATRIX` 逐项声明target/name/kind/owner/policy、受支持的参数数量、取值、图像来源和原生默认值；它不记录实现进度。默认lineJoin=miter、textAlign=start、textBaseline=alphabetic不表示允许写入矩阵外合法值。
 
-`REQUIRED_CASES` 按成员合同、重载、取值、来源及绘制结果分配最低case ID。ID由成员和具体值生成，不能重用或更改含义；新增组合可另加case，不能删最低目录以消除失败。`test/cases/manifest/index.js` 补充跨特性case ID。它们是验收需求目录，**没有可运行用例，不能计为通过**。
+`REQUIRED_CASES` 按成员合同、重载、取值、来源及绘制结果分配最低case ID。ID由成员和具体值生成，不能重用或更改含义；新增组合可另加case，不能删最低目录以消除失败。`test/cases/manifest/index.ts` 补充跨特性case ID。它们是验收需求目录，**没有可运行用例，不能计为通过**。
 
 - 工程单测：`test/**/*.test.mjs`，Node内置test runner自动发现，文件排序稳定，不跟随符号链接。
-- 后续浏览器用例：`test/cases/<feature>/*.case.js`，命名导出 `cases: CaseDefinition[]`；设施票递归发现、检查重复id与未知requirement，核对最低目录并单列missing。
+- 后续浏览器用例：`test/cases/<feature>/*.case.ts`，命名导出 `cases: CaseDefinition[]`；设施票递归发现、检查重复id与未知requirement，核对最低目录并单列missing。
 - `CaseDefinition.requirements` 引用矩阵的member id（例如`context.drawImage`）或规格id（例如`IMG-02`）；一个case可覆盖多个要求。case id仍须唯一，必需目录中的ID必须被显式实现。
 - 两个adapter独立运行同一case，不共享参考像素或被测算法。语义差异也使用明确断言/观测值。模板type中的unknown需由测试设施adapter提供原生/兼容具体类型，不能直接断言为全量CanvasRenderingContext2D而隐藏不支持API。
 

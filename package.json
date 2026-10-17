@@ -6,13 +6,12 @@
   "description": "Canvas 2D compatibility contracts for a WebGL 1 renderer",
   "exports": {
     ".": {
-      "types": "./types/index.d.ts",
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     }
   },
   "files": [
     "dist",
-    "types/index.d.ts",
     "README.md"
   ],
   "sideEffects": false,
@@ -24,7 +23,13 @@
     "test:browser": "node scripts/testing.mjs browser",
     "test:report": "node scripts/testing.mjs report",
     "test:acceptance": "node scripts/testing.mjs acceptance",
-    "verify": "npm run check && npm run build && npm run test:unit"
+    "verify": "npm run check && npm run test:unit",
+    "pretest:unit": "npm run build",
+    "pretest:browser": "npm run build",
+    "pretest:report": "npm run build",
+    "pretest:acceptance": "npm run build",
+    "test:smoke": "node scripts/harness-smoke.mjs",
+    "pretest:smoke": "npm run build"
   },
   "engines": {
     "node": ">=22"

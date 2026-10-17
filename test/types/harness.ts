@@ -1,4 +1,4 @@
-import type { CaseDefinition } from "../../types/internal/testing.js";
+import type { CaseDefinition } from "./testing.js";
 const definition: CaseDefinition = {
   id: "example",
   requirements: ["CAN-02"],

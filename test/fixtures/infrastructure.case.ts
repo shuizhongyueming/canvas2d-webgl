@@ -1,5 +1,6 @@
+import type { CaseAdapter, CaseDefinition } from "../types/testing.js";
 // Infrastructure only: these cases never satisfy the compatibility catalog.
-const base = {
+const base: Omit<CaseDefinition, "id" | "run"> = {
   requirements: ["ACC-02"],
   kind: "combined",
   width: 96,
@@ -7,7 +8,7 @@ const base = {
   seed: 42,
   fonts: ["16px sans-serif"],
 };
-function draw(a) {
+function draw(a: CaseAdapter) {
   const c = a.context;
   c.fillStyle = "#3469a0";
   c.fillRect(4, 4, 60, 40);
@@ -20,7 +21,7 @@ function draw(a) {
   a.observe("width", c.measureText("Canvas").width);
   a.observe("seeded-input", a.random());
 }
-export const cases = [
+export const cases: CaseDefinition[] = [
   { ...base, id: "self.native-pair", run: draw },
   { ...base, id: "self.local-difference", run: draw },
   { ...base, id: "self.display-difference", run: draw },

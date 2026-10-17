@@ -18,7 +18,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Real Chromium infrastructure regressions
         # Explicit software WebGL environment, recorded in the evidence. No fallback retry.
-        run: node scripts/harness-smoke.mjs --software
+        run: npm run test:smoke -- --software
       - uses: actions/upload-artifact@v4
         if: always()
         with:
