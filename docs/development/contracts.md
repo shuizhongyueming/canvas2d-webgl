@@ -92,7 +92,7 @@
 | --- | --- | --- |
 | `test:browser` | `--output <dir>`；可选`--case <id>` | TestRun JSON、原生/实际/差异图；0采集完成且语义无失败，不代表像素验收通过 |
 | `test:report` | `--run <run.json>` | 可查看渲染对与逐case状态的报告；不自动接受评审 |
-| `test:acceptance` | `--run <run.json> --reviews <reviews.json>` | 核对必需集合、真实compat运行、语义和评审；仅全量通过才退出0 |
+| `test:acceptance` | `--run <run.json> [--reviews <reviews.json>]` | 核对必需集合、真实compat运行、语义和评审；仅全量通过才退出0 |
 
 通用退出码：0本命令完成、1失败/非法输入、2阻塞/未执行/待评审。三个入口已实现；browser 需 --output，report/acceptance 需 --run。缺评审时 acceptance 退出2；报告生成成功不代表验收成功。
 

@@ -34,6 +34,8 @@ export async function assess(run, reviews, { directory, required, source }) {
   if (run.scope !== "compatibility")
     problem("infrastructure-only: cannot accept compatibility");
   if (run.error) problem(run.error);
+  if (run.dirty !== false)
+    problem("dirty-source: recollect from a clean commit");
   if (run.commit !== source.commit || run.sourceHash !== source.sourceHash)
     problem("stale-source");
   if (

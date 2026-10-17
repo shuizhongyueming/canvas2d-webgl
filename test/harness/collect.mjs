@@ -1,8 +1,9 @@
+import { validateOutput } from "./output.mjs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
-import { loadCatalog, requiredCatalog } from "./catalog.mjs";
+import { loadCatalog, requiredCases, SELF_TEST_CASE_IDS } from "./catalog.mjs";
 import { launchDriver } from "./driver.mjs";
 import { serve } from "./server.mjs";
 import { provenance } from "./provenance.mjs";
@@ -24,23 +25,21 @@ const metadata = (c) => ({
   seed: c.seed,
 });
 export async function collect(root, options) {
+  await validateOutput(root, options.output);
   const catalog = await loadCatalog(root, options.selfTest);
   const defaults = options.selfTest
-    ? catalog.filter((c) =>
-        ["self.native-pair", "self.local-difference"].includes(c.id),
-      )
+    ? catalog.filter((c) => SELF_TEST_CASE_IDS.includes(c.id))
     : catalog;
   const selected = options.caseId
     ? catalog.filter((c) => c.id === options.caseId)
     : defaults;
   if (options.caseId && !selected.length)
     throw Error(`Unknown case: ${options.caseId}`);
-  const required = options.selfTest
-    ? defaults
-    : [
-        ...requiredCatalog,
-        ...catalog.filter((c) => !requiredCatalog.some((r) => r.id === c.id)),
-      ];
+  const required = requiredCases(
+    catalog,
+    options.selfTest,
+    selected.map((c) => c.id),
+  );
   const source = await provenance(root);
   const run = {
     schemaVersion: 1,
@@ -113,6 +112,19 @@ export async function collect(root, options) {
             },
           );
           if (pair[side].scene) {
+            if (
+              options.selfTest &&
+              c.id === "self.display-difference" &&
+              side === "actual"
+            ) {
+              // Real DOM overlay changes the compositor only, never the canvas bitmap.
+              await page.evaluate(() => {
+                const overlay = document.createElement("div");
+                overlay.style.cssText =
+                  "position:absolute;left:80px;top:4px;width:4px;height:3px;background:rgb(255,0,255);pointer-events:none";
+                document.body.append(overlay);
+              });
+            }
             pair[side].display = await page.screenshot();
             pair[side].scene = {
               width: pair[side].scene.width,
@@ -160,6 +172,14 @@ export async function collect(root, options) {
       if (errors.length) result.error = errors.join("\n");
       if (result.semantic === "fail" && !result.error)
         result.error = "Semantic observations or assertions differ";
+      if (options.selfTest && c.id === "self.display-difference")
+        result.injection = {
+          x: 80,
+          y: 4,
+          width: 4,
+          height: 3,
+          surface: "display-only-dom-overlay",
+        };
       if (ref.scene && act.scene) {
         if (options.selfTest && c.id === "self.local-difference") {
           // Deliberate single-pixel mutation tests the locator, never tolerance calibration.

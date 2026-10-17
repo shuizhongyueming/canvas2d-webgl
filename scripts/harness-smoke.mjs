@@ -1,7 +1,9 @@
 // Real-browser infrastructure regressions; separate from deterministic Node tests.
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
-import { resolve } from "node:path";
+import { readFile } from "node:fs/promises";
+import { decode } from "../test/harness/evidence.mjs";
+import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { collect } from "../test/harness/collect.mjs";
 import { launchDriver } from "../test/harness/driver.mjs";
@@ -27,6 +29,29 @@ assert.deepEqual(injected.difference.scene.bounds, {
   width: 1,
   height: 1,
 });
+const displayInjected = normal.run.results.find(
+  (r) => r.caseId === "self.display-difference",
+);
+assert.equal(displayInjected.difference.scene.changedPixels, 0);
+assert.equal(displayInjected.difference.display.changedPixels, 12);
+assert.deepEqual(displayInjected.difference.display.bounds, {
+  x: 80,
+  y: 4,
+  width: 4,
+  height: 3,
+});
+const displayDir = dirname(normal.path);
+const pixel = (png, x, y) => [
+  ...png.data.subarray((y * png.width + x) * 4, (y * png.width + x) * 4 + 4),
+];
+const displayActual = decode(
+  await readFile(join(displayDir, displayInjected.artifacts.displayActual)),
+);
+const displayReference = decode(
+  await readFile(join(displayDir, displayInjected.artifacts.displayReference)),
+);
+assert.deepEqual(pixel(displayActual, 80, 4), [255, 0, 255, 255]);
+assert.deepEqual(pixel(displayReference, 80, 4), [255, 255, 255, 255]);
 for (const [caseId, code, pattern] of [
   ["self.render-error", 1, /injected drawing failure/],
   ["self.skip", 2, /skip:/],
@@ -38,11 +63,36 @@ for (const [caseId, code, pattern] of [
     result.run.results.find((r) => r.caseId === caseId).error,
     pattern,
   );
-  if (caseId === "self.render-error")
-    assert.ok(
-      result.run.results.find((r) => r.caseId === caseId).artifactHash,
-      "drawing failures retain partial images",
+  if (caseId === "self.render-error") {
+    const evidence = result.run.results.find((r) => r.caseId === caseId);
+    for (const key of ["reference", "actual"]) {
+      const png = decode(
+        await readFile(join(dirname(result.path), evidence.artifacts[key])),
+      );
+      assert.deepEqual(
+        pixel(png, 10, 10),
+        [255, 0, 0, 255],
+        "failure retains drawn red rectangle",
+      );
+      assert.deepEqual(
+        pixel(png, 0, 0),
+        [0, 0, 0, 0],
+        "untouched scene remains transparent",
+      );
+    }
+  }
+  if (caseId === "self.skip") {
+    const check = spawnSync(
+      process.execPath,
+      ["scripts/testing.mjs", "acceptance", "--run", result.path],
+      { cwd: root, encoding: "utf8" },
     );
+    assert.equal(check.status, 2);
+    assert.doesNotMatch(
+      check.stdout,
+      /missing-required-declaration|unknown-required-case|unexpected-result/,
+    );
+  }
 }
 const gpu = await collect(root, { ...options, disableGPU: true });
 assert.equal(gpu.code, 2);

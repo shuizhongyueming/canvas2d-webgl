@@ -23,10 +23,13 @@ function draw(a) {
 export const cases = [
   { ...base, id: "self.native-pair", run: draw },
   { ...base, id: "self.local-difference", run: draw },
+  { ...base, id: "self.display-difference", run: draw },
   {
     ...base,
     id: "self.render-error",
-    run() {
+    run(a) {
+      a.context.fillStyle = "#ff0000";
+      a.context.fillRect(8, 8, 12, 10);
       throw Error("injected drawing failure");
     },
   },

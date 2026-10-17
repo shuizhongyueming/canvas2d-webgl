@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { assess } from "./acceptance.mjs";
@@ -34,6 +34,7 @@ async function fixture(t) {
     runId: "run-a",
     ...source,
     scope: "compatibility",
+    dirty: false,
     environment,
     environmentHash: jsonHash(environment),
     requiredCaseIds: ["case"],
@@ -151,4 +152,25 @@ test("explicit rejection, semantic failure and duplicate records fail", async (t
   f.run.results[0].semantic = "not-applicable";
   f.run.results.push(f.run.results[0]);
   assert.equal((await assess(f.run, f.reviews, f.options)).code, 1);
+});
+
+test("dirty or unspecified source snapshots cannot be accepted despite valid reviews", async (t) => {
+  const f = await fixture(t);
+  for (const dirty of [true, undefined]) {
+    const run = { ...f.run, dirty };
+    assert.equal((await assess(run, f.reviews, f.options)).code, 2);
+  }
+});
+
+test("report displays imported identities and notes without treating stale reviews as valid", async (t) => {
+  const f = await fixture(t);
+  f.reviews[0].human.reviewer = "<script>not markup</script>";
+  f.reviews[0].commit = "old";
+  const assessment = await assess(f.run, f.reviews, f.options);
+  assert.equal(assessment.code, 2);
+  const path = await report(f.run, assessment, f.options.directory, f.reviews);
+  const html = await readFile(path, "utf8");
+  assert.match(html, /&lt;script&gt;not markup&lt;\/script&gt;/);
+  assert.match(html, /pending-review/);
+  assert.match(html, /Synthetic validator unit test only/);
 });

@@ -105,7 +105,6 @@ export async function execute({ module, id, mode, timeout = 10000 }) {
   let compat, target, context, hooks, definition;
   const observations = {},
     checks = [];
-  globalThis.__harnessCleanup = () => compat?.dispose();
   try {
     const { cases } = await import(module);
     definition = cases.find((c) => c.id === id);

@@ -68,3 +68,21 @@ export async function loadCatalog(root, selfTest = false) {
   validateCases(definitions, requirements);
   return definitions;
 }
+
+export const SELF_TEST_CASE_IDS = Object.freeze([
+  "self.native-pair",
+  "self.local-difference",
+  "self.display-difference",
+]);
+// The same catalog policy is used by collection and subsequent assessment.
+export function requiredCases(catalog, selfTest, selectedCaseIds = []) {
+  if (selfTest)
+    return catalog.filter(
+      (c) =>
+        SELF_TEST_CASE_IDS.includes(c.id) || selectedCaseIds.includes(c.id),
+    );
+  return [
+    ...requiredCatalog,
+    ...catalog.filter((c) => !requiredCatalog.some((r) => r.id === c.id)),
+  ];
+}

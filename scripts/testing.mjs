@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { collect } from "../test/harness/collect.mjs";
 import { assess } from "../test/harness/acceptance.mjs";
 import { report } from "../test/report/report.mjs";
-import { loadCatalog, requiredCatalog } from "../test/harness/catalog.mjs";
+import { loadCatalog, requiredCases } from "../test/harness/catalog.mjs";
 import { provenance } from "../test/harness/provenance.mjs";
 const root = fileURLToPath(new URL("../", import.meta.url));
 try {
@@ -66,15 +66,11 @@ try {
       root,
       run.scope === "infrastructure-self-test",
     );
-    const required =
-      run.scope === "infrastructure-self-test"
-        ? catalog.filter((c) => run.selectedCaseIds.includes(c.id))
-        : [
-            ...requiredCatalog,
-            ...catalog.filter(
-              (c) => !requiredCatalog.some((r) => r.id === c.id),
-            ),
-          ];
+    const required = requiredCases(
+      catalog,
+      run.scope === "infrastructure-self-test",
+      run.selectedCaseIds,
+    );
     const assessment = await assess(run, reviews, {
       directory,
       required,
@@ -83,7 +79,7 @@ try {
     if (stage === "report") {
       console.log(
         JSON.stringify({
-          report: await report(run, assessment, directory),
+          report: await report(run, assessment, directory, reviews),
           acceptance: assessment.status,
         }),
       );

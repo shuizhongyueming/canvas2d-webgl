@@ -8,7 +8,7 @@ Node >=22，`npm ci --ignore-scripts`，然后 `npx playwright install chromium`
 
 ```sh
 npm run verify
-# 设施自检：正常原生对照 + 单像素故障定位；每次生成新的 UUID 子目录。
+# 设施自检：正常原生对照 + 单像素故障定位 + 显示面 DOM overlay 定位；每次生成新的 UUID 子目录。
 npm run test:browser -- --self-test --output test-results/local
 # 命令输出完整 run.json 路径，用它替换下方 <run.json>。
 npm run test:report -- --run <run.json>
@@ -58,7 +58,7 @@ export const cases = [{
 
 ## 报告与评审
 
-每个像素用例产生六张 PNG：scene reference / actual / difference，以及 display reference / actual / difference。差异图只把任何 RGBA 差异标紫色，记录 changedPixels 和包围框供定位，**没有阈值、分类、平均误差准入或自动像素通过**。尺寸不一致为执行失败。设施自检的单像素注入仅在 actual 的 scene 产物中，报告明确标记 injection，不能进入兼容证据。
+每个像素用例产生六张 PNG：scene reference / actual / difference，以及 display reference / actual / difference。差异图只把任何 RGBA 差异标紫色，记录 changedPixels 和包围框供定位，**没有阈值、分类、平均误差准入或自动像素通过**。尺寸不一致记为测试失败（semantic: fail，退出 1；execution: executed 表示已尝试执行）。设施自检的单像素注入仅在 actual 的 scene 产物中，报告明确标记 injection，不能进入兼容证据。
 
 `test:report` 生成可离线打开的 `report.html`，含嵌入图片、搜索框、三类状态、公开语义观测和环境。缺产物展示错误。`reviews.template.json` 的 human / ai 均为 null；复制为 `reviews.json` 后由真正评审者填写身份、日期、verdict（accepted/rejected），AI 另填 notes。代理不能代填人类确认。再运行：
 
@@ -70,3 +70,15 @@ npm run test:acceptance -- --run <run.json> --reviews <reviews.json>
 评审逐 case 绑定 runId、commit、sourceHash、environmentHash 与包含全部六张图的 artifactHash。验收重新读文件计算 hash、验证 PNG 和路径；检查当前源码及当前必需目录，忽略 run 里声称的 render: accepted，重新推导状态。重复记录、旧评审、缺任何一张图、skip、missing 都不放行。评审导入不修改原始 run，重新生成报告即可关联。记录是本地评审声明，不提供身份认证或防恶意篡改签名。
 
 设施自检始终保持 infrastructure-self-test 范围，即使所有图片获评审也不能成为兼容验收。当前没有实际 compat 渲染对，因此没有提交人工像素通过记录，也不宣称七场景或 vivo 验证。
+
+## 审查后明确的验收边界
+
+`--reviews` 为可选参数；省略时按空评审集合处理，像素用例 pending-review，验收退出 2。开发中允许采集 dirty run 以调试和查看报告，但正式 acceptance 要求 `dirty === false`，缺少 dirty 字段也不会放行；提交后须重新采集，不能用旧 run 或旧评审作为新提交证据。
+
+环境中的 GL attributes 当前来自独立探针，证明浏览器基础能力，不能视为被测 compat target 的配置证据。GPU/facade 接线时须补充真实 target 的属性、尺寸和 stencil 核验。当前没有真实 compat 渲染验收。
+
+`execution: executed` 表示已经尝试执行，并不代表运行成功；当前协议没有 failed execution 枚举。产物解码或尺寸不符沿用 `semantic: fail` + error，退出 1；这是测试失败，不是像素评审 rejected。未知初始化错误也保持失败，不能默认当成环境不足来跳过。
+
+新增 self.display-difference 仅在 actual 页面覆盖 4×3 的品红色 DOM 块，scene 应相同、display 应有 12 个差异像素，且分别核对 reference/actual 颜色，避免产物接反也通过。self.render-error 在抛错前绘制红色矩形，回归直接核对两张场景 PNG 的已绘制及未绘制位置。
+
+采集在写文件之前校验输出路径：仓内仅允许被 Git 忽略的 test-results/，路径先解析符号链接；仓外目录可用。报告包含导入的人工/AI身份、日期、verdict和notes，即使记录过期也显示原文供排查，但有效性仍由门禁判断，不因展示记录而放行。
