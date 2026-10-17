@@ -7,10 +7,10 @@
 这是工程与协作契约，不是可用渲染器。公开入口 `createCompatCanvas` 始终同步抛 `not-implemented`；任何目标属性都不会被读取或修改。真实创建入口由公开画布票实现。不要将契约单测通过当成 Canvas 兼容性通过。
 
 - JavaScript ESM + JSDoc，开发机 Node >=22；Node 版本不代表 vivo 的 JS 运行时要求。
-- `npm ci --ignore-scripts` 安装锁定的类型检查开发依赖；生产代码无 npm 运行依赖。
+- `npm ci --ignore-scripts` 安装锁定的类型检查和测试开发依赖；生产代码无 npm 运行依赖。
 - `npm run check` 检查 JS/JSDoc、内部声明和公开类型约束；`npm run build` 将 runtime JS 放入 dist，不降级语法或植入平台 polyfill。
-- `npm run test:unit` 递归发现 `test/**/*.test.mjs`，空目录退出 2。当前仅执行工程契约测试。
-- `npm run verify` = 类型检查 + 构建 + 单测。CI 的 job 名和总结明确限定为 foundation contracts。
+- `npm run test:unit` 递归发现 `test/**/*.test.mjs`，空目录退出 2。包含工程契约及测试设施纯逻辑回归。
+- `npm run verify` = 类型检查 + 构建 + 单测。CI 同时运行真实 Chromium 设施自检，仍不代表兼容性验收。
 - package 只导出 `createCompatCanvas`，类型入口为 `types/index.d.ts`；测试钩子、内部声明和测试脚本没有 package 子路径导出。当前 private，不做发布。
 
 ## 文件与接口所有权
@@ -86,7 +86,7 @@
 
 ## 测试CLI和观测协议
 
-本票定义协议，真实驱动由[测试设施票](https://github.com/shuizhongyueming/canvas2d-webgl/issues/11)实施。选择可替换的真实Chromium浏览器driver，当前本机验证优先ego-browser；CI可配置独立Chromium driver，须真实执行WebGL 1并记录差异环境，不将个人浏览器会话作为CI依赖。
+真实驱动及操作说明见[测试设施](testing.md)。选择可替换的真实Chromium浏览器driver，当前本机验证优先ego-browser；CI可配置独立Chromium driver，须真实执行WebGL 1并记录差异环境，不将个人浏览器会话作为CI依赖。
 
 | 命令 | 后续固定输入 | 后续输出与退出语义 |
 | --- | --- | --- |
@@ -94,7 +94,7 @@
 | `test:report` | `--run <run.json>` | 可查看渲染对与逐case状态的报告；不自动接受评审 |
 | `test:acceptance` | `--run <run.json> --reviews <reviews.json>` | 核对必需集合、真实compat运行、语义和评审；仅全量通过才退出0 |
 
-通用退出码：0本命令完成、1失败/非法输入、2阻塞/未执行/待评审。当前这三个命令都输出 `execution: blocked, reason: driver-not-implemented` 并退出2，不解析参数或生成伪运行报告。工程单测会验证这一点；设施票接管时将其改为真实驱动的缺GPU/缺评审等边界测试，并调整CI。
+通用退出码：0本命令完成、1失败/非法输入、2阻塞/未执行/待评审。三个入口已实现；browser 需 --output，report/acceptance 需 --run。缺评审时 acceptance 退出2；报告生成成功不代表验收成功。
 
 `TestHooks.readScene`只通过测试侧适配器获取实例关联，不能挂在公开canvas/context、options或package exports；取样不改变公开API。返回直通RGBA8、sRGB、左上行优先，alpha=0时RGB归零；GPU内部预乘读回的转换是钩子的责任。
 
@@ -104,4 +104,4 @@
 
 ## 后续接续
 
-本票PR评审合并后才能解除依赖。下一批是测试设施与七场景文档；后续状态、GPU、raster、paint票按上述接口落地。无需重新创建工程或测试注册表；若发现签名不足，应先在票中标明消费者及最小变更，再协调公共契约，不能静默重命名。
+工程契约已合并，测试设施接续见 testing.md；后续状态、GPU、raster、paint票按上述接口落地。无需重新创建工程或测试注册表；若发现签名不足，应先在票中标明消费者及最小变更，再协调公共契约，不能静默重命名。
