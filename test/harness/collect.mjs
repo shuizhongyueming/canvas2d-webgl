@@ -97,7 +97,6 @@ export async function collect(root, options) {
     } finally {
       await probe.close();
     }
-    run.environmentHash = jsonHash(run.environment);
     for (const c of selected) {
       const pair = {};
       for (const side of ["reference", "actual"]) {

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { diffPixels, hash } from "./evidence.mjs";
-import { validateCases } from "./catalog.mjs";
+import { validateCases, requiredCatalog } from "./catalog.mjs";
 test("a one-pixel error is localized without declaring rendering accepted", () => {
   const a = { width: 100, height: 100, data: Buffer.alloc(40000) };
   const b = { ...a, data: Buffer.from(a.data) };
@@ -36,4 +36,27 @@ test("case discovery rejects duplicates, unknown requirements and weakening requ
     () => validateCases([{ ...c, width: 0 }], new Set(["CAN-01"]), []),
     /dimensions/,
   );
+});
+
+test("every canonical required case can be registered, including brightness parentheses", () => {
+  // Registration fixtures only: these are not executed compatibility cases.
+  const cases = requiredCatalog.map((metadata) => ({
+    ...metadata,
+    width: 16,
+    height: 16,
+    seed: 1,
+    fonts: [],
+    run() {},
+  }));
+  const requirements = new Set(cases.flatMap((c) => c.requirements));
+  assert.ok(
+    cases.some((c) => c.id === "context.filter.value-brightness(120%25)"),
+  );
+  assert.doesNotThrow(() => validateCases(cases, requirements));
+  for (const id of ["bad/id", "bad id", "bad?id", "bad#id"]) {
+    assert.throws(
+      () => validateCases([{ ...cases[0], id }], requirements),
+      /Invalid case id/,
+    );
+  }
 });

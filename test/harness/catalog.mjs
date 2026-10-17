@@ -8,7 +8,7 @@ export const requiredCatalog = [...apiCases, ...interactionCases];
 export function validateCases(cases, requirements, required = requiredCatalog) {
   const ids = new Set();
   for (const c of cases) {
-    if (!c || typeof c.id !== "string" || !/^[\w.:%-]+$/.test(c.id))
+    if (!c || typeof c.id !== "string" || !/^[\w.:%()-]+$/.test(c.id))
       throw Error("Invalid case id");
     if (ids.has(c.id)) throw Error(`Duplicate case: ${c.id}`);
     ids.add(c.id);
