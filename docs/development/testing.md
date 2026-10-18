@@ -4,22 +4,22 @@
 
 ## 安装及命令
 
-Node >=22，`npm ci --ignore-scripts`，然后 `npx playwright install chromium`（Linux CI 使用 `--with-deps`）。Playwright 和 pngjs 仅用于开发测试，生产包没有运行依赖或测试子路径导出。
+Node >=22，`pnpm install --frozen-lockfile --ignore-scripts`，然后 `pnpm exec playwright install chromium`（Linux CI 使用 `--with-deps`）。Playwright 和 pngjs 仅用于开发测试，生产包没有运行依赖或测试子路径导出。
 
 ```sh
-npm run verify
+pnpm run verify
 # 设施自检：正常原生对照 + 单像素故障定位 + 显示面 DOM overlay 定位；每次生成新的 UUID 子目录。
-npm run test:browser -- --self-test --output test-results/local
+pnpm run test:browser -- --self-test --output test-results/local
 # 命令输出完整 run.json 路径，用它替换下方 <run.json>。
-npm run test:report -- --run <run.json>
-npm run test:acceptance -- --run <run.json> --reviews <reviews.json>
+pnpm run test:report -- --run <run.json>
+pnpm run test:acceptance -- --run <run.json> --reviews <reviews.json>
 # 真实浏览器故障回归；本机默认不指定 GPU 后端。
-npm run test:smoke
+pnpm run test:smoke
 # CI 明确选择 SwiftShader WebGL；环境字段记录实际 renderer，绝不重试降级。
-npm run test:smoke -- --software
+pnpm run test:smoke -- --software
 # 后续特性实现后，自动发现 test/cases/**/*.case.ts。
-npm run test:browser -- --output test-results/compat
-npm run test:browser -- --output test-results/compat --case context.fillRect.render
+pnpm run test:browser -- --output test-results/compat
+pnpm run test:browser -- --output test-results/compat --case context.fillRect.render
 ```
 
 默认使用隔离的 Playwright Chromium，独立 browser context/page 确保 reference 与 actual 不共享 DOM、字体状态、随机状态或模块实例。`--executable <Chromium路径>` 可显式选当前安装的 Chromium；可在本机 ego-browser 查看报告和检查环境，CI 不依赖个人会话。`--software` 显式选择 SwiftShader，属于真实浏览器 WebGL 执行环境，不是 mock 或原生替代，不代表硬件 GPU 或 vivo 验证。默认没有缺 GPU 后自动降级的逻辑。若可用浏览器自选软件 renderer，原样记录 renderer，不隐瞒后端。
@@ -63,8 +63,8 @@ export const cases: CaseDefinition[] = [{
 `test:report` 生成可离线打开的 `report.html`，含嵌入图片、搜索框、三类状态、公开语义观测和环境。缺产物展示错误。`reviews.template.json` 的 human / ai 均为 null；复制为 `reviews.json` 后由真正评审者填写身份、日期、verdict（accepted/rejected），AI 另填 notes。代理不能代填人类确认。再运行：
 
 ```sh
-npm run test:report -- --run <run.json> --reviews <reviews.json>
-npm run test:acceptance -- --run <run.json> --reviews <reviews.json>
+pnpm run test:report -- --run <run.json> --reviews <reviews.json>
+pnpm run test:acceptance -- --run <run.json> --reviews <reviews.json>
 ```
 
 评审逐 case 绑定 runId、commit、sourceHash、environmentHash 与包含全部六张图的 artifactHash。验收重新读文件计算 hash、验证 PNG 和路径；检查当前源码及当前必需目录，忽略 run 里声称的 render: accepted，重新推导状态。重复记录、旧评审、缺任何一张图、skip、missing 都不放行。评审导入不修改原始 run，重新生成报告即可关联。记录是本地评审声明，不提供身份认证或防恶意篡改签名。
@@ -87,6 +87,6 @@ npm run test:acceptance -- --run <run.json> --reviews <reviews.json>
 
 运行库 `src/**/*.ts`、共享接口及浏览器用例 `test/cases/**/*.case.ts` 均进入 strict 类型检查，并开启 noUncheckedIndexedAccess、noImplicitOverride、verbatimModuleSyntax。Node 工程脚本和测试驱动仍使用 .mjs / .js，不作为生产实现模板。类型导入使用 import type；相对 ESM import 保持 .js 后缀，TypeScript 编译时解析到 .ts 文件。
 
-`npm run build` 清理旧产物，将运行库编译到 dist，测试用例编译到 .build/test。类型入口 dist/index.d.ts 从实现生成，另用包入口消费测试验证正反类型约束，不维护第二份公开声明。产物目录均被忽略。
+`pnpm run build` 清理旧产物，将运行库编译到 dist，测试用例编译到 .build/test。类型入口 dist/index.d.ts 从实现生成，另用包入口消费测试验证正反类型约束，不维护第二份公开声明。产物目录均被忽略。
 
-使用 npm run test:unit / test:browser / test:report / test:acceptance / test:smoke 会先构建；直接调用底层 node 脚本前需自行 npm run build。采集和报告入口检查源快照及编译产物 hash，发现缺失、过期或被修改的编译产物立即失败，避免用旧 JS 验证新 TS。修改源码/用例/协作文档后应重新构建。
+使用 pnpm run test:unit / test:browser / test:report / test:acceptance / test:smoke 会先构建；直接调用底层 node 脚本前需自行 pnpm run build。采集和报告入口检查源快照及编译产物 hash，发现缺失、过期或被修改的编译产物立即失败，避免用旧 JS 验证新 TS。修改源码/用例/协作文档后应重新构建。

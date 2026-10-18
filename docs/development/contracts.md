@@ -7,10 +7,10 @@
 这是工程与协作契约，不是可用渲染器。公开入口 `createCompatCanvas` 始终同步抛 `not-implemented`；任何目标属性都不会被读取或修改。真实创建入口由公开画布票实现。不要将契约单测通过当成 Canvas 兼容性通过。
 
 - 运行时、共享契约与浏览器用例使用 strict TypeScript + ESM；Node 构建与测试工具保留 JavaScript ESM。开发机 Node >=22；Node 版本不代表 vivo 的 JS 运行时要求。
-- `npm ci --ignore-scripts` 安装锁定的类型检查和测试开发依赖；生产代码无 npm 运行依赖。
-- `npm run check` 检查 TypeScript 源码、共享契约和公开类型约束；`npm run build` 用 tsc 编译为 ES2020 ESM JS 与 .d.ts 放入 dist，并编译浏览器用例；不植入平台 polyfill。
-- `npm run test:unit` 递归发现 `test/**/*.test.mjs`，空目录退出 2。包含工程契约及测试设施纯逻辑回归。
-- `npm run verify` = 类型检查 + 构建（含生成类型的消费检查）+ 单测。CI 同时运行真实 Chromium 设施自检，仍不代表兼容性验收。
+- `pnpm install --frozen-lockfile --ignore-scripts` 安装锁定的类型检查和测试开发依赖；生产代码无运行时依赖。
+- `pnpm run check` 检查 TypeScript 源码、共享契约和公开类型约束；`pnpm run build` 用 tsc 编译为 ES2020 ESM JS 与 .d.ts 放入 dist，并编译浏览器用例；不植入平台 polyfill。
+- `pnpm run test:unit` 递归发现 `test/**/*.test.mjs`，空目录退出 2。包含工程契约及测试设施纯逻辑回归。
+- `pnpm run verify` = 类型检查 + 构建（含生成类型的消费检查）+ 单测。CI 同时运行真实 Chromium 设施自检，仍不代表兼容性验收。
 - package 只导出 `createCompatCanvas`，类型入口为生成的 `dist/index.d.ts`；测试钩子、内部声明和测试脚本没有 package 子路径导出。当前 private，不做发布。
 
 ## 文件与接口所有权

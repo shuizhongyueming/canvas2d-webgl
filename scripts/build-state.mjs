@@ -34,7 +34,7 @@ export async function assertCurrentBuild(root) {
       throw Error("stale");
   } catch {
     throw Error(
-      "Missing, stale or modified TypeScript build; run npm run build",
+      "Missing, stale or modified TypeScript build; run pnpm run build",
     );
   }
 }

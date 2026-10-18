@@ -27,6 +27,6 @@
 
 ## 测试设施
 
-运行、用例接入与人工/AI评审见[真实浏览器测试指南](docs/development/testing.md)。`npm run test:smoke` 只验证设施，不代表兼容渲染通过。
+运行、用例接入与人工/AI评审见[真实浏览器测试指南](docs/development/testing.md)。`pnpm run test:smoke` 只验证设施，不代表兼容渲染通过。
 
-实现语言采用 **TypeScript（strict）**。公开类型从源码生成；后续 agent 使用 `src/**/*.ts` 和 `*.case.ts`，以 `npm run verify` 与 `npm run test:smoke -- --software` 验证。
+实现语言采用 **TypeScript（strict）**。公开类型从源码生成；后续 agent 使用 `src/**/*.ts` 和 `*.case.ts`，以 `pnpm run verify` 与 `pnpm run test:smoke -- --software` 验证。
