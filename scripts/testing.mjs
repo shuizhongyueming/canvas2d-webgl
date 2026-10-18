@@ -6,7 +6,7 @@ import { collect } from "../test/harness/collect.mjs";
 import { assess } from "../test/harness/acceptance.mjs";
 import { report } from "../test/report/report.mjs";
 import { loadCatalog, requiredCases } from "../test/harness/catalog.mjs";
-import { provenance } from "../test/harness/provenance.mjs";
+import { provenance } from "./provenance.mjs";
 const root = fileURLToPath(new URL("../", import.meta.url));
 try {
   const { values, positionals } = parseArgs({

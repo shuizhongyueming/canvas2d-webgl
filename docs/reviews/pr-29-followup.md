@@ -21,3 +21,20 @@ S2 / P5 的环境分类方向合理，但不能把所有未列出的契约异常
 S4 的统一产物 key 和 S6 的 execute 职责拆分是有效的可维护性建议，暂不在本轮扩大重构；固定六张产物仍由端到端自检和验收测试约束。CI 归属纠正 C1 同意，属于原先指定职责。
 
 以上为测试设施审查处置，不是人工像素评审，不代表生产渲染器、七场景或 vivo 验收。
+
+## TypeScript 迁移复审（基线 e823385）
+
+依据本地 `pr-29-typescript-refactor-review.md`，原报告不改写。
+
+| 意见 | 处置 |
+| --- | --- |
+| R1 | report 写入入口复用 validateOutput，拒绝仓内源码、dist、.build 等目录；回归确认拒绝后无 report.html。 |
+| R2 | HTML 区分 dirty、clean、unknown；只有 dirty 严格等于 false 才显示 clean，缺失值继续阻塞验收。 |
+| R3 | build 检查 dist 与 .build/test 的所有 JS，覆盖静态、动态和副作用 import，以及 re-export；新增拒绝 Node/裸包依赖的回归。此守卫不是完整 JavaScript 解析器或安全沙箱。 |
+| R5 | 明确 strict TS 覆盖运行时、共享契约和浏览器用例，Node 工具保留 JS；删除遗留“JS 形状”描述。 |
+| R6 | 通用 hash/provenance 移到 scripts，build 不再依赖 harness 或 pngjs；补充构建配置及生成类型消费测试的所有权。 |
+| R7（部分） | 补充 .build 产物修改拒绝测试，以及 dirty/unknown HTML 回归；注入坐标尚未抽取共享常量。 |
+
+R4（临时 .case.ts 发现/编译/加载全链路自动回归）、R8（评审身份独立性约束）、N1（未构建时静态 import 的错误提示）、N2（测试元数据类型归属）保留为非阻塞跟进项。本轮未实现，不计为关闭。人工与 AI 身份仍由流程保证，字段校验不提供身份认证。
+
+验证：类型检查、构建和 29 项单测通过；提交后的 Chromium 软件 WebGL 自检另见 PR 验证记录。以上仍不是 compat 像素验收。

@@ -1,9 +1,9 @@
-import { provenance } from "../test/harness/provenance.mjs";
+import { provenance } from "./provenance.mjs";
 import { recordBuild } from "./build-state.mjs";
-import { rm, cp, readFile } from "node:fs/promises";
+import { rm, cp } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import { discover } from "./discover.mjs";
+import { checkBrowserImports } from "./browser-imports.mjs";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const sourceHash = (await provenance(root)).sourceHash;
 await rm(new URL("../.build/", import.meta.url), {
@@ -32,14 +32,8 @@ for (const project of ["tsconfig.build.json", "tsconfig.package.json"]) {
       { recursive: true },
     );
 }
-const modules = await discover(root + "/dist", ".js");
-if (!modules.length) throw Error("No runtime modules to build");
-for (const path of modules) {
-  const text = await readFile(path, "utf8");
-  if (/\b(?:from\s*|import\s*\()\s*['"](?:node:|[^./])/.test(text))
-    throw Error(`Runtime import must be a relative browser module: ${path}`);
-}
+const moduleCount = await checkBrowserImports(root);
 await recordBuild(root, sourceHash);
 console.log(
-  `Compiled ${modules.length} TypeScript runtime modules, declarations and browser cases.`,
+  `Compiled ${moduleCount} TypeScript browser modules, declarations and browser cases.`,
 );

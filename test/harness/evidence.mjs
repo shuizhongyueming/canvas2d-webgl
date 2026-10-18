@@ -1,9 +1,8 @@
-import { createHash } from "node:crypto";
+import { hash, jsonHash } from "../../scripts/hash.mjs";
+export { hash, jsonHash } from "../../scripts/hash.mjs";
 import { readFile, realpath } from "node:fs/promises";
 import { resolve, sep } from "node:path";
 import { PNG } from "pngjs";
-export const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
-export const jsonHash = (value) => hash(JSON.stringify(value));
 export function diffPixels(a, b) {
   if (
     a.width !== b.width ||

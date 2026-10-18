@@ -6,7 +6,7 @@ import { isDeepStrictEqual } from "node:util";
 import { loadCatalog, requiredCases, SELF_TEST_CASE_IDS } from "./catalog.mjs";
 import { launchDriver } from "./driver.mjs";
 import { serve } from "./server.mjs";
-import { provenance } from "./provenance.mjs";
+import { provenance } from "../../scripts/provenance.mjs";
 import {
   hash,
   jsonHash,

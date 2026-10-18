@@ -6,7 +6,7 @@
 
 这是工程与协作契约，不是可用渲染器。公开入口 `createCompatCanvas` 始终同步抛 `not-implemented`；任何目标属性都不会被读取或修改。真实创建入口由公开画布票实现。不要将契约单测通过当成 Canvas 兼容性通过。
 
-- strict TypeScript + ESM，开发机 Node >=22；Node 版本不代表 vivo 的 JS 运行时要求。
+- 运行时、共享契约与浏览器用例使用 strict TypeScript + ESM；Node 构建与测试工具保留 JavaScript ESM。开发机 Node >=22；Node 版本不代表 vivo 的 JS 运行时要求。
 - `npm ci --ignore-scripts` 安装锁定的类型检查和测试开发依赖；生产代码无 npm 运行依赖。
 - `npm run check` 检查 TypeScript 源码、共享契约和公开类型约束；`npm run build` 用 tsc 编译为 ES2020 ESM JS 与 .d.ts 放入 dist，并编译浏览器用例；不植入平台 polyfill。
 - `npm run test:unit` 递归发现 `test/**/*.test.mjs`，空目录退出 2。包含工程契约及测试设施纯逻辑回归。
@@ -25,6 +25,7 @@
 | `test/types/testing.ts` | 测试设施票消费并实现驱动，GPU票实现钩子 |
 | `test/cases/manifest/index.ts` | 最低 API/交互验收目录，声明不等于已执行 |
 | `scripts/testing.mjs`, `test/harness/`, `test/report/` | 测试设施票接管真实运行器和报告 |
+| `scripts/build*.mjs`, `scripts/browser-imports.mjs`, `scripts/hash.mjs`, `scripts/provenance.mjs`, `tsconfig*.json`, `test/package-types/` | 工程与测试设施 owner 共同维护构建、来源绑定及类型消费门槛 |
 | `.github/workflows/contracts.yml` | 测试设施票后续增加真实浏览器门槛，届时移除“驱动必须缺失”的基础阶段检查 |
 
 特性代码目录沿用开发计划。`src/features/<feature>/` 可以放多个文件，对外导出一个 `FeatureFactory(environment)`，返回 `FeatureDefinition {id, members}`；context owner 在创建时显式传入工厂列表，不能维护进程级全局注册表。运行时不扫描磁盘。各模块输出各自描述符，集成 owner 才修改入口列表。

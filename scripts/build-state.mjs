@@ -1,8 +1,8 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { discover } from "./discover.mjs";
-import { provenance } from "../test/harness/provenance.mjs";
-import { hash, jsonHash } from "../test/harness/evidence.mjs";
+import { provenance } from "./provenance.mjs";
+import { hash, jsonHash } from "./hash.mjs";
 async function outputHash(root) {
   const paths = [
     ...(await discover(join(root, "dist"), "")),

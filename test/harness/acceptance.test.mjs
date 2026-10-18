@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
+import { mkdtemp, writeFile, readFile, rm, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { assess } from "./acceptance.mjs";
@@ -158,7 +158,17 @@ test("dirty or unspecified source snapshots cannot be accepted despite valid rev
   const f = await fixture(t);
   for (const dirty of [true, undefined]) {
     const run = { ...f.run, dirty };
-    assert.equal((await assess(run, f.reviews, f.options)).code, 2);
+    const assessment = await assess(run, f.reviews, f.options);
+    assert.equal(assessment.code, 2);
+    const html = await readFile(
+      await report(run, assessment, f.options.directory),
+      "utf8",
+    );
+    assert.doesNotMatch(html, /clean source/);
+    assert.match(
+      html,
+      dirty === true ? /dirty source snapshot/ : /unknown source state/,
+    );
   }
 });
 
@@ -173,4 +183,20 @@ test("report displays imported identities and notes without treating stale revie
   assert.match(html, /&lt;script&gt;not markup&lt;\/script&gt;/);
   assert.match(html, /pending-review/);
   assert.match(html, /Synthetic validator unit test only/);
+});
+
+test("report refuses repository source and build output directories before writing", async (t) => {
+  const f = await fixture(t);
+  const root = f.options.directory;
+  for (const name of ["src", ".build", "dist"]) {
+    const directory = join(root, name);
+    await mkdir(directory);
+    await assert.rejects(
+      report(f.run, {}, directory, [], root),
+      /Output inside repository/,
+    );
+    await assert.rejects(readFile(join(directory, "report.html")), {
+      code: "ENOENT",
+    });
+  }
 });

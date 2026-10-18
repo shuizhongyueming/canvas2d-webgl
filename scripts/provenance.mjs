@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { jsonHash, hash } from "./evidence.mjs";
+import { jsonHash, hash } from "./hash.mjs";
 export async function provenance(root) {
   const git = (...args) =>
     execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
