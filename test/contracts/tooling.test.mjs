@@ -7,14 +7,11 @@ import { join } from 'node:path';
 import { discover } from '../../scripts/discover.mjs';
 
 const cwd = new URL('../../', import.meta.url);
-test('unavailable browser/report/acceptance commands never report success', () => {
+test('CLI rejects missing required paths rather than claiming a successful run', () => {
   for (const stage of ['browser', 'report', 'acceptance']) {
     const result = spawnSync(process.execPath, ['scripts/testing.mjs', stage], { cwd, encoding: 'utf8' });
-    assert.equal(result.status, 2, result.stderr);
-    const report = JSON.parse(result.stdout);
-    assert.equal(report.execution, 'blocked');
-    assert.equal(report.stage, stage);
-    assert.equal(report.reason, 'driver-not-implemented');
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(result.stderr, /requires --/);
   }
 });
 

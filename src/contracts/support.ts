@@ -1,20 +1,25 @@
 /** Machine-readable scope, not implementation or test results. See docs/development/contracts.md. */
-/**
- * @typedef {{id: string, target: string, name: string, kind: 'method'|'property', owner: string,
- * policy: 'supported'|'unsupported'|'readonly'|'forward',
- * arities?: number[], values?: string[], sources?: string[], default?: string|number,
- * otherValues?: string}} SupportRow
- */
-/** @template T @param {T} value @returns {Readonly<T>} */
-function freeze(value) {
+export interface SupportRow {
+  readonly id: string; readonly target: string; readonly name: string;
+  readonly kind: 'method' | 'property'; readonly owner: string;
+  readonly policy: 'supported' | 'unsupported' | 'readonly' | 'forward';
+  readonly arities?: readonly number[]; readonly values?: readonly string[];
+  readonly sources?: readonly string[]; readonly default?: string | number;
+  readonly otherValues?: string;
+}
+export interface CaseMetadata {
+  readonly id: string;
+  readonly requirements: readonly string[];
+  readonly kind: 'semantic' | 'render' | 'combined';
+}
+function freeze<T>(value: T): Readonly<T> {
   if (value && typeof value === 'object') {
     Object.values(value).forEach(freeze);
     Object.freeze(value);
   }
   return value;
 }
-/** @type {readonly SupportRow[]} */
-export const SUPPORT_MATRIX = freeze([
+export const SUPPORT_MATRIX: readonly SupportRow[] = freeze<SupportRow[]>([
   {"id": "context.drawImage","target": "context","name": "drawImage","kind": "method","owner": "image","policy": "supported","arities": [3,5,9],"sources": ["HTMLImageElement","native-canvas"]},
   {"id": "context.fillRect","target": "context","name": "fillRect","kind": "method","owner": "rect","policy": "supported","arities": [4]},
   {"id": "context.clearRect","target": "context","name": "clearRect","kind": "method","owner": "rect","policy": "supported","arities": [4]},
@@ -118,15 +123,13 @@ export const SUPPORT_MATRIX = freeze([
   {"id": "metrics.ideographicBaseline","target": "metrics","name": "ideographicBaseline","kind": "property","owner": "text","policy": "unsupported"}
 ]);
 
-/** @param {string} target @param {string} name */
-export function lookupMember(target, name) {
+export function lookupMember(target: string, name: string): SupportRow | undefined {
   return SUPPORT_MATRIX.find(row => row.target === target && row.name === name);
 }
 
 /** Stable minimum case inventory. Add finer cases; never recycle an existing ID. */
 export const REQUIRED_CASES = freeze(SUPPORT_MATRIX.flatMap(row => {
-  /** @type {import('../../types/internal/testing.js').CaseMetadata[]} */
-  const cases = [{ id: `${row.id}.contract`, requirements: [row.id], kind: 'semantic' }];
+  const cases: CaseMetadata[] = [{ id: `${row.id}.contract`, requirements: [row.id], kind: 'semantic' }];
   for (const arity of row.arities || []) cases.push({ id: `${row.id}.arity-${arity}`, requirements: [row.id], kind: 'semantic' });
   for (const value of row.values || []) cases.push({ id: `${row.id}.value-${encodeURIComponent(value)}`, requirements: [row.id], kind: 'semantic' });
   for (const source of row.sources || []) cases.push({ id: `${row.id}.source-${source}`, requirements: [row.id], kind: 'semantic' });

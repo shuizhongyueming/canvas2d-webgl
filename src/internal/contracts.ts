@@ -1,71 +1,136 @@
-import type { NativeCanvas, ImageSource, CompositeMode } from '../index.js';
+import type { NativeCanvas, ImageSource, CompositeMode } from "../api.js";
 
 /** All geometry uses device pixels, top-left origin, unless called out explicitly. */
 export type Matrix = readonly [number, number, number, number, number, number];
-export type Bounds = Readonly<{ x: number; y: number; width: number; height: number }>;
+export type Bounds = Readonly<{
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}>;
 /** Straight (not premultiplied) sRGB channels in [0,1]; premultiply once at GPU ingress. */
 export type Color = readonly [number, number, number, number];
 export type Paint =
-  | Readonly<{ kind: 'solid'; color: Color }>
-  | Readonly<{ kind: 'linear-gradient'; id: number; version: number; transform: Matrix; from: readonly [number, number]; to: readonly [number, number]; stops: readonly Readonly<{ offset: number; color: Color }>[] }>
-  | Readonly<{ kind: 'repeat-pattern'; id: number; version: number; image: HTMLImageElement; width: number; height: number }>;
+  | Readonly<{ kind: "solid"; color: Color }>
+  | Readonly<{
+      kind: "linear-gradient";
+      id: number;
+      version: number;
+      transform: Matrix;
+      from: readonly [number, number];
+      to: readonly [number, number];
+      stops: readonly Readonly<{ offset: number; color: Color }>[];
+    }>
+  | Readonly<{
+      kind: "repeat-pattern";
+      id: number;
+      version: number;
+      image: HTMLImageElement;
+      width: number;
+      height: number;
+    }>;
 /** Live logical style reference. save/restore retains this object; draw captures a Paint. */
-export interface PaintRef { readonly id: number; readonly version: number; snapshot(): Paint }
+export interface PaintRef {
+  readonly id: number;
+  readonly version: number;
+  snapshot(): Paint;
+}
 export interface DrawState {
   readonly transform: Matrix;
   readonly fill: Paint;
   readonly stroke: Paint;
   readonly alpha: number;
   readonly composite: CompositeMode;
-  readonly filter: 'none' | 'brightness(120%)';
+  readonly filter: "none" | "brightness(120%)";
   readonly lineWidth: number;
-  readonly lineCap: 'butt' | 'round';
-  readonly lineJoin: 'miter' | 'round';
+  readonly lineCap: "butt" | "round";
+  readonly lineJoin: "miter" | "round";
   readonly font: string;
-  readonly textAlign: 'start' | 'left' | 'center' | 'right';
-  readonly textBaseline: 'alphabetic' | 'top' | 'middle' | 'bottom';
+  readonly textAlign: "start" | "left" | "center" | "right";
+  readonly textBaseline: "alphabetic" | "top" | "middle" | "bottom";
   readonly clip: ClipSnapshot | null;
 }
 export type PathCommand =
-  | Readonly<{ op: 'closePath'; args: readonly []; transform: Matrix }>
-  | Readonly<{ op: 'moveTo' | 'lineTo'; args: readonly [number, number]; transform: Matrix }>
-  | Readonly<{ op: 'rect' | 'quadraticCurveTo'; args: readonly [number, number, number, number]; transform: Matrix }>
-  | Readonly<{ op: 'arcTo'; args: readonly [number, number, number, number, number]; transform: Matrix }>
-  | Readonly<{ op: 'arc'; args: readonly [number, number, number, number, number, boolean]; transform: Matrix }>
-  | Readonly<{ op: 'ellipse'; args: readonly [number, number, number, number, number, number, number, boolean]; transform: Matrix }>;
-export interface PathSnapshot { readonly id: number; readonly commands: readonly PathCommand[] }
+  | Readonly<{ op: "closePath"; args: readonly []; transform: Matrix }>
+  | Readonly<{
+      op: "moveTo" | "lineTo";
+      args: readonly [number, number];
+      transform: Matrix;
+    }>
+  | Readonly<{
+      op: "rect" | "quadraticCurveTo";
+      args: readonly [number, number, number, number];
+      transform: Matrix;
+    }>
+  | Readonly<{
+      op: "arcTo";
+      args: readonly [number, number, number, number, number];
+      transform: Matrix;
+    }>
+  | Readonly<{
+      op: "arc";
+      args: readonly [number, number, number, number, number, boolean];
+      transform: Matrix;
+    }>
+  | Readonly<{
+      op: "ellipse";
+      args: readonly [
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        boolean,
+      ];
+      transform: Matrix;
+    }>;
+export interface PathSnapshot {
+  readonly id: number;
+  readonly commands: readonly PathCommand[];
+}
 export interface ClipSnapshot {
   readonly id: number;
   readonly parent: ClipSnapshot | null;
   readonly path: PathSnapshot;
-  readonly rule: 'nonzero' | 'evenodd';
+  readonly rule: "nonzero" | "evenodd";
 }
 /** No GL object escapes a lease. A handle belongs to one device generation. */
-export interface ResourceHandle { readonly id: number; readonly generation: number }
+export interface ResourceHandle {
+  readonly id: number;
+  readonly generation: number;
+}
 export interface ResourceLease {
   readonly handle: ResourceHandle;
   /** Idempotent; a stale generation cannot delete a newly allocated resource. */
   release(): void;
 }
 export interface RasterSource {
-  readonly kind: 'raster';
+  readonly kind: "raster";
   readonly canvas: NativeCanvas;
   readonly bounds: Bounds;
   readonly pixelWidth: number;
   readonly pixelHeight: number;
-  readonly colorSpace: 'srgb';
-  readonly alpha: 'straight';
+  readonly colorSpace: "srgb";
+  readonly alpha: "straight";
   /** Native canvas bitmap is consumed synchronously before release or reuse. */
   release(): void;
 }
 export type DrawSource =
   | RasterSource
-  | Readonly<{ kind: 'rect'; bounds: Bounds; transform: Matrix; paint: Paint }>
-  | Readonly<{ kind: 'image'; image: ImageSource; sourceRect: Bounds; destinationRect: Bounds; transform: Matrix }>
-  | Readonly<{ kind: 'empty' }>;
+  | Readonly<{ kind: "rect"; bounds: Bounds; transform: Matrix; paint: Paint }>
+  | Readonly<{
+      kind: "image";
+      image: ImageSource;
+      sourceRect: Bounds;
+      destinationRect: Bounds;
+      transform: Matrix;
+    }>
+  | Readonly<{ kind: "empty" }>;
 export interface DrawOperation {
   readonly generation: number;
-  readonly kind: 'draw' | 'clear';
+  readonly kind: "draw" | "clear";
   readonly state: DrawState;
   readonly source: DrawSource;
   /** Device-space bounding box of source coverage; not the composite operation domain. */
@@ -75,7 +140,7 @@ export interface DrawOperation {
 }
 export interface GPUDevice {
   readonly generation: number;
-  readonly status: 'active' | 'lost' | 'disposed';
+  readonly status: "active" | "lost" | "disposed";
   readonly width: number;
   readonly height: number;
   /** Read/upload native sources now, never defer them until present. No ownership transfer. */
@@ -104,9 +169,23 @@ export interface Presenter {
   invalidate(generation: number): void;
 }
 export interface Rasterizer {
-  path(path: PathSnapshot, state: DrawState, mode: 'fill' | 'stroke'): RasterSource;
-  text(text: string, x: number, y: number, state: DrawState, mode: 'fill' | 'stroke'): RasterSource;
-  clip(path: PathSnapshot, rule: 'nonzero' | 'evenodd', bounds: Bounds): RasterSource;
+  path(
+    path: PathSnapshot,
+    state: DrawState,
+    mode: "fill" | "stroke",
+  ): RasterSource;
+  text(
+    text: string,
+    x: number,
+    y: number,
+    state: DrawState,
+    mode: "fill" | "stroke",
+  ): RasterSource;
+  clip(
+    path: PathSnapshot,
+    rule: "nonzero" | "evenodd",
+    bounds: Bounds,
+  ): RasterSource;
   measureWidth(text: string, state: DrawState): number;
   clearCache(): void;
   dispose(): void;
@@ -139,4 +218,6 @@ export interface FeatureDefinition {
   /** Member names from the context support manifest, owned by exactly one feature. */
   readonly members: Readonly<Record<string, PropertyDescriptor>>;
 }
-export type FeatureFactory = (environment: FeatureEnvironment) => FeatureDefinition;
+export type FeatureFactory = (
+  environment: FeatureEnvironment,
+) => FeatureDefinition;

@@ -1,4 +1,4 @@
-import { createCompatCanvas, type NativeCanvas } from '../../types/index.js';
+import { createCompatCanvas, type NativeCanvas } from '../../src/index.js';
 const canvas = createCompatCanvas(document.createElement('canvas'));
 const ctx = canvas.getContext('2d');
 ctx.drawImage(new Image(), 1, 2);
