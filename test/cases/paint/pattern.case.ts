@@ -1,5 +1,12 @@
 import type { CaseDefinition } from "../../types/testing.js";
-import { errorInfo, callRaw, loadImage, STRIPES_3x5 } from "./fixtures.js";
+import {
+  errorInfo,
+  callRaw,
+  loadImage,
+  STRIPES_3x5,
+  YELLOW_BLACK_3x5,
+} from "./fixtures.js";
+import { isCompat, outcome } from "./shared.js";
 
 type Ctx = CanvasRenderingContext2D;
 const asNative = (context: unknown): Ctx => context as Ctx;
@@ -85,18 +92,13 @@ export const cases: CaseDefinition[] = [
       const context = asNative(a.context);
       const image = await loadImage(STRIPES_3x5);
       const pattern = context.createPattern(image, "repeat")!;
-      let reported: string | null = null;
-      try {
-        (pattern as CanvasPattern).setTransform();
-        reported = "called";
-      } catch (error) {
-        reported = String((error as { code?: unknown })?.code ?? "thrown");
-      }
       // Native: the method exists and runs. Compat: explicit unsupported-api.
-      a.assert(
-        reported === "called" || reported === "unsupported-api",
-        `setTransform reports a sanctioned outcome, got ${reported}`,
-      );
+      const result = outcome(() => {
+        (pattern as CanvasPattern).setTransform();
+      });
+      const expected = isCompat(a) ? "unsupported-api" : "ok";
+      a.assert(result === expected, "setTransform follows approved semantics");
+      a.observe("setTransform", result === expected ? "as-approved" : result);
     },
   },
   {
@@ -123,21 +125,53 @@ export const cases: CaseDefinition[] = [
       const context = asNative(a.context);
       const image = await loadImage(STRIPES_3x5);
       for (const mode of ["repeat-x", "repeat-y", "no-repeat"]) {
-        let reported: string | null = null;
-        try {
+        const result = outcome(() => {
           context.createPattern(image, mode);
-        } catch (error) {
-          reported = String((error as { code?: unknown })?.code);
-        }
-        if (reported === null) {
-          a.assert(true, `native accepts ${mode}`);
-        } else {
-          a.assert(
-            reported === "unsupported-api",
-            `${mode} reports unsupported-api, got ${reported}`,
-          );
-        }
+        });
+        // Native accepts every legal repetition; compat only supports repeat.
+        const expected = isCompat(a) ? "unsupported-api" : "ok";
+        a.assert(result === expected, `${mode} follows approved semantics`);
+        a.observe(mode, result === expected ? "as-approved" : result);
       }
+    },
+  },
+  {
+    ...base,
+    id: "paint.pattern.reject-non-branded-sources",
+    requirements: ["context.createPattern"],
+    run(a) {
+      const context = asNative(a.context);
+      // Native rejects all three with a TypeError: duck-typed objects are not
+      // image sources, and ImageData is absent from the source union.
+      a.observe(
+        "plainObject",
+        errorInfo(() =>
+          callRaw(
+            context,
+            "createPattern",
+            { complete: true, naturalWidth: 3, naturalHeight: 5 },
+            "repeat",
+          ),
+        ),
+      );
+      a.observe(
+        "fakeCanvas",
+        errorInfo(() =>
+          callRaw(
+            context,
+            "createPattern",
+            { getContext: () => null, width: 3, height: 5 },
+            "repeat",
+          ),
+        ),
+      );
+      a.observe(
+        "imageData",
+        errorInfo(() =>
+          callRaw(context, "createPattern", new ImageData(3, 5), "repeat"),
+        ),
+      );
+      a.assert(true, "error identities recorded");
     },
   },
   {
@@ -149,18 +183,14 @@ export const cases: CaseDefinition[] = [
       const source = document.createElement("canvas");
       source.width = 3;
       source.height = 5;
-      let reported: string | null = null;
-      try {
-        context.createPattern(source, "repeat");
-      } catch (error) {
-        reported = String((error as { code?: unknown })?.code);
-      }
       // Native accepts canvas sources; the support matrix excludes them, so
       // the compat side must report unsupported-api instead.
-      a.assert(
-        reported === null || reported === "unsupported-api",
-        `canvas source outcome sanctioned, got ${reported}`,
-      );
+      const result = outcome(() => {
+        context.createPattern(source, "repeat");
+      });
+      const expected = isCompat(a) ? "unsupported-api" : "ok";
+      a.assert(result === expected, "canvas source follows approved semantics");
+      a.observe("canvas", result === expected ? "as-approved" : result);
     },
   },
   {
@@ -238,6 +268,26 @@ export const cases: CaseDefinition[] = [
       context.fillRect(0, 0, 12, 10);
       context.fillRect(13, 11, 9, 9);
       context.fillRect(30.5, 20, 15, 15);
+    },
+  },
+  {
+    ...renderBase,
+    id: "paint.pattern.source-swap-after-create",
+    requirements: ["context.createPattern", "context.fillRect"],
+    async run(a) {
+      const context = asNative(a.context);
+      const image = await loadImage(STRIPES_3x5);
+      const pattern = context.createPattern(image, "repeat");
+      image.src = YELLOW_BLACK_3x5;
+      await new Promise((resolve, reject) => {
+        image.onload = resolve;
+        image.onerror = reject;
+      });
+      assignFill(context, pattern);
+      // Native truth (probe, issue #36): the pattern keeps the creation-time
+      // bitmap, so the swapped-in yellow tile must NOT appear. The compat
+      // side does not capture the bitmap yet; this case pins the gap.
+      context.fillRect(0, 0, 24, 24);
     },
   },
 ];

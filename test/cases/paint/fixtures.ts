@@ -8,6 +8,10 @@
 export const STRIPES_3x5 =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAMAAAAFCAYAAACAcVaiAAAAHUlEQVR4AU3BsQ0AAAzDIJT/f3bXgkii5plnnnkOW/gGA3oXmjIAAAAASUVORK5CYII=";
 
+/** 3x5 tile: yellow with a black middle column (src-swap probe target). */
+export const YELLOW_BLACK_3x5 =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAMAAAAFCAYAAACAcVaiAAAAH0lEQVR4AYyHsQkAAAyDJP//bNulc0BQowh4zsZTzgAAAP//lGZXSwAAAAZJREFUAwCZPQcEErXhXQAAAABJRU5ErkJggg==";
+
 export function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();

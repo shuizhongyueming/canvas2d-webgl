@@ -1,6 +1,7 @@
 import type { CompatGradient, CompatPattern } from "../../../src/api.js";
 import type { CaseDefinition } from "../../types/testing.js";
 import { errorInfo, loadImage, STRIPES_3x5 } from "./fixtures.js";
+import { isCompat, outcome } from "./shared.js";
 
 type Ctx = CanvasRenderingContext2D;
 const asNative = (context: unknown): Ctx => context as Ctx;
@@ -140,6 +141,28 @@ export const cases: CaseDefinition[] = [
   },
   {
     ...base,
+    id: "paint.color.alpha-byte-table",
+    requirements: ["context.fillStyle"],
+    run(a) {
+      const context = asNative(a.context);
+      const table: string[] = [];
+      for (let byte = 0; byte < 256; byte += 1) {
+        assignStyle(context, "fillStyle", `#000000${byte.toString(16).padStart(2, "0")}`);
+        const serialized = context.fillStyle as string;
+        table.push(serialized);
+        // Re-assigning the serialization must be idempotent.
+        assignStyle(context, "fillStyle", serialized);
+        if (context.fillStyle !== serialized) table.push(`UNSTABLE:${byte}`);
+      }
+      a.assert(
+        table.length === 256 && !table.some((v) => v.startsWith("UNSTABLE")),
+        "all 256 alpha bytes serialize to a stable value",
+      );
+      a.observe("table", table);
+    },
+  },
+  {
+    ...base,
     id: "paint.color.unsupported-values",
     requirements: ["context.fillStyle"],
     run(a) {
@@ -152,29 +175,19 @@ export const cases: CaseDefinition[] = [
         "color(display-p3 1 0 0)",
       ]) {
         assignStyle(context, "fillStyle", "#010203");
-        let reported: string | null = null;
-        try {
+        const result = outcome(() => {
           assignStyle(context, "fillStyle", value);
-        } catch (error) {
-          reported = String((error as { code?: unknown })?.code);
-        }
-        if (reported === null) {
-          // Native reference path: the legal value parses and canonicalizes.
-          a.assert(
-            context.fillStyle !== "#010203",
-            `native accepts ${value}`,
-          );
-        } else {
-          // Compat path: legal but out-of-matrix values fail explicitly.
-          a.assert(
-            reported === "unsupported-api",
-            `${value} reports unsupported-api, got ${reported}`,
-          );
-          a.assert(
-            context.fillStyle === "#010203",
-            "state unchanged after rejection",
-          );
-        }
+        });
+        // Native parses and applies the legal value; compat rejects it with
+        // unsupported-api and keeps the previous style.
+        const expected = isCompat(a) ? "unsupported-api" : "ok";
+        const sanctionedState =
+          result === "ok"
+            ? context.fillStyle !== "#010203"
+            : context.fillStyle === "#010203";
+        a.assert(result === expected, `${value} follows approved semantics`);
+        a.assert(sanctionedState, `${value} leaves the sanctioned state`);
+        a.observe(value, result === expected ? "as-approved" : result);
       }
     },
   },

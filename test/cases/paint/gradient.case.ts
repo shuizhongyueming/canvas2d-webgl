@@ -1,6 +1,7 @@
 import type { CompatGradient } from "../../../src/api.js";
 import type { CaseDefinition } from "../../types/testing.js";
 import { errorInfo, callRaw } from "./fixtures.js";
+import { isCompat, outcome } from "./shared.js";
 
 type Ctx = CanvasRenderingContext2D;
 const asNative = (context: unknown): Ctx => context as Ctx;
@@ -113,21 +114,38 @@ export const cases: CaseDefinition[] = [
     run(a) {
       const gradient = asNative(a.context).createLinearGradient(0, 0, 16, 0);
       for (const color of ["red", "hsl(120,50%,50%)", "rgb(1 2 3 / 0.5)"]) {
-        let reported: string | null = null;
-        try {
+        const result = outcome(() => {
           gradient.addColorStop(0.5, color);
-        } catch (error) {
-          reported = String((error as { code?: unknown })?.code);
-        }
-        if (reported === null) {
-          a.assert(true, `native accepts ${color}`);
-        } else {
-          a.assert(
-            reported === "unsupported-api",
-            `${color} reports unsupported-api, got ${reported}`,
-          );
-        }
+        });
+        // Native accepts the legal CSS color; compat reports unsupported-api.
+        const expected = isCompat(a) ? "unsupported-api" : "ok";
+        a.assert(result === expected, `${color} follows approved semantics`);
+        a.observe(color, result === expected ? "as-approved" : result);
       }
+    },
+  },
+  {
+    ...base,
+    id: "paint.gradient.bigint-rejected",
+    requirements: ["context.createLinearGradient", "gradient.addColorStop"],
+    run(a) {
+      const context = asNative(a.context);
+      // WebIDL double conversion: BigInt coordinates/offsets throw a plain
+      // TypeError; a BigInt color stringifies and fails as a color instead.
+      a.observe(
+        "coordinates",
+        errorInfo(() => callRaw(context, "createLinearGradient", 1n, 0, 1, 1)),
+      );
+      const gradient = context.createLinearGradient(0, 0, 16, 0);
+      a.observe(
+        "offset",
+        errorInfo(() => callRaw(gradient, "addColorStop", 1n, "#fff")),
+      );
+      a.observe(
+        "color",
+        errorInfo(() => callRaw(gradient, "addColorStop", 0.5, 1n)),
+      );
+      a.assert(true, "error identities recorded");
     },
   },
   {
@@ -195,6 +213,28 @@ export const cases: CaseDefinition[] = [
       gradient.addColorStop(0.5, "#0000ff");
       context.fillStyle = gradient as unknown as CompatGradient;
       context.fillRect(0, 0, 64, 32);
+    },
+  },
+  {
+    ...renderBase,
+    id: "paint.gradient.stops-duplicate-edge",
+    requirements: ["gradient.addColorStop", "context.fillRect"],
+    run(a) {
+      const context = asNative(a.context);
+      // Native truth (Chromium probe, PR #34 review): at a duplicated edge
+      // offset the LAST stop wins at the point; the pad extends the edge stop.
+      const dupFirst = context.createLinearGradient(0, 0, 32, 0);
+      dupFirst.addColorStop(0, "#ff0000");
+      dupFirst.addColorStop(0, "#0000ff");
+      dupFirst.addColorStop(1, "#00ff00");
+      context.fillStyle = dupFirst as unknown as CompatGradient;
+      context.fillRect(0, 0, 32, 32);
+      const dupLast = context.createLinearGradient(32, 0, 64, 0);
+      dupLast.addColorStop(0, "#ff0000");
+      dupLast.addColorStop(1, "#00ff00");
+      dupLast.addColorStop(1, "#0000ff");
+      context.fillStyle = dupLast as unknown as CompatGradient;
+      context.fillRect(32, 0, 32, 32);
     },
   },
   {
