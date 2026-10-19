@@ -57,12 +57,19 @@ export function createFacade<T extends TargetCanvas>(
       throw new TypeError(
         "Failed to execute 'getContext' on 'HTMLCanvasElement': 1 argument required, but only 0 present.",
       );
-    if (args.length > 1)
+    // WebIDL DOMString conversion rejects Symbols with a native TypeError.
+    if (typeof args[0] === "symbol")
+      throw new TypeError(
+        "Failed to execute 'getContext' on 'HTMLCanvasElement': Cannot convert a Symbol value to a string",
+      );
+    // An undefined/null second argument is an absent optional dictionary and
+    // equals the one-argument form; any real attributes dictionary is a
+    // spec-legal overload outside the approved matrix.
+    if (args.length > 1 && args[1] !== undefined && args[1] !== null)
       throw createCompatError(
         ERROR_CODES.UNSUPPORTED_API,
         "getContext: context attributes argument",
       );
-    // WebIDL DOMString conversion; Symbol rejects with a native TypeError.
     const type = typeof args[0] === "string" ? args[0] : String(args[0]);
     return type === "2d" ? context : null;
   };

@@ -132,3 +132,53 @@ test("session lost/restore entries drive the device and notify callbacks", () =>
   assert.deepEqual(events, ["lost", "restored"]);
   assert.deepEqual(parts.order, ["raster.clearCache"]);
 });
+
+test("session dispose drains every cleanup and rethrows the first failure", () => {
+  const parts = fakeParts();
+  const deviceFailure = Object.assign(new Error("device cleanup failed"), {
+    code: "initialization-failed",
+  });
+  parts.device.dispose = () => {
+    parts.device.calls.push(["dispose"]);
+    throw deviceFailure;
+  };
+  const session = createSession({
+    ...parts,
+    onContextLost: undefined,
+    onContextRestored: undefined,
+  });
+  assert.throws(
+    () => session.dispose(),
+    (error) => error === deviceFailure,
+  );
+  assert.deepEqual(parts.device.calls, [["dispose"]]);
+  // The rasterizer cleanup still ran despite the device failure.
+  assert.deepEqual(parts.order, ["raster.dispose"]);
+  assert.equal(session.disposed, true);
+  // Everything already drained: a retry is a no-op, not a second chance.
+  session.dispose();
+  assert.deepEqual(parts.device.calls, [["dispose"]]);
+});
+
+test("session dispose reports the device failure over a later raster failure", () => {
+  const parts = fakeParts();
+  const deviceFailure = new Error("device failed");
+  const rasterFailure = new Error("raster failed");
+  parts.device.dispose = () => {
+    throw deviceFailure;
+  };
+  parts.raster.dispose = () => {
+    parts.order.push("raster.dispose");
+    throw rasterFailure;
+  };
+  const session = createSession({
+    ...parts,
+    onContextLost: undefined,
+    onContextRestored: undefined,
+  });
+  assert.throws(
+    () => session.dispose(),
+    (error) => error === deviceFailure,
+  );
+  assert.deepEqual(parts.order, ["raster.dispose"]);
+});

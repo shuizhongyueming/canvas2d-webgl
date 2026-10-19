@@ -62,8 +62,24 @@ export function createSession(parts: SessionParts): CanvasSession {
     dispose(): void {
       if (disposed) return;
       disposed = true;
-      device.dispose();
-      raster.dispose();
+      // Drain every cleanup even when one fails, then rethrow the first
+      // failure — the same semantics as ResourceOwner.releaseAll.
+      let failed = false;
+      let failure: unknown;
+      for (const cleanup of [
+        () => device.dispose(),
+        () => raster.dispose(),
+      ]) {
+        try {
+          cleanup();
+        } catch (error) {
+          if (!failed) {
+            failed = true;
+            failure = error;
+          }
+        }
+      }
+      if (failed) throw failure;
     },
   };
 }

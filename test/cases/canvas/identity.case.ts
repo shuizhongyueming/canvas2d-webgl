@@ -120,9 +120,37 @@ export const cases: CaseDefinition[] = [
       const expected = isCompat(a) ? "unsupported-api" : "ok";
       a.assert(
         twoArguments === expected,
-        "the context-attributes argument follows approved semantics",
+        "a real attributes dictionary follows approved semantics",
       );
-      a.observe("twoArguments", twoArguments === expected ? "as-approved" : twoArguments);
+      a.observe(
+        "attributesDictionary",
+        twoArguments === expected ? "as-approved" : twoArguments,
+      );
+      // Native-probed WebIDL edges (Chromium 156): an absent optional
+      // dictionary (undefined/null) equals the one-argument form, a Symbol
+      // type rejects with a TypeError, and a BigInt type converts to "1".
+      a.assert(
+        canvas.getContext("2d", undefined) === a.context,
+        "('2d', undefined) equals the one-argument form",
+      );
+      a.assert(
+        canvas.getContext("2d", null) === a.context,
+        "('2d', null) equals the one-argument form",
+      );
+      a.observe("absentDictionary", [
+        canvas.getContext("2d", undefined) === a.context,
+        canvas.getContext("2d", null) === a.context,
+      ]);
+      a.observe(
+        "symbolType",
+        outcome(() => canvas.getContext(Symbol("probe"))),
+      );
+      a.observe("bigintType", canvas.getContext(1n) === null);
+      a.assert(
+        outcome(() => canvas.getContext(Symbol("probe"))) === "TypeError",
+        "a Symbol context type rejects with a native TypeError",
+      );
+      a.assert(canvas.getContext(1n) === null, "a BigInt type converts to '1'");
     },
   },
 ];
