@@ -676,6 +676,7 @@ export function createSceneRenderer(
     const owner = createResourceOwner();
     const device = new SceneDevice(target, gl, maxTextureSize, owner);
     device.createGpuObjects();
+    cleanups.push(() => device.shutdown());
     if (options.failAfter === "programs")
       throw createCompatError(
         ERROR_CODES.INITIALIZATION,
@@ -684,7 +685,6 @@ export function createSceneRenderer(
     device.installScene(
       createSceneFramebuffer(gl, target.width, target.height, maxTextureSize),
     );
-    cleanups.push(() => device.shutdown());
     if (options.failAfter === "scene")
       throw createCompatError(
         ERROR_CODES.INITIALIZATION,
