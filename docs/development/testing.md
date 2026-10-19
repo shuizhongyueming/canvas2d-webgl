@@ -9,17 +9,17 @@ Node >=22，`pnpm install --frozen-lockfile --ignore-scripts`，然后 `pnpm exe
 ```sh
 pnpm run verify
 # 设施自检：正常原生对照 + 单像素故障定位 + 显示面 DOM overlay 定位；每次生成新的 UUID 子目录。
-pnpm run test:browser -- --self-test --output test-results/local
+pnpm run test:browser --self-test --output test-results/local
 # 命令输出完整 run.json 路径，用它替换下方 <run.json>。
-pnpm run test:report -- --run <run.json>
-pnpm run test:acceptance -- --run <run.json> --reviews <reviews.json>
+pnpm run test:report --run <run.json>
+pnpm run test:acceptance --run <run.json> --reviews <reviews.json>
 # 真实浏览器故障回归；本机默认不指定 GPU 后端。
 pnpm run test:smoke
 # CI 明确选择 SwiftShader WebGL；环境字段记录实际 renderer，绝不重试降级。
-pnpm run test:smoke -- --software
+pnpm run test:smoke --software
 # 后续特性实现后，自动发现 test/cases/**/*.case.ts。
-pnpm run test:browser -- --output test-results/compat
-pnpm run test:browser -- --output test-results/compat --case context.fillRect.render
+pnpm run test:browser --output test-results/compat
+pnpm run test:browser --output test-results/compat --case context.fillRect.render
 ```
 
 默认使用隔离的 Playwright Chromium，独立 browser context/page 确保 reference 与 actual 不共享 DOM、字体状态、随机状态或模块实例。`--executable <Chromium路径>` 可显式选当前安装的 Chromium；可在本机 ego-browser 查看报告和检查环境，CI 不依赖个人会话。`--software` 显式选择 SwiftShader，属于真实浏览器 WebGL 执行环境，不是 mock 或原生替代，不代表硬件 GPU 或 vivo 验证。默认没有缺 GPU 后自动降级的逻辑。若可用浏览器自选软件 renderer，原样记录 renderer，不隐瞒后端。
@@ -63,8 +63,8 @@ export const cases: CaseDefinition[] = [{
 `test:report` 生成可离线打开的 `report.html`，含嵌入图片、搜索框、三类状态、公开语义观测和环境。缺产物展示错误。`reviews.template.json` 的 human / ai 均为 null；复制为 `reviews.json` 后由真正评审者填写身份、日期、verdict（accepted/rejected），AI 另填 notes。代理不能代填人类确认。再运行：
 
 ```sh
-pnpm run test:report -- --run <run.json> --reviews <reviews.json>
-pnpm run test:acceptance -- --run <run.json> --reviews <reviews.json>
+pnpm run test:report --run <run.json> --reviews <reviews.json>
+pnpm run test:acceptance --run <run.json> --reviews <reviews.json>
 ```
 
 评审逐 case 绑定 runId、commit、sourceHash、environmentHash 与包含全部六张图的 artifactHash。验收重新读文件计算 hash、验证 PNG 和路径；检查当前源码及当前必需目录，忽略 run 里声称的 render: accepted，重新推导状态。重复记录、旧评审、缺任何一张图、skip、missing 都不放行。评审导入不修改原始 run，重新生成报告即可关联。记录是本地评审声明，不提供身份认证或防恶意篡改签名。
