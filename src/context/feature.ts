@@ -115,8 +115,10 @@ export const stateFeature: FeatureFactory = (environment): FeatureDefinition => 
               transform(state, [a, b, c, d, e + 0, f + 0] as Matrix);
             }
           } else if (args.length <= 1) {
-            // The omitted and DOMMatrix2DInit forms are spec-legal but unapproved;
-            // dictionary conversion rejects primitives with a native TypeError.
+            // The support matrix approves only the six-argument form. The omitted
+            // and DOMMatrix2DInit forms are spec-legal, so they are reported as
+            // unsupported-api; dictionary conversion rejects primitives with a
+            // native TypeError.
             const value = args[0];
             if (
               args.length === 0 ||
