@@ -9,6 +9,7 @@ export interface NativeCanvas {
   height: number;
   getContext(
     type: "2d",
+    options?: CanvasRenderingContext2DSettings,
   ): CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
 }
 export interface CompatOptions {
