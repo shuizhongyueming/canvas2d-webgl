@@ -19,8 +19,10 @@ function lerpPremultiplied(from: Color, to: Color, t: number): Color {
  * Reference stop interpolation in premultiplied sRGB (result is straight).
  * Stops are sorted by offset with stable ties. At a duplicated offset the
  * last stop wins exactly at the point while the first stop of the group is
- * approached from the left; outside [0, 1] the edge stops extend (pad).
- * Returns null when there is nothing to paint (no stops).
+ * approached from the left; beyond the edge stops the edge colors extend
+ * (pad): left of the group the FIRST stop paints, even at a duplicated
+ * leading offset (Chromium probe, issue #15). Returns null when there is
+ * nothing to paint (no stops).
  */
 export function interpolateStops(
   stops: readonly GradientStop[],
@@ -29,20 +31,19 @@ export function interpolateStops(
   if (stops.length === 0) return null;
   const first = stops[0]!;
   const last = stops[stops.length - 1]!;
-  const t = Math.min(1, Math.max(0, offset));
-  if (t <= first.offset) return first.color;
-  if (t >= last.offset) return last.color;
+  if (offset < first.offset) return first.color;
+  if (offset > last.offset) return last.color;
   let index = 0;
-  while (index + 1 < stops.length && stops[index + 1]!.offset <= t) {
+  while (index + 1 < stops.length && stops[index + 1]!.offset <= offset) {
     index += 1;
   }
   const a = stops[index]!;
-  if (a.offset === t) return a.color;
+  if (a.offset === offset) return a.color;
   const b = stops[index + 1]!;
   return lerpPremultiplied(
     a.color,
     b.color,
-    (t - a.offset) / (b.offset - a.offset),
+    (offset - a.offset) / (b.offset - a.offset),
   );
 }
 

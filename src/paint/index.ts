@@ -2,10 +2,11 @@
  * Paint feature: colors, linear gradients and repeat-only patterns.
  *
  * Consumer guide:
- * - State ticket: install defaultStylePaint() for keys "fill"/"stroke" at
- *   initialization and reset; keep PaintRef references across save/restore;
- *   StateStore.snapshot() must call PaintRef.snapshot() so draws capture the
- *   current version/stops. paintFeature() also reads the "transform" key.
+ * - State ticket: install defaultStylePaint(DEFAULT_STYLE_IDS.fill/.stroke)
+ *   for keys "fill"/"stroke" at initialization and reset; keep PaintRef
+ *   references across save/restore; StateStore.snapshot() must call
+ *   PaintRef.snapshot() so draws capture the current version/stops.
+ *   paintFeature() also reads the "transform" key.
  * - GPU ticket: Paint snapshots plus REPEAT_PATTERN_GLSL cover both NPOT and
  *   POT tiling; texture wrap must stay CLAMP_TO_EDGE (see shader.ts).
  * - Raster ticket: the same Paint snapshots describe native-assisted draws;
@@ -20,7 +21,7 @@ export {
   createRepeatPattern,
   isCompatPattern,
 } from "./pattern.js";
-export { SolidPaint, defaultStylePaint } from "./solid.js";
+export { SolidPaint, defaultStylePaint, DEFAULT_STYLE_IDS } from "./solid.js";
 export {
   interpolateStops,
   linearGradientColorAt,

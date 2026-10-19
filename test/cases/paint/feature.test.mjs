@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { capture } from "./helpers.mjs";
-import { paintFeature, defaultStylePaint } from "../../../dist/paint/index.js";
+import { paintFeature, defaultStylePaint, DEFAULT_STYLE_IDS } from "../../../dist/paint/index.js";
 
 // Minimal StateStore double implementing the paint seam ("fill"/"stroke"/"transform").
 function stateDouble(initial = {}) {
@@ -95,6 +95,10 @@ test("createLinearGradient validates like native and captures creation transform
   assert.throws(() => ctx.createLinearGradient(0, 0, 1), TypeError);
   assert.throws(() => ctx.createLinearGradient(NaN, 0, 1, 1), TypeError);
   assert.throws(() => ctx.createLinearGradient(0, 0, Infinity, 1), TypeError);
+  // WebIDL double conversion rejects BigInt with a plain TypeError.
+  const bigint = capture(() => ctx.createLinearGradient(1n, 0, 1, 1));
+  assert.equal(bigint.name, "TypeError");
+  assert.equal(bigint.code, undefined, "not a DOMException");
   const g = ctx.createLinearGradient("1", "2", "3", "4");
   ctx.fillStyle = g;
   const paint = state.get("fill").snapshot();
@@ -116,6 +120,12 @@ test("paint ids are unique within one canvas feature instance", () => {
   ctx.fillStyle = "#654321";
   seen.add(state.get("fill").id);
   assert.equal(seen.size, 4);
+  for (const id of seen) {
+    assert.ok(
+      id > DEFAULT_STYLE_IDS.stroke,
+      `id ${id} stays above the reserved default-style ids`,
+    );
+  }
 });
 
 test("createLinearGradient requires the state transform seam", () => {

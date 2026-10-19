@@ -2,7 +2,8 @@
  * Native-style DOMException for supported-API input errors. Runtimes without a
  * DOMException global get a plain Error carrying the same name and code.
  */
-export function nativeException(  name: "IndexSizeError" | "SyntaxError" | "InvalidStateError",
+export function nativeException(
+  name: "IndexSizeError" | "SyntaxError" | "InvalidStateError",
   code: number,
   message: string,
 ): Error & { code: number } {
@@ -28,4 +29,15 @@ export function webidlString(value: unknown): string {
     throw new TypeError("Cannot convert a Symbol value to a string");
   }
   return String(value);
+}
+
+/**
+ * WebIDL double conversion: BigInt throws a TypeError, everything else
+ * coerces with Number (numeric strings, null, booleans, ...).
+ */
+export function webidlDouble(value: unknown): number {
+  if (typeof value === "bigint") {
+    throw new TypeError("Cannot convert a BigInt value to a number");
+  }
+  return Number(value);
 }

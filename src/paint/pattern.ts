@@ -11,9 +11,12 @@ export function isCompatPattern(value: unknown): value is CompatPattern {
 const REPETITIONS = new Set(["repeat", "repeat-x", "repeat-y", "no-repeat"]);
 
 /**
- * Immutable repeat-only pattern. The image bitmap is captured at creation
- * (later img.src swaps are not observed, matching native), so version stays 0
- * and id+version safely key any derived GPU/raster material.
+ * Repeat-only pattern holding the live image plus its creation-time
+ * dimensions. Native captures the bitmap at creation (later img.src swaps
+ * are not observed); this reference does NOT capture it yet — bitmap capture
+ * ownership and the Paint.image contract shape are decided by issue #36.
+ * Until then id+version must not key derived GPU/raster material across src
+ * swaps. version stays 0 because the recorded fields never change.
  */
 export class RepeatPatternPaint implements PaintRef {
   readonly version = 0;
@@ -56,19 +59,31 @@ function globalInstanceof(value: object, name: string): boolean {
   return typeof ctor === "function" && value instanceof (ctor as new () => object);
 }
 
+/**
+ * Cross-realm brand check: DOM interface objects carry a Symbol.toStringTag
+ * that survives across realms, unlike instanceof against one realm's ctor
+ * (native createPattern accepts cross-realm images and canvases).
+ */
+function hasDomTag(value: object, tag: string): boolean {
+  return Object.prototype.toString.call(value) === `[object ${tag}]`;
+}
+
 function isCanvasLike(value: object): boolean {
-  if (
-    typeof (value as { getContext?: unknown }).getContext === "function" ||
+  return (
     globalInstanceof(value, "HTMLCanvasElement") ||
-    globalInstanceof(value, "OffscreenCanvas")
-  ) {
-    return true;
-  }
-  return false;
+    globalInstanceof(value, "OffscreenCanvas") ||
+    hasDomTag(value, "HTMLCanvasElement") ||
+    hasDomTag(value, "OffscreenCanvas")
+  );
 }
 
 function isImageElementLike(value: object): boolean {
   if (globalInstanceof(value, "HTMLImageElement")) return true;
+  if (hasDomTag(value, "HTMLImageElement")) return true;
+  // Structural fallback only where no DOM brand exists (non-DOM platforms,
+  // Node unit tests); browsers reject plain objects with a TypeError.
+  const ctor = (globalThis as Record<string, unknown>).HTMLImageElement;
+  if (typeof ctor === "function") return false;
   const candidate = value as {
     complete?: unknown;
     naturalWidth?: unknown;
@@ -87,7 +102,6 @@ function isOtherNativeImageSource(value: object): boolean {
     "SVGImageElement",
     "HTMLVideoElement",
     "VideoFrame",
-    "ImageData",
     "CSSImageValue",
   ]) {
     if (globalInstanceof(value, name)) return true;

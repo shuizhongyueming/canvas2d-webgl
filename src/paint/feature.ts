@@ -8,9 +8,9 @@ import type {
 import { ERROR_CODES, createCompatError } from "../contracts/errors.js";
 import { classifyColorValue, parseSupportedColor } from "./color.js";
 import { LinearGradientPaint, isCompatGradient } from "./gradient.js";
-import { webidlString } from "./native-error.js";
+import { webidlDouble, webidlString } from "./native-error.js";
 import { createRepeatPattern, isCompatPattern } from "./pattern.js";
-import { SolidPaint } from "./solid.js";
+import { DEFAULT_STYLE_IDS, SolidPaint } from "./solid.js";
 
 /** A PaintRef carrying the value the fillStyle/strokeStyle getter returns. */
 export interface StylePaintRef extends PaintRef {
@@ -46,7 +46,9 @@ type StyleMember = "fillStyle" | "strokeStyle";
  */
 export function paintFeature(environment: FeatureEnvironment): FeatureDefinition {
   const state = environment.state;
-  let nextPaintId = 1;
+  // Ids at or below DEFAULT_STYLE_IDS.stroke are reserved for the default
+  // fill/stroke styles installed by the state ticket.
+  let nextPaintId = DEFAULT_STYLE_IDS.stroke + 1;
   const allocId = (): number => nextPaintId++;
 
   const keyOf = (member: StyleMember): string =>
@@ -96,7 +98,7 @@ export function paintFeature(environment: FeatureEnvironment): FeatureDefinition
         `Failed to execute 'createLinearGradient' on 'CanvasRenderingContext2D': 4 arguments required, but only ${arity} present.`,
       );
     }
-    const coords = [x0, y0, x1, y1].map((value) => Number(value)) as [
+    const coords = [x0, y0, x1, y1].map((value) => webidlDouble(value)) as [
       number,
       number,
       number,

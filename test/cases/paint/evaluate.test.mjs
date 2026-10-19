@@ -55,6 +55,28 @@ test("duplicate offsets: last stop wins at the point, first from the left", () =
   assert.deepEqual(interpolateStops(stops, 0.75).map(byte), [128, 128, 255, 255]);
 });
 
+test("duplicated edge stops: point takes the last stop, pad takes the edge stop", () => {
+  // Chromium probe (PR #34 review): [0:red, 0:blue, 1:green] paints blue at
+  // t=0 exactly, red in the left pad, and blue->green right of the group.
+  const dupFirst = [stop(0, "#ff0000"), stop(0, "#0000ff"), stop(1, "#00ff00")];
+  assert.deepEqual(interpolateStops(dupFirst, 0), color("#0000ff"), "t=0");
+  assert.deepEqual(interpolateStops(dupFirst, -0.5), color("#ff0000"), "left pad");
+  const rightOfGroup = interpolateStops(dupFirst, 0.001).map(byte);
+  assert.ok(
+    rightOfGroup[2] > 250 && rightOfGroup[1] < 5,
+    `right of the group starts from blue: ${rightOfGroup}`,
+  );
+  // [0:red, 1:green, 1:blue] paints blue at t=1 and in the right pad.
+  const dupLast = [stop(0, "#ff0000"), stop(1, "#00ff00"), stop(1, "#0000ff")];
+  assert.deepEqual(interpolateStops(dupLast, 1), color("#0000ff"), "t=1");
+  assert.deepEqual(interpolateStops(dupLast, 1.5), color("#0000ff"), "right pad");
+  const leftOfGroup = interpolateStops(dupLast, 0.999).map(byte);
+  assert.ok(
+    leftOfGroup[1] > 250 && leftOfGroup[2] < 5,
+    `left of the group approaches green: ${leftOfGroup}`,
+  );
+});
+
 test("linearGradientColorAt follows native drawing rules", () => {
   const ramp = gradient([stop(0, "#ff0000"), stop(1, "#0000ff")]);
   assert.deepEqual(linearGradientColorAt(ramp, 0, 5), color("#ff0000"));

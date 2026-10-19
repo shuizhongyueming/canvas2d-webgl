@@ -2,7 +2,7 @@ import type { CompatGradient } from "../api.js";
 import type { Color, Matrix, Paint, PaintRef } from "../internal/contracts.js";
 import { ERROR_CODES, createCompatError } from "../contracts/errors.js";
 import { classifyColorValue, parseSupportedColor } from "./color.js";
-import { nativeException, webidlString } from "./native-error.js";
+import { nativeException, webidlDouble, webidlString } from "./native-error.js";
 
 const registry = new WeakSet<object>();
 export function isCompatGradient(value: unknown): value is CompatGradient {
@@ -58,7 +58,7 @@ export class LinearGradientPaint implements PaintRef {
         `Failed to execute 'addColorStop' on 'CanvasGradient': 2 arguments required, but only ${arity} present.`,
       );
     }
-    const value = Number(offset);
+    const value = webidlDouble(offset);
     if (!Number.isFinite(value)) {
       throw new TypeError(
         "Failed to execute 'addColorStop' on 'CanvasGradient': The provided double value is non-finite.",

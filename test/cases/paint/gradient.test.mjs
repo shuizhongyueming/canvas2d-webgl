@@ -17,6 +17,13 @@ test("addColorStop keeps native exception types", () => {
     const error = capture(() => g.addColorStop(offset, "#fff"));
     assert.equal(error.name, "TypeError");
   }
+  // WebIDL double conversion rejects BigInt with a plain TypeError.
+  const bigint = capture(() => g.addColorStop(1n, "#fff"));
+  assert.equal(bigint.name, "TypeError");
+  assert.equal(bigint.code, undefined, "not a DOMException");
+  // BigInt colors stringify per WebIDL and then fail as colors.
+  const bigintColor = capture(() => g.addColorStop(0.5, 1n));
+  assert.equal(bigintColor.name, "SyntaxError");
   for (const color of ["not-a-color", "", null]) {
     const error = capture(() => g.addColorStop(0.5, color));
     assert.equal(error.name, "SyntaxError");
