@@ -199,19 +199,24 @@ export const cases: CaseDefinition[] = [
         captureError(() => second.device.restore())?.code ?? "no-error",
       );
       extension.restoreContext();
-      a.observe(
-        "realRestored",
-        await waitFor(() => !second.gl.isContextLost()),
-      );
-      second.device.restore();
-      second.device.draw(
-        rectDraw(
-          second.device.generation,
-          { x: 0, y: 0, width: 4, height: 4 },
-          BLUE,
-        ),
-      );
-      a.observe("afterRealRestore", pixelAt(second.hooks.readScene(), 0, 0));
+      const realRestored = await waitFor(() => !second.gl.isContextLost());
+      a.observe("realRestored", realRestored);
+      if (realRestored) {
+        second.device.restore();
+        second.device.draw(
+          rectDraw(
+            second.device.generation,
+            { x: 0, y: 0, width: 4, height: 4 },
+            BLUE,
+          ),
+        );
+        a.observe("afterRealRestore", pixelAt(second.hooks.readScene(), 0, 0));
+      } else {
+        a.observe(
+          "afterRealRestore",
+          "skipped: software driver keeps the context lost",
+        );
+      }
       second.device.dispose();
     },
   },

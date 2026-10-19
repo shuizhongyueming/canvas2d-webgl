@@ -337,6 +337,7 @@ class SceneDevice implements GPUDevice {
     gl.vertexAttribPointer(solid.aPosition, 2, gl.FLOAT, false, 0, 0);
     this.applyBlend(composite);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    gl.disableVertexAttribArray(solid.aPosition);
   }
 
   private drawTexturedQuad(
@@ -377,6 +378,8 @@ class SceneDevice implements GPUDevice {
     gl.vertexAttribPointer(textured.aUv, 2, gl.FLOAT, false, 0, 0);
     this.applyBlend(composite);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    gl.disableVertexAttribArray(textured.aPosition);
+    gl.disableVertexAttribArray(textured.aUv);
   }
 
   private texturedGeometry(source: RasterSource | ImageDrawSource): {

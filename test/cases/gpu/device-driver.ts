@@ -17,7 +17,7 @@ export type GpuModule = typeof gpu;
  */
 export async function loadGpu(): Promise<GpuModule> {
   return (await import(
-    new URL("../../../dist/gpu/index.js", import.meta.url).href
+    new URL("../../../../dist/gpu/index.js", import.meta.url).href
   )) as GpuModule;
 }
 
