@@ -6,6 +6,7 @@ import type {
   DrawState,
   GPUDevice,
   Matrix,
+  PatternBitmap,
   RasterSource,
 } from "../../../src/internal/contracts.js";
 
@@ -160,6 +161,31 @@ export function makeRasterSource(
       /* call-counting belongs to the owning test */
     },
   };
+}
+
+/** Frozen captured-bitmap fixture, matching the paint feature's PatternBitmap. */
+export function makePatternBitmap(
+  width: number,
+  height: number,
+  colorAt: (x: number, y: number) => readonly [number, number, number, number],
+): PatternBitmap {
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y += 1)
+    for (let x = 0; x < width; x += 1) {
+      const [r, g, b, alpha] = colorAt(x, y);
+      const offset = (y * width + x) * 4;
+      data[offset] = r;
+      data[offset + 1] = g;
+      data[offset + 2] = b;
+      data[offset + 3] = alpha;
+    }
+  return Object.freeze({
+    width,
+    height,
+    colorSpace: "srgb",
+    alpha: "straight",
+    data,
+  });
 }
 
 export type Pixel = [number, number, number, number];

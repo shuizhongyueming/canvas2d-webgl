@@ -3,12 +3,11 @@
 // with the path feature ticket (#19); these cases stay module regressions on
 // both sides.
 import type { CaseAdapter, CaseDefinition } from "../../types/testing.js";
-import type { Paint } from "../../../src/internal/contracts.js";
 import { PathRecorder } from "../../../src/path/recorder.js";
 import {
   IDENTITY,
   compareAsset,
-  loadTileImage,
+  loadTilePaint,
   makeLab,
   makeState,
   referenceContext,
@@ -193,15 +192,7 @@ async function run(a: CaseAdapter): Promise<void> {
   shifted.release();
 
   // Repeat-pattern fill paints in the draw-time space.
-  const image = await loadTileImage();
-  const patternPaint: Paint = {
-    kind: "repeat-pattern",
-    id: 1,
-    version: 1,
-    image,
-    width: 4,
-    height: 4,
-  };
+  const { image, paint: patternPaint } = await loadTilePaint(1);
   const patternReference = referenceContext();
   patternReference.beginPath();
   patternReference.rect(20, 130, 60, 40);

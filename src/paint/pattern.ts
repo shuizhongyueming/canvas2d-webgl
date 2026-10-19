@@ -1,5 +1,5 @@
-import type { CompatPattern } from "../api.js";
-import type { Paint, PaintRef } from "../internal/contracts.js";
+import type { CompatPattern, NativeCanvas } from "../api.js";
+import type { Paint, PaintRef, PatternBitmap } from "../internal/contracts.js";
 import { ERROR_CODES, createCompatError } from "../contracts/errors.js";
 import { nativeException, webidlString } from "./native-error.js";
 
@@ -11,21 +11,19 @@ export function isCompatPattern(value: unknown): value is CompatPattern {
 const REPETITIONS = new Set(["repeat", "repeat-x", "repeat-y", "no-repeat"]);
 
 /**
- * Repeat-only pattern holding the live image plus its creation-time
- * dimensions. Native captures the bitmap at creation (later img.src swaps
- * are not observed); this reference does NOT capture it yet — bitmap capture
- * ownership and the Paint.image contract shape are decided by issue #36.
- * Until then id+version must not key derived GPU/raster material across src
- * swaps. version stays 0 because the recorded fields never change.
+ * Repeat-only pattern holding the frozen bitmap captured at creation
+ * (decision #36): native captures the bitmap when createPattern runs, so
+ * later img.src swaps are never observed. With the capture owned and frozen,
+ * the pattern is immutable and id+version (version stays 0: the recorded
+ * fields never change) is again a sufficient key for derived GPU/raster
+ * material.
  */
 export class RepeatPatternPaint implements PaintRef {
   readonly version = 0;
 
   constructor(
     readonly id: number,
-    readonly image: HTMLImageElement,
-    readonly width: number,
-    readonly height: number,
+    readonly image: PatternBitmap,
   ) {
     registry.add(this);
   }
@@ -48,9 +46,50 @@ export class RepeatPatternPaint implements PaintRef {
       id: this.id,
       version: this.version,
       image: this.image,
-      width: this.width,
-      height: this.height,
     }) as Paint;
+  }
+}
+
+/**
+ * Synchronously capture the image's current bitmap through the
+ * platform-injected offscreen factory: draw at natural size, read the
+ * straight sRGB pixels back, and freeze the owned struct. The factory and a
+ * 2D context on its product are required capabilities — their absence fails
+ * capability-unavailable instead of silently degrading to a live image
+ * reference. The scratch canvas is released immediately; getImageData has
+ * already copied the pixels.
+ */
+function capturePatternBitmap(
+  image: HTMLImageElement,
+  width: number,
+  height: number,
+  createCanvas: ((width: number, height: number) => NativeCanvas) | undefined,
+): PatternBitmap {
+  if (!createCanvas)
+    throw createCompatError(
+      ERROR_CODES.CAPABILITY,
+      "createPattern: offscreen canvas factory is unavailable",
+    );
+  const canvas = createCanvas(width, height);
+  const context = canvas.getContext("2d");
+  if (!context)
+    throw createCompatError(
+      ERROR_CODES.CAPABILITY,
+      "createPattern: offscreen 2D context is unavailable",
+    );
+  try {
+    context.drawImage(image, 0, 0);
+    const captured = context.getImageData(0, 0, width, height);
+    return Object.freeze({
+      width,
+      height,
+      colorSpace: "srgb",
+      alpha: "straight",
+      data: captured.data,
+    });
+  } finally {
+    canvas.width = 0;
+    canvas.height = 0;
   }
 }
 
@@ -114,13 +153,16 @@ function isOtherNativeImageSource(value: object): boolean {
  * evidence on issue #15): arity -> image type -> repetition -> usability.
  * Canvas sources and non-repeat modes are legal native values outside the
  * support matrix, so they fail with unsupported-api instead of the native
- * outcome; everything else keeps native exception types.
+ * outcome; everything else keeps native exception types. Only a genuinely
+ * creatable pattern reaches the bitmap capture, so the missing-factory
+ * capability failure never masks a native input error.
  */
 export function createRepeatPattern(
   image: unknown,
   repetition: unknown,
   arity: number,
   allocId: () => number,
+  createCanvas?: (width: number, height: number) => NativeCanvas,
 ): RepeatPatternPaint | null {
   if (arity < 2) {
     throw new TypeError(
@@ -179,9 +221,12 @@ export function createRepeatPattern(
   if (typeof source.naturalWidth === "number" && source.naturalWidth > 0) {
     return new RepeatPatternPaint(
       allocId(),
-      image as HTMLImageElement,
-      source.naturalWidth,
-      source.naturalHeight,
+      capturePatternBitmap(
+        image as HTMLImageElement,
+        source.naturalWidth,
+        source.naturalHeight,
+        createCanvas,
+      ),
     );
   }
   const hasSource =

@@ -1,9 +1,11 @@
 import type { NativeCanvas } from "../../../src/api.js";
 import type {
   DrawState,
+  Paint,
   RasterSource,
   Rasterizer,
 } from "../../../src/internal/contracts.js";
+import { createRepeatPattern } from "../../../src/paint/pattern.js";
 import { createRasterizer } from "../../../src/raster/rasterizer.js";
 import type { CaseAdapter } from "../../types/testing.js";
 
@@ -80,6 +82,26 @@ export async function loadTileImage(): Promise<HTMLImageElement> {
     image.src = tile.toDataURL("image/png");
   });
   return image;
+}
+
+/**
+ * Build the repeat-pattern Paint for the checkerboard tile through the real
+ * creation-time capture of the paint feature, so the raster cases consume
+ * exactly the frozen bitmap the library produces. The loaded image is
+ * returned alongside for the native reference render.
+ */
+export async function loadTilePaint(
+  id: number,
+): Promise<{ image: HTMLImageElement; paint: Paint }> {
+  const image = await loadTileImage();
+  const pattern = createRepeatPattern(image, "repeat", 2, () => id, (width, height) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    return canvas;
+  });
+  if (!pattern) throw new Error("tile pattern unavailable");
+  return { image, paint: pattern.snapshot() };
 }
 
 export function referenceContext(): CanvasRenderingContext2D {

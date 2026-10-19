@@ -7,6 +7,7 @@ import {
   clearOp,
   countPixels,
   isTransparent,
+  makePatternBitmap,
   makeRasterSource,
   makeRenderer,
   nextFrame,
@@ -230,6 +231,51 @@ export const cases: CaseDefinition[] = [
         "staleRetain",
         captureError(() => device.retain(stale.handle))?.code ?? "no-error",
       );
+      device.dispose();
+    },
+  },
+  {
+    id: "gpu.resources.pattern-bitmap-texture",
+    requirements: ["REN-02"],
+    kind: "semantic",
+    width: 32,
+    height: 32,
+    seed: 1,
+    fonts: [],
+    async run(a) {
+      const { gl, device, hooks } = await makeRenderer(4, 4);
+      // A captured pattern bitmap uploads through the typed-array texImage2D
+      // path (issue #37): NPOT 3x5 stays legal because wrap is CLAMP_TO_EDGE,
+      // and the straight-alpha pixels premultiply under the same unpack
+      // convention as DOM sources.
+      const bitmap = makePatternBitmap(3, 5, (x) => [
+        x === 0 ? 255 : 0,
+        x === 1 ? 255 : 0,
+        x === 2 ? 255 : 0,
+        255,
+      ]);
+      const counts = () => {
+        const current = hooks.resourceCounts();
+        return [current.textures, current.textureLeases];
+      };
+      a.observe("before", counts());
+      const lease = device.acquireTexture(bitmap);
+      a.observe("afterAcquire", counts());
+      const retained = device.retain(lease.handle);
+      lease.release();
+      a.observe("afterLeaseRelease", counts());
+      retained.release();
+      a.observe("afterFinalRelease", counts());
+      const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
+      const oversized = makePatternBitmap(maxTextureSize + 1, 1, () => [
+        0, 0, 0, 255,
+      ]);
+      a.observe(
+        "oversizeCode",
+        captureError(() => device.acquireTexture(oversized))?.code ??
+          "no-error",
+      );
+      a.observe("afterOversize", counts());
       device.dispose();
     },
   },

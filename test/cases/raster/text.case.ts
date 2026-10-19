@@ -5,7 +5,7 @@
 import type { CaseAdapter, CaseDefinition } from "../../types/testing.js";
 import {
   compareAsset,
-  loadTileImage,
+  loadTilePaint,
   makeLab,
   makeState,
   referenceContext,
@@ -161,15 +161,7 @@ async function run(a: CaseAdapter): Promise<void> {
   gradientStroke.release();
 
   // Pattern text paints in the draw-time space as well.
-  const tile = await loadTileImage();
-  const patternPaint: Paint = {
-    kind: "repeat-pattern",
-    id: 42,
-    version: 1,
-    image: tile,
-    width: 4,
-    height: 4,
-  };
+  const { image: tile, paint: patternPaint } = await loadTilePaint(42);
   const patternRef = referenceContext();
   patternRef.font = font;
   patternRef.setTransform(1, 0, 0, 1, 10, 7);

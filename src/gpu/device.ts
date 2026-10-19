@@ -4,6 +4,7 @@ import type {
   DrawOperation,
   GPUDevice,
   Matrix,
+  PatternBitmap,
   Presenter,
   RasterSource,
   ResourceHandle,
@@ -576,7 +577,7 @@ class SceneDevice implements GPUDevice {
     this.owner.releaseAll();
   }
 
-  acquireTexture(source: RasterSource | ImageSource): ResourceLease {
+  acquireTexture(source: RasterSource | ImageSource | PatternBitmap): ResourceLease {
     if (this.status === "disposed")
       throw createCompatError(ERROR_CODES.DISPOSED, "device is disposed");
     if (this.status === "lost")

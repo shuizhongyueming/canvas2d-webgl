@@ -10,6 +10,20 @@ export type Bounds = Readonly<{
 }>;
 /** Straight (not premultiplied) sRGB channels in [0,1]; premultiply once at GPU ingress. */
 export type Color = readonly [number, number, number, number];
+/**
+ * Immutable bitmap captured at createPattern time: straight sRGB RGBA8,
+ * aligned with RasterSource alpha semantics. The owning paint never mutates
+ * the typed array and the wrapper is frozen at creation, so a captured
+ * bitmap outlives any later mutation of the source image. Runtime-neutral
+ * on purpose: this is not a DOM ImageData.
+ */
+export interface PatternBitmap {
+  readonly width: number;
+  readonly height: number;
+  readonly colorSpace: "srgb";
+  readonly alpha: "straight";
+  readonly data: Uint8ClampedArray;
+}
 export type Paint =
   | Readonly<{ kind: "solid"; color: Color }>
   | Readonly<{
@@ -25,9 +39,7 @@ export type Paint =
       kind: "repeat-pattern";
       id: number;
       version: number;
-      image: HTMLImageElement;
-      width: number;
-      height: number;
+      image: PatternBitmap;
     }>;
 /** Live logical style reference. save/restore retains this object; draw captures a Paint. */
 export interface PaintRef {
@@ -152,7 +164,7 @@ export interface GPUDevice {
   lose(): void;
   restore(): void;
   dispose(): void;
-  acquireTexture(source: RasterSource | ImageSource): ResourceLease;
+  acquireTexture(source: RasterSource | ImageSource | PatternBitmap): ResourceLease;
   /** Obtain a separate lease for a live handle; stale generations fail explicitly. */
   retain(handle: ResourceHandle): ResourceLease;
 }
@@ -212,6 +224,12 @@ export interface FeatureEnvironment {
   readonly gpu: GPUDevice;
   readonly presenter: Presenter;
   readonly resources: ResourceOwner;
+  /**
+   * Platform-injected factory for library-internal offscreen canvases
+   * (CompatOptions.createOffscreenCanvas). Consumers that need it fail
+   * capability-unavailable when it is absent; no silent fallback.
+   */
+  readonly createOffscreenCanvas?: (width: number, height: number) => NativeCanvas;
 }
 export interface FeatureDefinition {
   readonly id: string;

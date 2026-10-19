@@ -1,6 +1,5 @@
-import type { Paint } from "../internal/contracts.js";
+import type { Paint, PatternBitmap } from "../internal/contracts.js";
 import type { Native2DContext } from "./native.js";
-import { createCompatError, ERROR_CODES } from "../contracts/errors.js";
 
 function channel(value: number): number {
   return Math.round(Math.min(1, Math.max(0, value)) * 255);
@@ -15,6 +14,14 @@ type StyleContext = Pick<
   Native2DContext,
   "createLinearGradient" | "createPattern" | "fillStyle" | "strokeStyle"
 >;
+
+/**
+ * Turns a captured pattern bitmap into a native pattern at the platform
+ * boundary. The caller (rasterizer) owns the scratch canvas behind it;
+ * native createPattern copies the scratch bitmap synchronously, so the
+ * returned pattern stays valid after the scratch is reused.
+ */
+export type PatternSource = (bitmap: PatternBitmap) => CanvasPattern;
 
 /**
  * Bake a Paint into native style state. Solid colors are written directly.
@@ -35,6 +42,7 @@ export function applyPaint(
   ctx: StyleContext,
   paint: Paint,
   mode: "fill" | "stroke",
+  patternSource: PatternSource,
 ): void {
   let style: string | CanvasGradient | CanvasPattern;
   if (paint.kind === "solid") {
@@ -50,13 +58,7 @@ export function applyPaint(
       gradient.addColorStop(stop.offset, cssColor(stop.color));
     style = gradient;
   } else {
-    const pattern = ctx.createPattern(paint.image, "repeat");
-    if (!pattern)
-      throw createCompatError(
-        ERROR_CODES.CONTRACT,
-        "repeat-pattern paint produced no native pattern",
-      );
-    style = pattern;
+    style = patternSource(paint.image);
   }
   if (mode === "fill") ctx.fillStyle = style;
   else ctx.strokeStyle = style;

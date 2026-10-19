@@ -300,16 +300,35 @@ export const cases: CaseDefinition[] = [
       const context = asNative(a.context);
       const image = await loadImage(STRIPES_3x5);
       const pattern = context.createPattern(image, "repeat");
+      a.assert(pattern !== null, "repeat pattern created before the src swap");
       image.src = YELLOW_BLACK_3x5;
       await new Promise((resolve, reject) => {
         image.onload = resolve;
         image.onerror = reject;
       });
       assignFill(context, pattern);
-      // Native truth (probe, issue #36): the pattern keeps the creation-time
-      // bitmap, so the swapped-in yellow tile must NOT appear. The compat
-      // side does not capture the bitmap yet; this case pins the gap.
       context.fillRect(0, 0, 24, 24);
+      // Creation-time bitmap capture (HTML Standard; Chromium probe on issue
+      // #36; implemented by issue #37): the pattern keeps the creation-time
+      // bitmap, so the swapped-in yellow/black tile must NOT appear. The
+      // native side asserts the painted pixels directly; the compat side has
+      // no readback API, so its scene artifact diffed against this asserted
+      // reference is its half of the assertion.
+      if (!isCompat(a)) {
+        const row = (context as Ctx).getImageData(0, 0, 3, 1).data;
+        a.assert(
+          row[0] === 255 && row[1] === 0 && row[2] === 0 && row[3] === 255,
+          "first stripe is the creation-time red, not the swapped-in yellow",
+        );
+        a.assert(
+          row[4] === 0 && row[5] === 255 && row[6] === 0 && row[7] === 255,
+          "second stripe is the creation-time green, not the swapped-in black",
+        );
+        a.assert(
+          row[8] === 0 && row[9] === 0 && row[10] === 255 && row[11] === 255,
+          "third stripe is the creation-time blue",
+        );
+      }
     },
   },
 ];
