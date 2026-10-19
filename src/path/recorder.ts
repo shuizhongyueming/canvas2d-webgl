@@ -48,14 +48,19 @@ function freezeCommand(command: PathCommand): PathCommand {
  * transform captured at construction time; snapshots are immutable and survive
  * later mutations, begin() and reset().
  */
+// Snapshot ids come from one page-wide counter: a rasterizer consuming
+// snapshots from several recorder instances must never see the same id on
+// different content. Id 1 is the never-mutated snapshot, empty for every
+// recorder, so sharing it cannot alias distinct paths.
+let nextSnapshotId = 2;
+
 export class PathRecorder implements PathStore {
   #commands: PathCommand[] = [];
   #id = 1;
-  #nextId = 2;
 
   begin(): void {
     this.#commands = [];
-    this.#id = this.#nextId++;
+    this.#id = nextSnapshotId++;
   }
 
   reset(): void {
@@ -69,7 +74,7 @@ export class PathRecorder implements PathStore {
     )
       throw new TypeError(`Invalid path command: ${String(command.op)}`);
     this.#commands.push(freezeCommand(command));
-    this.#id = this.#nextId++;
+    this.#id = nextSnapshotId++;
   }
 
   snapshot(): PathSnapshot {

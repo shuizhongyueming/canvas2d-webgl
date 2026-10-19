@@ -49,6 +49,17 @@ test("ids stay stable without mutation and change on append, begin and reset", (
   assert.equal(recorder.snapshot().commands.length, 0);
 });
 
+test("snapshot ids are unique across recorder instances", () => {
+  const first = new PathRecorder();
+  const second = new PathRecorder();
+  first.moveTo(0, 0, IDENTITY);
+  second.moveTo(0, 0, IDENTITY);
+  assert.notEqual(first.snapshot().id, second.snapshot().id);
+  first.begin();
+  second.begin();
+  assert.notEqual(first.snapshot().id, second.snapshot().id);
+});
+
 test("negative radii raise IndexSizeError matching the native shape", () => {
   const recorder = new PathRecorder();
   for (const call of [
