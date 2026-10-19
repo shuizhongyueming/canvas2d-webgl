@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import { createCompatCanvas } from '../../dist/index.js';
 import { createCompatError, ERROR_CODES, rollbackInitialization } from '../../dist/contracts/errors.js';
 
-test('unimplemented factory fails explicitly without touching the target', () => {
-  const target = new Proxy({}, { get() { throw Error('Target was touched'); } });
-  assert.throws(() => createCompatCanvas(target), { code: 'not-implemented' });
+test('factory rejects an invalid target synchronously', () => {
+  // A non-canvas target fails fast with a stable code; the real factory must
+  // read the target to validate it, so the input here is simply unusable.
+  assert.throws(() => createCompatCanvas({}), { code: 'invalid-target' });
+  assert.throws(() => createCompatCanvas(null), { code: 'invalid-target' });
 });
 
 test('stable errors identify the capability without converting native exceptions', () => {
