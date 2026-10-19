@@ -5,7 +5,8 @@ import { readFile } from 'node:fs/promises';
 test('built package exports only the public fail-fast factory, never test hooks', async () => {
   const api = await import('canvas2d-webgl');
   assert.deepEqual(Object.keys(api), ['createCompatCanvas']);
-  assert.throws(() => api.createCompatCanvas({}), { code: 'not-implemented' });
+  // The real factory fail-fast reports invalid-target for a non-canvas target.
+  assert.throws(() => api.createCompatCanvas({}), { code: 'invalid-target' });
   for (const path of ['canvas2d-webgl/testing', 'canvas2d-webgl/contracts', 'canvas2d-webgl/types/internal/testing']) {
     await assert.rejects(import(path), { code: 'ERR_PACKAGE_PATH_NOT_EXPORTED' });
   }

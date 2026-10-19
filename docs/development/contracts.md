@@ -4,7 +4,7 @@
 
 ## 当前交付
 
-这是工程与协作契约，不是可用渲染器。公开入口 `createCompatCanvas` 始终同步抛 `not-implemented`；任何目标属性都不会被读取或修改。真实创建入口由公开画布票实现。不要将契约单测通过当成 Canvas 兼容性通过。
+这是工程与协作契约。公开入口 `createCompatCanvas` 已接入真实创建（[#16](https://github.com/shuizhongyueming/canvas2d-webgl/issues/16)）：输入校验、离屏工厂同步探测、GPU 能力检测与资源分配、状态/context 组装、画布三分法转发；失败按错误表同步抛带 `code` 的错误并回滚库资源，不返回半初始化对象。尚不是可用渲染器：绘制入口未实现，未安装的受支持成员抛 `not-implemented`，读回/导出按支持矩阵抛 `unsupported-api`。不要将契约单测通过当成 Canvas 兼容性通过。
 
 - 运行时、共享契约与浏览器用例使用 strict TypeScript + ESM；Node 构建与测试工具保留 JavaScript ESM。开发机 Node >=22；Node 版本不代表 vivo 的 JS 运行时要求。
 - `pnpm install --frozen-lockfile --ignore-scripts` 安装锁定的类型检查和测试开发依赖；生产代码无运行时依赖。
