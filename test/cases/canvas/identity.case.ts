@@ -1,5 +1,5 @@
 import type { CaseDefinition } from "../../types/testing.js";
-import { isCompat, outcome } from "./shared.js";
+import { isCompat, outcome } from "../shared.js";
 
 const base = {
   kind: "semantic" as const,

@@ -1,6 +1,6 @@
 import type { CaseDefinition } from "../../types/testing.js";
 import type { NativeCanvas } from "../../../src/api.js";
-import { loadFactory, makeTarget, outcome } from "./shared.js";
+import { loadFactory, makeTarget, outcome } from "../shared.js";
 
 const base = {
   kind: "semantic" as const,
