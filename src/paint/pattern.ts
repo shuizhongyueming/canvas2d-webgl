@@ -1,7 +1,7 @@
 import type { CompatPattern } from "../api.js";
 import type { Paint, PaintRef } from "../internal/contracts.js";
 import { ERROR_CODES, createCompatError } from "../contracts/errors.js";
-import { nativeException } from "./native-error.js";
+import { nativeException, webidlString } from "./native-error.js";
 
 const registry = new WeakSet<object>();
 export function isCompatPattern(value: unknown): value is CompatPattern {
@@ -139,7 +139,7 @@ export function createRepeatPattern(
   if (repetition === null || repetition === "") {
     mode = "repeat";
   } else {
-    mode = String(repetition);
+    mode = webidlString(repetition);
   }
   if (!REPETITIONS.has(mode)) {
     throw nativeException(

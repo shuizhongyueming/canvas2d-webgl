@@ -8,6 +8,7 @@ import type {
 import { ERROR_CODES, createCompatError } from "../contracts/errors.js";
 import { classifyColorValue, parseSupportedColor } from "./color.js";
 import { LinearGradientPaint, isCompatGradient } from "./gradient.js";
+import { webidlString } from "./native-error.js";
 import { createRepeatPattern, isCompatPattern } from "./pattern.js";
 import { SolidPaint } from "./solid.js";
 
@@ -62,7 +63,7 @@ export function paintFeature(environment: FeatureEnvironment): FeatureDefinition
       state.set(keyOf(member), value as unknown as PaintRef);
       return;
     }
-    const text = String(value);
+    const text = webidlString(value);
     const parsed = parseSupportedColor(text);
     if (parsed === null) {
       if (classifyColorValue(text) === "unsupported") {
