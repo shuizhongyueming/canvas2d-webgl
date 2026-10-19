@@ -8,7 +8,8 @@
 
 | 字段 | 填写内容 |
 | --- | --- |
-| `date` | 执行日期（YYYY-MM-DD，含时区） |
+| `date` | 执行日期（YYYY-MM-DD；不含时区，时区由下一字段单独记录） |
+| `timezone` | 执行时区（如 `UTC+08:00`），与 `date` 分开记录 |
 | `operator` | 执行人/agent 标识 |
 | `platform` | OS 与架构 |
 | `browser` | 浏览器名称与完整版本（首批：Chromium 系当前稳定版，#6；不锁版本，记录实际值） |
@@ -18,7 +19,7 @@
 | `canvasSize` | 目标画布 CSS 尺寸与物理尺寸 |
 | `fonts` | `Montserrat-ExtraBold` 加载检查结果（`document.fonts.check` 实际返回）；游戏唯一字体经启动前预载（#8 事实） |
 | `game` | 游戏标识与版本/commit（记录实际值；游戏文件不入仓） |
-| `library` | 被测库 commit 与 dirty 状态 |
+| `library` | 被测库 commit、dirty 状态与源快照哈希 `sourceHash`（缺哈希时无法判定源变化，旧记录与评审不可复用；无法取得时填「待核验」） |
 | `collector` | 注入采集器标识/版本与注入方式（仓外工具） |
 | `environmentId` | 执行方给出的环境标识，供证据引用 |
 | `notes` | 其他复现所需信息 |
@@ -26,7 +27,8 @@
 ## 可复制的空白模板
 
 ```markdown
-- date: <待填>
+- date: <待填：YYYY-MM-DD>
+- timezone: <待填>
 - operator: <待填>
 - platform: <待填>
 - browser: <待填>
@@ -36,7 +38,7 @@
 - canvasSize: <待填>
 - fonts: <待填：document.fonts.check 实际返回>
 - game: <待填：标识与版本/commit>
-- library: <待填：commit, dirty>
+- library: <待填：commit, dirty, sourceHash>
 - collector: <待填：标识/版本/注入方式>
 - environmentId: <待填>
 - notes: <待填>
