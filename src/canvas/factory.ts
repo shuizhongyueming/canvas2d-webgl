@@ -122,6 +122,9 @@ export function createCompatCanvas<T extends TargetCanvas>(
       gpu: device,
       presenter,
       resources,
+      // Already resolved and proven by validateOffscreenFactory; the paint
+      // feature captures pattern bitmaps through it (decision #36).
+      createOffscreenCanvas: offscreenFactory,
     };
     let facade!: CompatCanvas<T>;
     // ctx.canvas closes over the facade, assigned before this factory returns;
