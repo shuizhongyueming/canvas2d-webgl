@@ -60,21 +60,97 @@ function field(name: string): StateField {
 }
 
 function checkValue(key: StateField, value: unknown): void {
-  if (key === "transform") {
-    if (
-      !Array.isArray(value) ||
-      value.length !== 6 ||
-      !(value as unknown[]).every((v) => typeof v === "number")
-    )
-      fail("transform must be a six-element numeric matrix");
-  } else if (key === "fill" || key === "stroke") {
-    if (
-      !value ||
-      typeof (value as PaintRef).snapshot !== "function" ||
-      typeof (value as PaintRef).id !== "number" ||
-      typeof (value as PaintRef).version !== "number"
-    )
-      fail(`${key} must be a PaintRef`);
+  switch (key) {
+    case "transform":
+      if (
+        !Array.isArray(value) ||
+        value.length !== 6 ||
+        !(value as unknown[]).every(
+          (v) => typeof v === "number" && Number.isFinite(v),
+        )
+      )
+        fail("transform must be a six-element finite matrix");
+      break;
+    case "fill":
+    case "stroke":
+      if (
+        !value ||
+        typeof (value as PaintRef).snapshot !== "function" ||
+        typeof (value as PaintRef).id !== "number" ||
+        typeof (value as PaintRef).version !== "number"
+      )
+        fail(`${key} must be a PaintRef`);
+      break;
+    case "alpha":
+      if (
+        typeof value !== "number" ||
+        !Number.isFinite(value) ||
+        value < 0 ||
+        value > 1
+      )
+        fail("alpha must be a finite number in [0,1]");
+      break;
+    case "composite":
+      if (
+        value !== "source-over" &&
+        value !== "source-atop" &&
+        value !== "source-in" &&
+        value !== "lighter"
+      )
+        fail(`unknown composite mode: ${String(value)}`);
+      break;
+    case "filter":
+      if (value !== "none" && value !== "brightness(120%)")
+        fail(`unknown filter: ${String(value)}`);
+      break;
+    case "lineWidth":
+      if (typeof value !== "number" || !Number.isFinite(value) || value <= 0)
+        fail("lineWidth must be a positive finite number");
+      break;
+    case "lineCap":
+      if (value !== "butt" && value !== "round")
+        fail(`unknown lineCap: ${String(value)}`);
+      break;
+    case "lineJoin":
+      if (value !== "miter" && value !== "round")
+        fail(`unknown lineJoin: ${String(value)}`);
+      break;
+    case "font":
+      if (typeof value !== "string" || !value) fail("font must be a string");
+      break;
+    case "textAlign":
+      if (
+        value !== "start" &&
+        value !== "left" &&
+        value !== "center" &&
+        value !== "right"
+      )
+        fail(`unknown textAlign: ${String(value)}`);
+      break;
+    case "textBaseline":
+      if (
+        value !== "alphabetic" &&
+        value !== "top" &&
+        value !== "middle" &&
+        value !== "bottom"
+      )
+        fail(`unknown textBaseline: ${String(value)}`);
+      break;
+    case "clip":
+      if (value !== null) {
+        const clip = value as ClipSnapshot;
+        if (
+          !clip ||
+          typeof clip !== "object" ||
+          typeof clip.id !== "number" ||
+          (clip.rule !== "nonzero" && clip.rule !== "evenodd") ||
+          !clip.path ||
+          typeof clip.path.id !== "number" ||
+          !Array.isArray(clip.path.commands)
+        )
+          fail("clip must be a ClipSnapshot or null");
+      }
+      break;
   }
 }
 

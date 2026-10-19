@@ -157,4 +157,46 @@ export const cases: CaseDefinition[] = [
       a.observe("primitive", primitive === "TypeError" ? "as-approved" : primitive);
     },
   },
+  {
+    ...base,
+    id: "state.transform.singular-ctm",
+    requirements: ["context.translate", "context.scale", "context.setTransform"],
+    run(a) {
+      const c = a.context;
+      c.setTransform(1, 0, 0, 0, 0, 0);
+      a.observe("translateOnSingular", outcome(() => c.translate(5, 5)));
+      a.observe("scaleOnSingular", outcome(() => c.scale(2, 2)));
+      a.observe("rotateOnSingular", outcome(() => c.rotate(1)));
+      a.observe("rescue", outcome(() => c.setTransform(1, 0, 0, 1, 0, 0)));
+      c.scale(0, 0);
+      a.observe("translateAfterZeroScale", outcome(() => c.translate(5, 5)));
+    },
+  },
+  {
+    ...base,
+    id: "state.transform.bigint-typeerror",
+    requirements: [
+      "context.translate",
+      "context.rotate",
+      "context.scale",
+      "context.setTransform",
+      "context.globalAlpha",
+      "context.lineWidth",
+    ],
+    run(a) {
+      const c = a.context;
+      const translate = c.translate as (...args: unknown[]) => void;
+      const rotate = c.rotate as (...args: unknown[]) => void;
+      const scale = c.scale as (...args: unknown[]) => void;
+      const setTransform = c.setTransform as (...args: unknown[]) => void;
+      const loose = c as unknown as { globalAlpha: unknown; lineWidth: unknown };
+      a.observe("translate", outcome(() => translate.call(c, 1n, 0)));
+      a.observe("rotate", outcome(() => rotate.call(c, 1n)));
+      a.observe("scale", outcome(() => scale.call(c, 1n, 1)));
+      a.observe("setTransform", outcome(() => setTransform.call(c, 1n, 0, 0, 1, 0, 0)));
+      a.observe("globalAlpha", outcome(() => { loose.globalAlpha = 1n; }));
+      a.observe("lineWidth", outcome(() => { loose.lineWidth = 1n; }));
+      a.assert(c.globalAlpha === 1 && c.lineWidth === 1, "BigInt assignments change nothing");
+    },
+  },
 ];

@@ -48,6 +48,30 @@ test('set/get round-trips and unknown fields are contract violations', () => {
   assert.throws(() => s.set('fill', { kind: 'solid' }), { code: 'contract-violation' });
 });
 
+test('internal values outside the DrawState contract are rejected', () => {
+  const s = store();
+  assert.throws(() => s.set('alpha', 2), { code: 'contract-violation' });
+  assert.throws(() => s.set('alpha', NaN), { code: 'contract-violation' });
+  assert.throws(() => s.set('lineWidth', -1), { code: 'contract-violation' });
+  assert.throws(() => s.set('lineWidth', 0), { code: 'contract-violation' });
+  assert.throws(() => s.set('lineCap', 'bevel'), { code: 'contract-violation' });
+  assert.throws(() => s.set('lineJoin', 'bevel'), { code: 'contract-violation' });
+  assert.throws(() => s.set('composite', 'multiply'), { code: 'contract-violation' });
+  assert.throws(() => s.set('filter', 'blur(2px)'), { code: 'contract-violation' });
+  assert.throws(() => s.set('font', ''), { code: 'contract-violation' });
+  assert.throws(() => s.set('textAlign', 'justify'), { code: 'contract-violation' });
+  assert.throws(() => s.set('textBaseline', 'hanging'), { code: 'contract-violation' });
+  assert.throws(() => s.set('clip', {}), { code: 'contract-violation' });
+  assert.throws(() => s.set('transform', [1, 0, 0, 1, NaN, 0]), { code: 'contract-violation' });
+  s.set('composite', 'lighter');
+  s.set('filter', 'brightness(120%)');
+  s.set('textAlign', 'start');
+  s.set('textBaseline', 'alphabetic');
+  s.set('clip', null);
+  assert.equal(s.get('composite'), 'lighter');
+  assert.equal(s.get('filter'), 'brightness(120%)');
+});
+
 test('the store copies transforms on set and on snapshot', () => {
   const s = store();
   const input = [1, 0, 0, 1, 5, 6];
