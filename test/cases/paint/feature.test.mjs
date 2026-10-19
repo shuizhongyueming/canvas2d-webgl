@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { capture } from "./helpers.mjs";
 import { paintFeature, defaultStylePaint, DEFAULT_STYLE_IDS } from "../../../dist/paint/index.js";
 
-// Minimal StateStore double implementing the paint seam ("fill"/"stroke"/"transform").
+// Minimal StateStore double implementing the paint seam ("fill"/"stroke").
 function stateDouble(initial = {}) {
   const map = new Map(Object.entries(initial));
   return {
@@ -12,7 +12,6 @@ function stateDouble(initial = {}) {
     has: (name) => map.has(name),
   };
 }
-const TRANSFORM = Object.freeze([1, 0, 0, 1, 0, 0]);
 const make = (state) => {
   const feature = paintFeature({ state });
   const target = Object.create(null);
@@ -37,7 +36,7 @@ test("feature descriptor shape matches the context contract", () => {
 });
 
 test("fillStyle/strokeStyle parse, canonicalize and keep invalid input ignored", () => {
-  const ctx = make(stateDouble({ transform: TRANSFORM }));
+  const ctx = make(stateDouble());
   assert.equal(ctx.fillStyle, "#000000");
   assert.equal(ctx.strokeStyle, "#000000");
   ctx.fillStyle = "#AbCdEf";
@@ -59,7 +58,7 @@ test("fillStyle/strokeStyle parse, canonicalize and keep invalid input ignored",
 });
 
 test("legal but out-of-scope style values report unsupported-api", () => {
-  const ctx = make(stateDouble({ transform: TRANSFORM }));
+  const ctx = make(stateDouble());
   for (const value of ["red", "hsl(120,50%,50%)", "rgb(1 2 3 / 0.5)"]) {
     const error = capture(() => {
       ctx.fillStyle = value;
@@ -70,7 +69,7 @@ test("legal but out-of-scope style values report unsupported-api", () => {
 });
 
 test("gradient and pattern assignment keep object identity and live references", () => {
-  const state = stateDouble({ transform: TRANSFORM });
+  const state = stateDouble();
   const ctx = make(state);
   const gradient = ctx.createLinearGradient(0, 0, 10, 0);
   gradient.addColorStop(0, "#ff0000");
@@ -88,8 +87,8 @@ test("gradient and pattern assignment keep object identity and live references",
   assert.equal(state.get("fill"), state.get("stroke"));
 });
 
-test("createLinearGradient validates like native and captures creation transform", () => {
-  const state = stateDouble({ transform: Object.freeze([0, 1, -1, 0, 5, 6]) });
+test("createLinearGradient validates like native and records no transform", () => {
+  const state = stateDouble();
   const ctx = make(state);
   assert.throws(() => ctx.createLinearGradient(), TypeError);
   assert.throws(() => ctx.createLinearGradient(0, 0, 1), TypeError);
@@ -99,16 +98,19 @@ test("createLinearGradient validates like native and captures creation transform
   const bigint = capture(() => ctx.createLinearGradient(1n, 0, 1, 1));
   assert.equal(bigint.name, "TypeError");
   assert.equal(bigint.code, undefined, "not a DOMException");
+  // Gradients evaluate in the draw-time space (issue #33), so creation reads
+  // no transform from the state store: a state without a "transform" key is
+  // sufficient and the snapshot carries user-space endpoints only.
   const g = ctx.createLinearGradient("1", "2", "3", "4");
   ctx.fillStyle = g;
   const paint = state.get("fill").snapshot();
   assert.deepEqual(paint.from, [1, 2], "string arguments coerce like WebIDL");
   assert.deepEqual(paint.to, [3, 4]);
-  assert.deepEqual(paint.transform, [0, 1, -1, 0, 5, 6]);
+  assert.equal("transform" in paint, false);
 });
 
 test("paint ids are unique within one canvas feature instance", () => {
-  const state = stateDouble({ transform: TRANSFORM });
+  const state = stateDouble();
   const ctx = make(state);
   const seen = new Set();
   ctx.fillStyle = "#123456";
@@ -126,12 +128,6 @@ test("paint ids are unique within one canvas feature instance", () => {
       `id ${id} stays above the reserved default-style ids`,
     );
   }
-});
-
-test("createLinearGradient requires the state transform seam", () => {
-  const ctx = make(stateDouble());
-  const error = capture(() => ctx.createLinearGradient(0, 0, 1, 1));
-  assert.equal(error.code, "contract-violation");
 });
 
 test("defaultStylePaint provides the matrix default", () => {

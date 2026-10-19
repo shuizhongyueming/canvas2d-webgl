@@ -1,7 +1,6 @@
-import type { Matrix, Paint } from "../internal/contracts.js";
+import type { Paint } from "../internal/contracts.js";
 import type { Native2DContext } from "./native.js";
 import { createCompatError, ERROR_CODES } from "../contracts/errors.js";
-import { applyPoint, invert, offsetMatrix } from "./matrix.js";
 
 function channel(value: number): number {
   return Math.round(Math.min(1, Math.max(0, value)) * 255);
@@ -19,38 +18,34 @@ type StyleContext = Pick<
 
 /**
  * Bake a Paint into native style state. Solid colors are written directly.
- * Gradients are defined by creation-time transform and user-space endpoints, so
- * their device-space endpoints are re-expressed in the space the native paint
- * will be interpreted in: asset space for fill, the stroke-time transform for
- * stroke. Patterns paint in the current draw space and are handed over as-is.
+ *
+ * Gradients and patterns are interpreted by the native rasterizer in the
+ * coordinate space of the transform in effect WHEN RENDERING (HTML Standard,
+ * createLinearGradient; issue #33), never in a creation-time space. Callers
+ * have already installed the draw-time transform on `ctx` before calling, so
+ * the recorded user-space gradient endpoints pass through verbatim and native
+ * derives the device-space ramp itself: device = drawTransform ∘ endpoint.
+ *
+ * Asset-space composition is equally native: the text path installs
+ * offsetMatrix(drawTransform, assetOrigin), so native computes
+ * drawTransform ∘ endpoint − assetOrigin — the draw-time ramp shifted into
+ * asset space with no inverse-matrix premultiplication anywhere.
  */
 export function applyPaint(
   ctx: StyleContext,
   paint: Paint,
   mode: "fill" | "stroke",
-  offsetX: number,
-  offsetY: number,
-  strokeTransform: Matrix,
 ): void {
   let style: string | CanvasGradient | CanvasPattern;
   if (paint.kind === "solid") {
     style = cssColor(paint.color);
   } else if (paint.kind === "linear-gradient") {
-    let from = applyPoint(paint.transform, paint.from[0], paint.from[1]);
-    let to = applyPoint(paint.transform, paint.to[0], paint.to[1]);
-    from = [from[0] - offsetX, from[1] - offsetY];
-    to = [to[0] - offsetX, to[1] - offsetY];
-    if (mode === "stroke") {
-      // Native stroke interprets the gradient in the stroke-time space; pre-multiply
-      // by the inverse of the asset-space stroke transform so the device-space ramp
-      // stays the creation-time one.
-      const inv = invert(offsetMatrix(strokeTransform, offsetX, offsetY));
-      if (inv) {
-        from = applyPoint(inv, from[0], from[1]);
-        to = applyPoint(inv, to[0], to[1]);
-      }
-    }
-    const gradient = ctx.createLinearGradient(from[0], from[1], to[0], to[1]);
+    const gradient = ctx.createLinearGradient(
+      paint.from[0],
+      paint.from[1],
+      paint.to[0],
+      paint.to[1],
+    );
     for (const stop of paint.stops)
       gradient.addColorStop(stop.offset, cssColor(stop.color));
     style = gradient;

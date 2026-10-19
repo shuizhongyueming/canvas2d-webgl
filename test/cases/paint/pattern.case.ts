@@ -6,7 +6,7 @@ import {
   STRIPES_3x5,
   YELLOW_BLACK_3x5,
 } from "./fixtures.js";
-import { isCompat, outcome } from "./shared.js";
+import { isCompat, outcome } from "../shared.js";
 
 type Ctx = CanvasRenderingContext2D;
 const asNative = (context: unknown): Ctx => context as Ctx;
@@ -228,6 +228,28 @@ export const cases: CaseDefinition[] = [
       assignFill(context, pattern);
       context.fillRect(0, 0, 24, 24);
       // Native truth: the tile phase shifts with the draw-time transform.
+    },
+  },
+  {
+    ...renderBase,
+    id: "paint.pattern.creation-transform-ignored",
+    requirements: [
+      "context.createPattern",
+      "context.translate",
+      "context.save",
+      "context.restore",
+    ],
+    async run(a) {
+      const context = asNative(a.context);
+      context.save();
+      context.translate(1, 0);
+      const pattern = context.createPattern(await loadImage(STRIPES_3x5), "repeat");
+      context.restore(); // draw-time space is identity again
+      assignFill(context, pattern);
+      context.fillRect(0, 0, 24, 24);
+      // Native truth (issue #33): the creation-time transform does NOT bake
+      // into the pattern; only the draw-time space sets the tile phase, so
+      // this fill must match an untransformed one. Mirror of npot-phase.
     },
   },
   {

@@ -304,19 +304,22 @@ class NativeRasterizer implements Rasterizer {
       );
       replayPath(stage.ctx, path, 0, 0);
       if (mode === "stroke") {
+        // Stroke-time CTM is the draw-time transform: it scales the stroke
+        // width and is the space native interprets the stroke paint in.
         stage.ctx.setTransform(...state.transform);
         stage.ctx.lineWidth = state.lineWidth;
         stage.ctx.lineCap = state.lineCap;
         stage.ctx.lineJoin = state.lineJoin;
-        applyPaint(stage.ctx, state.stroke, "stroke", 0, 0, state.transform);
+        applyPaint(stage.ctx, state.stroke, "stroke");
         stage.ctx.stroke();
       } else {
-        // Patterns paint in the draw-time space; solids and gradients are
-        // transform-independent because gradient endpoints are pre-mapped.
-        if (state.fill.kind === "repeat-pattern")
-          stage.ctx.setTransform(...state.transform);
-        else stage.ctx.setTransform(1, 0, 0, 1, 0, 0);
-        applyPaint(stage.ctx, state.fill, "fill", 0, 0, state.transform);
+        // Gradients and patterns are evaluated in the draw-time space at fill
+        // time, so install the draw-time transform for them; solids are
+        // transform-independent. Path geometry is already construction-baked
+        // and the fill-time CTM never re-transforms it.
+        if (state.fill.kind === "solid") stage.ctx.setTransform(1, 0, 0, 1, 0, 0);
+        else stage.ctx.setTransform(...state.transform);
+        applyPaint(stage.ctx, state.fill, "fill");
         stage.ctx.fill();
       }
       ctx.putImageData(
@@ -394,20 +397,53 @@ class NativeRasterizer implements Rasterizer {
     if (!bounds) return emptyAsset(this.#options.createCanvas);
     const { canvas, ctx } = this.#createAsset(bounds);
     try {
-      const shifted = offsetMatrix(state.transform, bounds.x, bounds.y);
-      ctx.setTransform(...shifted);
-      ctx.font = state.font;
-      ctx.textAlign = state.textAlign;
-      ctx.textBaseline = state.textBaseline;
       const paint = mode === "fill" ? state.fill : state.stroke;
-      if (mode === "stroke") {
-        ctx.lineWidth = state.lineWidth;
-        ctx.lineCap = state.lineCap;
-        ctx.lineJoin = state.lineJoin;
+      if (paint.kind === "solid") {
+        // Solid text is translation-invariant (byte-exact across scene
+        // positions), so it keeps this tight asset canvas with the draw-time
+        // transform shifted into asset space.
+        const shifted = offsetMatrix(state.transform, bounds.x, bounds.y);
+        ctx.setTransform(...shifted);
+        ctx.font = state.font;
+        ctx.textAlign = state.textAlign;
+        ctx.textBaseline = state.textBaseline;
+        if (mode === "stroke") {
+          ctx.lineWidth = state.lineWidth;
+          ctx.lineCap = state.lineCap;
+          ctx.lineJoin = state.lineJoin;
+        }
+        applyPaint(ctx, paint, mode);
+        if (mode === "fill") ctx.fillText(text, x, y);
+        else ctx.strokeText(text, x, y);
+      } else {
+        // Same scene-position rule as #renderPath: native gradient/pattern
+        // quantization depends on the absolute device coordinates the paint
+        // is evaluated at, so a tight asset canvas with a shifted CTM cannot
+        // byte-match the scene-origin render (Chromium probe, PR #38 review).
+        // Paint on the scene-origin stage under the draw-time transform and
+        // crop the coverage window.
+        const stage = this.#stageContext(
+          bounds.x + bounds.width,
+          bounds.y + bounds.height,
+        );
+        stage.ctx.setTransform(...state.transform);
+        stage.ctx.font = state.font;
+        stage.ctx.textAlign = state.textAlign;
+        stage.ctx.textBaseline = state.textBaseline;
+        if (mode === "stroke") {
+          stage.ctx.lineWidth = state.lineWidth;
+          stage.ctx.lineCap = state.lineCap;
+          stage.ctx.lineJoin = state.lineJoin;
+        }
+        applyPaint(stage.ctx, paint, mode);
+        if (mode === "fill") stage.ctx.fillText(text, x, y);
+        else stage.ctx.strokeText(text, x, y);
+        ctx.putImageData(
+          stage.ctx.getImageData(bounds.x, bounds.y, bounds.width, bounds.height),
+          0,
+          0,
+        );
       }
-      applyPaint(ctx, paint, mode, bounds.x, bounds.y, state.transform);
-      if (mode === "fill") ctx.fillText(text, x, y);
-      else ctx.strokeText(text, x, y);
     } catch (error) {
       destroyCanvas(canvas);
       throw error;

@@ -16,7 +16,7 @@ export type Paint =
       kind: "linear-gradient";
       id: number;
       version: number;
-      transform: Matrix;
+      /** User-space endpoints, evaluated through DrawState.transform at draw time. */
       from: readonly [number, number];
       to: readonly [number, number];
       stops: readonly Readonly<{ offset: number; color: Color }>[];

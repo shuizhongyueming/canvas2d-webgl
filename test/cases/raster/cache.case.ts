@@ -24,7 +24,6 @@ function gradient(version: number, second: string): Paint {
     kind: "linear-gradient",
     id: 9,
     version,
-    transform: IDENTITY,
     from: [10, 10],
     to: [60, 50],
     stops: [
@@ -117,7 +116,7 @@ function run(a: CaseAdapter): void {
   v1Again.release();
 
   // Semantic placement probe: the ramp runs red at the from end, green at the
-  // to end, in device space (creation-time transform is identity here).
+  // to end, in device space (the draw-time transform is identity here).
   const offsetX = gradientV2.bounds.x;
   const offsetY = gradientV2.bounds.y;
   const px = (x: number, y: number) => {

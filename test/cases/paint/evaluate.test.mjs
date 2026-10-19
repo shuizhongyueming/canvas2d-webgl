@@ -6,7 +6,6 @@ import {
   linearGradientColorAt,
 } from "../../../dist/paint/evaluate.js";
 
-const IDENTITY = Object.freeze([1, 0, 0, 1, 0, 0]);
 const color = (hex, alpha = 255) =>
   [
     parseInt(hex.slice(1, 3), 16) / 255,
@@ -19,7 +18,6 @@ const gradient = (stops, from = [0, 0], to = [100, 0]) => ({
   kind: "linear-gradient",
   id: 1,
   version: 1,
-  transform: IDENTITY,
   from,
   to,
   stops,
@@ -95,7 +93,7 @@ test("linearGradientColorAt follows native drawing rules", () => {
 });
 
 test("class snapshots feed the evaluator without aliasing", () => {
-  const g = new LinearGradientPaint(1, [0, 0], [10, 0], IDENTITY);
+  const g = new LinearGradientPaint(1, [0, 0], [10, 0]);
   g.addColorStop(0, "#ff0000");
   const paint = g.snapshot();
   assert.deepEqual(linearGradientColorAt(paint, 2, 0), color("#ff0000"));

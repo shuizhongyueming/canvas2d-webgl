@@ -13,20 +13,6 @@ export function scaleBound(m: Matrix): number {
   return Math.sqrt(m[0] ** 2 + m[1] ** 2 + m[2] ** 2 + m[3] ** 2);
 }
 
-export function invert(m: Matrix): Matrix | null {
-  const det = m[0] * m[3] - m[1] * m[2];
-  if (!Number.isFinite(det) || det === 0) return null;
-  const inv = 1 / det;
-  return [
-    m[3] * inv,
-    -m[1] * inv,
-    -m[2] * inv,
-    m[0] * inv,
-    (m[2] * m[5] - m[3] * m[4]) * inv,
-    (m[1] * m[4] - m[0] * m[5]) * inv,
-  ];
-}
-
 /** translate(-x, -y) applied after m: asset-space version of a device-space matrix. */
 export function offsetMatrix(m: Matrix, x: number, y: number): Matrix {
   return [m[0], m[1], m[2], m[3], m[4] - x, m[5] - y];

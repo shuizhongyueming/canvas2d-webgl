@@ -1,4 +1,4 @@
-import type { CaseAdapter } from "../../types/testing.js";
+import type { CaseAdapter } from "../types/testing.js";
 
 /** Stable error observation: the compat code when present, else the error name. */
 export function outcome(fn: () => void): string {
