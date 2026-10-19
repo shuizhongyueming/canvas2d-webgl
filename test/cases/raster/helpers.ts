@@ -37,7 +37,13 @@ export interface Lab {
   readonly created: NativeCanvas[];
 }
 
-export function makeLab(options: { maxEntries?: number; maxPixels?: number } = {}): Lab {
+export function makeLab(
+  options: {
+    maxEntries?: number;
+    maxPixels?: number;
+    maxTextureDimension?: number;
+  } = {},
+): Lab {
   const created: NativeCanvas[] = [];
   const rasterizer = createRasterizer({
     createCanvas: (width, height) => {
@@ -50,8 +56,30 @@ export function makeLab(options: { maxEntries?: number; maxPixels?: number } = {
     sceneExtent: () => SCENE,
     maxEntries: options.maxEntries,
     maxPixels: options.maxPixels,
+    maxTextureDimension: options.maxTextureDimension,
   });
   return { rasterizer, created };
+}
+
+/** A 4x4 checkerboard decoded as an image, for repeat-pattern paints. */
+export async function loadTileImage(): Promise<HTMLImageElement> {
+  const tile = document.createElement("canvas");
+  tile.width = 4;
+  tile.height = 4;
+  const tctx = tile.getContext("2d");
+  if (!tctx) throw new Error("native 2d context unavailable");
+  tctx.fillStyle = "#ff0000";
+  tctx.fillRect(0, 0, 4, 4);
+  tctx.fillStyle = "#00ff00";
+  tctx.fillRect(0, 0, 2, 2);
+  tctx.fillRect(2, 2, 2, 2);
+  const image = new Image();
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error("tile image decode failed"));
+    image.src = tile.toDataURL("image/png");
+  });
+  return image;
 }
 
 export function referenceContext(): CanvasRenderingContext2D {
@@ -117,8 +145,9 @@ export function diffAsset(
 
 /**
  * The asset must equal the native render exactly inside its coverage region
- * (same rasterizer, integer-aligned sampling phase) and the reference must
- * hold no ink outside that region (the asset never truncates the painting).
+ * (painted at the exact scene position with the recorded transforms, then
+ * cropped) and the reference must hold no ink outside that region (the asset
+ * never truncates the painting).
  */
 export function compareAsset(
   a: CaseAdapter,

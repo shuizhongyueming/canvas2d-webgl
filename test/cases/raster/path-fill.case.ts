@@ -1,14 +1,20 @@
+// Raster-module self-test (native-assisted): drives src/raster directly with its
+// own native canvases, not the compat context. Compat context coverage arrives
+// with the path feature ticket (#19); these cases stay module regressions on
+// both sides.
 import type { CaseAdapter, CaseDefinition } from "../../types/testing.js";
+import type { Paint } from "../../../src/internal/contracts.js";
 import { PathRecorder } from "../../../src/path/recorder.js";
 import {
   IDENTITY,
   compareAsset,
+  loadTileImage,
   makeLab,
   makeState,
   referenceContext,
 } from "./helpers.js";
 
-function run(a: CaseAdapter): void {
+async function run(a: CaseAdapter): Promise<void> {
   const lab = makeLab();
   const recorder = new PathRecorder();
 
@@ -129,16 +135,100 @@ function run(a: CaseAdapter): void {
   const partial = lab.rasterizer.path(recorder.snapshot(), makeState(), "fill");
   compareAsset(a, nanReference, partial, "non-finite-fill");
   partial.release();
+
+  // A rotated ellipse alone: bounds must follow the rotated AABB, not the
+  // unrotated radii (regression: y direction was previously truncated).
+  const ellipseReference = referenceContext();
+  ellipseReference.fillStyle = "rgba(204,26,51,1)";
+  ellipseReference.beginPath();
+  ellipseReference.ellipse(100, 100, 40, 10, Math.PI / 4, 0, Math.PI * 2);
+  ellipseReference.fill();
+  recorder.begin();
+  recorder.ellipse(100, 100, 40, 10, Math.PI / 4, 0, Math.PI * 2, false, IDENTITY);
+  const ellipseSource = lab.rasterizer.path(recorder.snapshot(), makeState(), "fill");
+  compareAsset(a, ellipseReference, ellipseSource, "rotated-ellipse-fill");
+  ellipseSource.release();
+
+  // Rect and arc constructed under a rotation bake at construction time.
+  const rotated = [0, 1, -1, 0, 150, 20] as const;
+  const rotatedReference = referenceContext();
+  rotatedReference.fillStyle = "rgba(204,26,51,1)";
+  rotatedReference.save();
+  rotatedReference.setTransform(0, 1, -1, 0, 150, 20);
+  rotatedReference.beginPath();
+  rotatedReference.rect(10, 10, 30, 15);
+  rotatedReference.moveTo(45, 40);
+  rotatedReference.arc(35, 40, 10, 0, Math.PI * 1.5);
+  rotatedReference.restore();
+  rotatedReference.fill();
+  recorder.begin();
+  recorder.rect(10, 10, 30, 15, rotated);
+  recorder.moveTo(45, 40, rotated);
+  recorder.arc(35, 40, 10, 0, Math.PI * 1.5, false, rotated);
+  const rotatedSource = lab.rasterizer.path(recorder.snapshot(), makeState(), "fill");
+  compareAsset(a, rotatedReference, rotatedSource, "rotated-construction-fill");
+  rotatedSource.release();
+
+  // A draw-time transform must not move construction-baked geometry.
+  const shiftReference = referenceContext();
+  shiftReference.fillStyle = "rgba(204,26,51,1)";
+  shiftReference.beginPath();
+  shiftReference.moveTo(10, 60);
+  shiftReference.lineTo(50, 60);
+  shiftReference.lineTo(30, 90);
+  shiftReference.closePath();
+  shiftReference.setTransform(1, 0, 0, 1, 25, 15);
+  shiftReference.fill();
+  recorder.begin();
+  recorder.moveTo(10, 60, IDENTITY);
+  recorder.lineTo(50, 60, IDENTITY);
+  recorder.lineTo(30, 90, IDENTITY);
+  recorder.closePath(IDENTITY);
+  const shifted = lab.rasterizer.path(
+    recorder.snapshot(),
+    makeState({ transform: [1, 0, 0, 1, 25, 15] }),
+    "fill",
+  );
+  compareAsset(a, shiftReference, shifted, "fill-draw-transform");
+  shifted.release();
+
+  // Repeat-pattern fill paints in the draw-time space.
+  const image = await loadTileImage();
+  const patternPaint: Paint = {
+    kind: "repeat-pattern",
+    id: 1,
+    version: 1,
+    image,
+    width: 4,
+    height: 4,
+  };
+  const patternReference = referenceContext();
+  patternReference.beginPath();
+  patternReference.rect(20, 130, 60, 40);
+  const nativePattern = patternReference.createPattern(image, "repeat");
+  if (!nativePattern) throw new Error("native pattern unavailable");
+  patternReference.setTransform(1, 0, 0, 1, 13, 7);
+  patternReference.fillStyle = nativePattern;
+  patternReference.fill();
+  recorder.begin();
+  recorder.rect(20, 130, 60, 40, IDENTITY);
+  const patternSource = lab.rasterizer.path(
+    recorder.snapshot(),
+    makeState({ transform: [1, 0, 0, 1, 13, 7], fill: patternPaint }),
+    "fill",
+  );
+  compareAsset(a, patternReference, patternSource, "pattern-fill");
+  patternSource.release();
   lab.rasterizer.dispose();
 }
 
 export const cases: CaseDefinition[] = [
   {
     id: "raster.path-fill.geometry",
-    requirements: ["context.fill", "context.rect", "REN-01"],
+    requirements: ["REN-01"],
     kind: "semantic",
-    width: 64,
-    height: 64,
+    width: 200,
+    height: 200,
     seed: 1,
     fonts: [],
     run,

@@ -63,7 +63,10 @@ export class PathRecorder implements PathStore {
   }
 
   append(command: PathCommand): void {
-    if (!(command.op in ARG_COUNT) || command.args.length !== ARG_COUNT[command.op])
+    if (
+      !Object.prototype.hasOwnProperty.call(ARG_COUNT, command.op) ||
+      command.args.length !== ARG_COUNT[command.op]
+    )
       throw new TypeError(`Invalid path command: ${String(command.op)}`);
     this.#commands.push(freezeCommand(command));
     this.#id = this.#nextId++;

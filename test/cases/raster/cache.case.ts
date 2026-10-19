@@ -154,16 +154,21 @@ function run(a: CaseAdapter): void {
   gradientV2.release();
 
   // LRU with two entries: rasterizing a third distinct asset evicts the oldest
-  // exactly once, freeing its native bitmap.
+  // exactly once, freeing its native bitmap. The staging canvas is created on
+  // the first miss and stays resident alongside the surviving assets.
   const evictLab = makeLab({ maxEntries: 2 });
   const evictRecorder = new PathRecorder();
   for (const dx of [0, 70, 120]) {
     triangle(evictRecorder, dx);
     evictLab.rasterizer.path(evictRecorder.snapshot(), red, "fill").release();
   }
-  const [oldest, ...rest] = evictLab.created;
-  a.assert(evictLab.created.length === 3, "each distinct asset allocated once");
+  const [oldest, stage, ...rest] = evictLab.created;
+  a.assert(
+    evictLab.created.length === 4,
+    "three distinct assets share one staging canvas",
+  );
   a.assert(oldest !== undefined && oldest.width === 0, "evicted asset bitmap is released");
+  a.assert(stage !== undefined && stage.width > 0, "staging canvas stays resident");
   a.assert(
     rest.every((canvas) => canvas.width > 0),
     "freshly used assets survive eviction",
@@ -184,16 +189,63 @@ function run(a: CaseAdapter): void {
   );
   compareAsset(a, redReference, regenerated, "cache-regenerated");
   regenerated.release();
+
+  // An asset over the pixel budget is never cached; release destroys it at once.
+  const tinyLab = makeLab({ maxPixels: 16 });
+  const tinyRecorder = new PathRecorder();
+  triangle(tinyRecorder, 0);
+  const oversized = tinyLab.rasterizer.path(tinyRecorder.snapshot(), red, "fill");
+  oversized.release();
+  a.assert(
+    tinyLab.created[0] !== undefined && tinyLab.created[0].width === 0,
+    "uncacheable asset is destroyed on release",
+  );
+  tinyLab.rasterizer.dispose();
+
+  // Assets larger than the configured texture dimension fail with resource-limit.
+  const limitLab = makeLab({ maxTextureDimension: 32 });
+  const limitRecorder = new PathRecorder();
+  triangle(limitRecorder, 0);
+  let limitError: string | undefined;
+  try {
+    limitLab.rasterizer.path(limitRecorder.snapshot(), red, "fill");
+  } catch (error) {
+    limitError = (error as { code?: string }).code;
+  }
+  a.observe("resource-limit:code", limitError ?? "none");
+  a.assert(limitError === "resource-limit", "oversized assets report resource-limit");
+  limitLab.rasterizer.dispose();
+
+  // dispose releases cached bitmaps and the shared measure canvas, then
+  // rejects further calls.
+  const disposeLab = makeLab();
+  const disposeRecorder = new PathRecorder();
+  triangle(disposeRecorder, 0);
+  disposeLab.rasterizer.measureWidth("warm", makeState({ font: "16px sans-serif" }));
+  disposeLab.rasterizer.path(disposeRecorder.snapshot(), red, "fill").release();
+  disposeLab.rasterizer.dispose();
+  a.assert(
+    disposeLab.created.every((canvas) => canvas.width === 0),
+    "dispose releases every internally owned bitmap",
+  );
+  let disposedError: string | undefined;
+  try {
+    disposeLab.rasterizer.path(disposeRecorder.snapshot(), red, "fill");
+  } catch (error) {
+    disposedError = (error as { code?: string }).code;
+  }
+  a.observe("disposed:code", disposedError ?? "none");
+  a.assert(disposedError === "disposed", "disposed rasterizer rejects new work");
   lab.rasterizer.dispose();
 }
 
 export const cases: CaseDefinition[] = [
   {
     id: "raster.cache.behavior",
-    requirements: ["context.fill", "REN-01"],
+    requirements: ["REN-01"],
     kind: "semantic",
-    width: 64,
-    height: 64,
+    width: 200,
+    height: 200,
     seed: 1,
     fonts: [],
     run,

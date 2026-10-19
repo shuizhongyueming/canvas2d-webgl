@@ -1,24 +1,17 @@
+// Raster-module self-test (native-assisted): drives src/raster directly with its
+// own native canvases, not the compat context. Compat context coverage arrives
+// with the path feature ticket (#19); these cases stay module regressions on
+// both sides.
 import type { CaseAdapter, CaseDefinition } from "../../types/testing.js";
 import { PathRecorder } from "../../../src/path/recorder.js";
 import { IDENTITY } from "./helpers.js";
 
-interface NativeError {
+interface CapturedError {
   name: string;
   code: number | undefined;
 }
 
-function captureNative(fn: () => void): NativeError | null {
-  try {
-    fn();
-    return null;
-  } catch (error) {
-    if (error instanceof DOMException)
-      return { name: error.name, code: error.code };
-    return { name: error instanceof Error ? error.name : "unknown", code: undefined };
-  }
-}
-
-function captureRecorder(fn: () => void): NativeError | null {
+function capture(fn: () => void): CapturedError | null {
   try {
     fn();
     return null;
@@ -52,8 +45,8 @@ function run(a: CaseAdapter): void {
     ],
   ];
   for (const [label, nativeCall, recorderCall] of attempts) {
-    const expected = captureNative(nativeCall);
-    const actual = captureRecorder(recorderCall);
+    const expected = capture(nativeCall);
+    const actual = capture(recorderCall);
     a.observe(`${label}:native`, expected ? `${expected.name}:${expected.code}` : "none");
     a.assert(expected !== null, `${label}: native rejects a negative radius`);
     a.assert(actual !== null, `${label}: recorder rejects a negative radius`);
@@ -74,8 +67,8 @@ function run(a: CaseAdapter): void {
     ["quadratic-non-finite", () => ctx.quadraticCurveTo(1, 2, 3, Infinity), () => recorder.quadraticCurveTo(1, 2, 3, Infinity, IDENTITY)],
   ];
   for (const [label, nativeCall, recorderCall] of ignores) {
-    const expected = captureNative(nativeCall);
-    const actual = captureRecorder(recorderCall);
+    const expected = capture(nativeCall);
+    const actual = capture(recorderCall);
     a.assert(expected === null, `${label}: native silently ignores non-finite input`);
     a.assert(actual === null, `${label}: recorder silently ignores non-finite input`);
   }
@@ -102,10 +95,10 @@ function run(a: CaseAdapter): void {
 export const cases: CaseDefinition[] = [
   {
     id: "raster.exceptions.native-match",
-    requirements: ["context.arc", "context.arcTo", "context.ellipse", "context.save"],
+    requirements: ["REN-01"],
     kind: "semantic",
-    width: 64,
-    height: 64,
+    width: 200,
+    height: 200,
     seed: 1,
     fonts: [],
     run,

@@ -116,17 +116,27 @@ export function pathGeometryBounds(path: PathSnapshot): Bounds | null {
         break;
       }
       case "ellipse": {
-        const [x, y, radiusX, radiusY] = command.args;
+        const [x, y, radiusX, radiusY, rotation] = command.args;
+        // Axis-aligned bounds of the rotated ellipse; the unrotated radii alone
+        // underestimate once rotation is neither 0 nor a right angle.
+        const cos = Math.cos(rotation);
+        const sin = Math.sin(rotation);
+        const extentX = Math.sqrt(
+          radiusX ** 2 * cos ** 2 + radiusY ** 2 * sin ** 2,
+        );
+        const extentY = Math.sqrt(
+          radiusX ** 2 * sin ** 2 + radiusY ** 2 * cos ** 2,
+        );
         for (const [cx, cy] of [
-          [x - radiusX, y - radiusY],
-          [x + radiusX, y - radiusY],
-          [x + radiusX, y + radiusY],
-          [x - radiusX, y + radiusY],
+          [x - extentX, y - extentY],
+          [x + extentX, y - extentY],
+          [x + extentX, y + extentY],
+          [x - extentX, y + extentY],
         ] as const) {
           const [px, py] = at(cx, cy);
           walker.include(px, py);
         }
-        const [sx, sy] = at(x + radiusX, y);
+        const [sx, sy] = at(x + radiusX * cos, y + radiusX * sin);
         walker.lineTo(sx, sy);
         break;
       }

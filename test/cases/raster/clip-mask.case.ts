@@ -1,3 +1,7 @@
+// Raster-module self-test (native-assisted): drives src/raster directly with its
+// own native canvases, not the compat context. Stencil clip consumption belongs
+// to the clip feature ticket (#21); these cases stay module regressions on
+// both sides.
 import type { CaseAdapter, CaseDefinition } from "../../types/testing.js";
 import { PathRecorder } from "../../../src/path/recorder.js";
 import {
@@ -62,10 +66,10 @@ function run(a: CaseAdapter): void {
 export const cases: CaseDefinition[] = [
   {
     id: "raster.clip.mask",
-    requirements: ["context.clip", "REN-01"],
+    requirements: ["REN-01"],
     kind: "semantic",
-    width: 64,
-    height: 64,
+    width: 200,
+    height: 200,
     seed: 1,
     fonts: [],
     run,

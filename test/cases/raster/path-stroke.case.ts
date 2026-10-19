@@ -1,3 +1,7 @@
+// Raster-module self-test (native-assisted): drives src/raster directly with its
+// own native canvases, not the compat context. Compat context coverage arrives
+// with the path feature ticket (#19); these cases stay module regressions on
+// both sides.
 import type { CaseAdapter, CaseDefinition } from "../../types/testing.js";
 import { PathRecorder } from "../../../src/path/recorder.js";
 import {
@@ -124,10 +128,10 @@ function run(a: CaseAdapter): void {
 export const cases: CaseDefinition[] = [
   {
     id: "raster.path-stroke.geometry",
-    requirements: ["context.stroke", "context.lineWidth", "REN-01"],
+    requirements: ["REN-01"],
     kind: "semantic",
-    width: 64,
-    height: 64,
+    width: 200,
+    height: 200,
     seed: 1,
     fonts: [],
     run,

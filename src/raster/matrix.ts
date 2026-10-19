@@ -32,17 +32,6 @@ export function offsetMatrix(m: Matrix, x: number, y: number): Matrix {
   return [m[0], m[1], m[2], m[3], m[4] - x, m[5] - y];
 }
 
-export function unionBounds(a: Bounds, b: Bounds): Bounds {
-  const x = Math.min(a.x, b.x);
-  const y = Math.min(a.y, b.y);
-  return {
-    x,
-    y,
-    width: Math.max(a.x + a.width, b.x + b.width) - x,
-    height: Math.max(a.y + a.height, b.y + b.height) - y,
-  };
-}
-
 /** Grow to whole pixels without moving the sampling phase, then clip to the scene. */
 export function alignOutset(
   bounds: Bounds,

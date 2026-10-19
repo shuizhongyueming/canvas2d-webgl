@@ -5,8 +5,11 @@ export type Native2DContext =
   | CanvasRenderingContext2D
   | OffscreenCanvasRenderingContext2D;
 
-export function context2d(canvas: NativeCanvas): Native2DContext {
-  const context = canvas.getContext("2d");
+export function context2d(
+  canvas: NativeCanvas,
+  settings?: CanvasRenderingContext2DSettings,
+): Native2DContext {
+  const context = canvas.getContext("2d", settings);
   if (!context)
     throw createCompatError(
       ERROR_CODES.CAPABILITY,

@@ -68,7 +68,8 @@ class NativeRasterizer implements Rasterizer {
   readonly #cache: RasterCache<Asset>;
   #epoch = 0;
   #disposed = false;
-  #measure: Native2DContext | null = null;
+  #measure: { canvas: NativeCanvas; context: Native2DContext } | null = null;
+  #stage: { canvas: NativeCanvas; context: Native2DContext } | null = null;
 
   constructor(options: RasterizerOptions) {
     this.#options = options;
@@ -83,6 +84,7 @@ class NativeRasterizer implements Rasterizer {
     const key = [
       "path",
       this.#epoch,
+      this.#sceneKey(),
       mode,
       path.id,
       state.transform.join(","),
@@ -110,8 +112,11 @@ class NativeRasterizer implements Rasterizer {
     const key = [
       "text",
       this.#epoch,
+      this.#sceneKey(),
       mode,
       text,
+      x,
+      y,
       state.font,
       state.textAlign,
       state.textBaseline,
@@ -138,6 +143,7 @@ class NativeRasterizer implements Rasterizer {
     const key = [
       "clip",
       this.#epoch,
+      this.#sceneKey(),
       rule,
       path.id,
       bounds.x,
@@ -173,7 +179,10 @@ class NativeRasterizer implements Rasterizer {
     if (this.#disposed) return;
     this.#disposed = true;
     this.#cache.clear();
+    if (this.#measure) destroyCanvas(this.#measure.canvas);
     this.#measure = null;
+    if (this.#stage) destroyCanvas(this.#stage.canvas);
+    this.#stage = null;
   }
 
   #assertLive(): void {
@@ -182,9 +191,50 @@ class NativeRasterizer implements Rasterizer {
   }
 
   #measureContext(): Native2DContext {
-    if (!this.#measure)
-      this.#measure = context2d(this.#options.createCanvas(1, 1));
-    return this.#measure;
+    if (!this.#measure) {
+      const canvas = this.#options.createCanvas(1, 1);
+      this.#measure = { canvas, context: context2d(canvas) };
+    }
+    return this.#measure.context;
+  }
+
+  /**
+   * One grow-only staging canvas, retained across misses and released on
+   * dispose. Native curve rasterization is not translation-invariant: conic
+   * generation and device-space flattening depend on the absolute coordinates
+   * and the construction transform, so an asset only byte-matches the native
+   * scene render when it is painted at the exact scene position and cropped.
+   * The stage therefore shares the scene origin and spans down to the asset's
+   * far corner. Readback happens on every miss, so it stays CPU-backed.
+   */
+  #stageContext(
+    width: number,
+    height: number,
+  ): { canvas: NativeCanvas; ctx: Native2DContext } {
+    if (!this.#stage) {
+      const canvas = this.#options.createCanvas(width, height);
+      this.#stage = {
+        canvas,
+        context: context2d(canvas, { willReadFrequently: true }),
+      };
+    } else {
+      // Any width/height assignment resets the bitmap and the context state, so
+      // only grow the dimension that actually changed; both are rebuilt below.
+      const canvas = this.#stage.canvas;
+      if (width > canvas.width) canvas.width = width;
+      if (height > canvas.height) canvas.height = height;
+    }
+    const { canvas, context } = this.#stage;
+    context.setTransform(1, 0, 0, 1, 0, 0);
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    return { canvas, ctx: context };
+  }
+
+  #sceneKey(): string {
+    // Bounds are intersected with the scene, so a resize must not serve assets
+    // clipped by the previous extent.
+    const { width, height } = this.#options.sceneExtent();
+    return `${width}x${height}`;
   }
 
   #scene(): Bounds {
@@ -244,23 +294,39 @@ class NativeRasterizer implements Rasterizer {
     const bounds = alignOutset(geometry, margin, this.#scene());
     if (!bounds) return emptyAsset(this.#options.createCanvas);
     const { canvas, ctx } = this.#createAsset(bounds);
-    replayPath(ctx, path, bounds.x, bounds.y);
-    if (mode === "stroke") {
-      const strokeTransform = offsetMatrix(state.transform, bounds.x, bounds.y);
-      ctx.setTransform(...strokeTransform);
-      ctx.lineWidth = state.lineWidth;
-      ctx.lineCap = state.lineCap;
-      ctx.lineJoin = state.lineJoin;
-      applyPaint(ctx, state.stroke, "stroke", bounds.x, bounds.y, state.transform);
-      ctx.stroke();
-    } else {
-      // Patterns paint in the draw-time space; solids and gradients are
-      // transform-independent because gradient endpoints are pre-mapped.
-      if (state.fill.kind === "repeat-pattern")
-        ctx.setTransform(...offsetMatrix(state.transform, bounds.x, bounds.y));
-      else ctx.setTransform(1, 0, 0, 1, 0, 0);
-      applyPaint(ctx, state.fill, "fill", bounds.x, bounds.y, state.transform);
-      ctx.fill();
+    try {
+      // Paint at the exact scene position with the recorded transforms
+      // verbatim, then crop the coverage window; translating the geometry into
+      // a tight canvas would rasterize curves differently than the native scene.
+      const stage = this.#stageContext(
+        bounds.x + bounds.width,
+        bounds.y + bounds.height,
+      );
+      replayPath(stage.ctx, path, 0, 0);
+      if (mode === "stroke") {
+        stage.ctx.setTransform(...state.transform);
+        stage.ctx.lineWidth = state.lineWidth;
+        stage.ctx.lineCap = state.lineCap;
+        stage.ctx.lineJoin = state.lineJoin;
+        applyPaint(stage.ctx, state.stroke, "stroke", 0, 0, state.transform);
+        stage.ctx.stroke();
+      } else {
+        // Patterns paint in the draw-time space; solids and gradients are
+        // transform-independent because gradient endpoints are pre-mapped.
+        if (state.fill.kind === "repeat-pattern")
+          stage.ctx.setTransform(...state.transform);
+        else stage.ctx.setTransform(1, 0, 0, 1, 0, 0);
+        applyPaint(stage.ctx, state.fill, "fill", 0, 0, state.transform);
+        stage.ctx.fill();
+      }
+      ctx.putImageData(
+        stage.ctx.getImageData(bounds.x, bounds.y, bounds.width, bounds.height),
+        0,
+        0,
+      );
+    } catch (error) {
+      destroyCanvas(canvas);
+      throw error;
     }
     return {
       canvas,
@@ -327,20 +393,25 @@ class NativeRasterizer implements Rasterizer {
     );
     if (!bounds) return emptyAsset(this.#options.createCanvas);
     const { canvas, ctx } = this.#createAsset(bounds);
-    const shifted = offsetMatrix(state.transform, bounds.x, bounds.y);
-    ctx.setTransform(...shifted);
-    ctx.font = state.font;
-    ctx.textAlign = state.textAlign;
-    ctx.textBaseline = state.textBaseline;
-    const paint = mode === "fill" ? state.fill : state.stroke;
-    if (mode === "stroke") {
-      ctx.lineWidth = state.lineWidth;
-      ctx.lineCap = state.lineCap;
-      ctx.lineJoin = state.lineJoin;
+    try {
+      const shifted = offsetMatrix(state.transform, bounds.x, bounds.y);
+      ctx.setTransform(...shifted);
+      ctx.font = state.font;
+      ctx.textAlign = state.textAlign;
+      ctx.textBaseline = state.textBaseline;
+      const paint = mode === "fill" ? state.fill : state.stroke;
+      if (mode === "stroke") {
+        ctx.lineWidth = state.lineWidth;
+        ctx.lineCap = state.lineCap;
+        ctx.lineJoin = state.lineJoin;
+      }
+      applyPaint(ctx, paint, mode, bounds.x, bounds.y, state.transform);
+      if (mode === "fill") ctx.fillText(text, x, y);
+      else ctx.strokeText(text, x, y);
+    } catch (error) {
+      destroyCanvas(canvas);
+      throw error;
     }
-    applyPaint(ctx, paint, mode, bounds.x, bounds.y, state.transform);
-    if (mode === "fill") ctx.fillText(text, x, y);
-    else ctx.strokeText(text, x, y);
     return {
       canvas,
       bounds,
@@ -357,10 +428,27 @@ class NativeRasterizer implements Rasterizer {
     const aligned = alignOutset(bounds, 0, this.#scene());
     if (!aligned) return emptyAsset(this.#options.createCanvas);
     const { canvas, ctx } = this.#createAsset(aligned);
-    replayPath(ctx, path, aligned.x, aligned.y);
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = "#ffffff";
-    ctx.fill(rule);
+    try {
+      // Same scene-position rule as #renderPath: the mask must match the
+      // native clip coverage byte for byte, so curves are never re-rasterized
+      // at a translated origin.
+      const stage = this.#stageContext(
+        aligned.x + aligned.width,
+        aligned.y + aligned.height,
+      );
+      replayPath(stage.ctx, path, 0, 0);
+      stage.ctx.setTransform(1, 0, 0, 1, 0, 0);
+      stage.ctx.fillStyle = "#ffffff";
+      stage.ctx.fill(rule);
+      ctx.putImageData(
+        stage.ctx.getImageData(aligned.x, aligned.y, aligned.width, aligned.height),
+        0,
+        0,
+      );
+    } catch (error) {
+      destroyCanvas(canvas);
+      throw error;
+    }
     return {
       canvas,
       bounds: aligned,

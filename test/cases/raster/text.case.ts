@@ -1,3 +1,7 @@
+// Raster-module self-test (native-assisted): drives src/raster directly with its
+// own native canvases, not the compat context. Compat context coverage arrives
+// with the text feature ticket; these cases stay module regressions on
+// both sides.
 import type { CaseAdapter, CaseDefinition } from "../../types/testing.js";
 import {
   compareAsset,
@@ -74,16 +78,38 @@ function run(a: CaseAdapter): void {
   const rotatedSource = lab.rasterizer.text("Rot", 0, 0, rotated, "fill");
   compareAsset(a, rotatedReference, rotatedSource, "fillText:rotated");
   rotatedSource.release();
+
+  // Cache keys include x/y: the same text at two positions must miss, and a
+  // repeated position must hit.
+  const positionState = makeState({ font });
+  const atA = lab.rasterizer.text("Pos", 40, 60, positionState, "fill");
+  const atB = lab.rasterizer.text("Pos", 120, 60, positionState, "fill");
+  a.assert(atA.canvas !== atB.canvas, "different positions miss the cache");
+  const posAReference = referenceContext();
+  posAReference.font = font;
+  posAReference.fillStyle = "rgba(204,26,51,1)";
+  posAReference.fillText("Pos", 40, 60);
+  compareAsset(a, posAReference, atA, "fillText:position-a");
+  const posBReference = referenceContext();
+  posBReference.font = font;
+  posBReference.fillStyle = "rgba(204,26,51,1)";
+  posBReference.fillText("Pos", 120, 60);
+  compareAsset(a, posBReference, atB, "fillText:position-b");
+  const atA2 = lab.rasterizer.text("Pos", 40, 60, positionState, "fill");
+  a.assert(atA2.canvas === atA.canvas, "same position hits the cache");
+  atA.release();
+  atB.release();
+  atA2.release();
   lab.rasterizer.dispose();
 }
 
 export const cases: CaseDefinition[] = [
   {
     id: "raster.text.placement",
-    requirements: ["context.fillText", "context.strokeText", "context.measureText"],
+    requirements: ["REN-01"],
     kind: "semantic",
-    width: 64,
-    height: 64,
+    width: 200,
+    height: 200,
     seed: 1,
     fonts: ["24px sans-serif"],
     run,
