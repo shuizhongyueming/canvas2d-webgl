@@ -1,6 +1,6 @@
 import type { CaseDefinition } from "../../types/testing.js";
 import { isCompat, outcome } from "../shared.js";
-import { dumpScene, hooksOf, pixelsEqual } from "./helpers.js";
+import { displayPixel, dumpScene, hooksOf, pixelsEqual } from "./helpers.js";
 
 const base = {
   kind: "combined" as const,
@@ -87,14 +87,32 @@ export const cases: CaseDefinition[] = [
     height: 64,
     async run(a) {
       const context = a.context;
+      // Asymmetric markers: a flipped or swapped present is caught both by the
+      // in-case display probe and by the review of the display artifacts.
       context.fillStyle = "#ff0000";
-      context.fillRect(4, 4, 24, 24);
-      // The first frame presents and becomes visible before the next rAF.
-      await a.checkpoint();
+      context.fillRect(4, 4, 24, 24); // top-left
       context.fillStyle = "#00ff00";
-      context.fillRect(36, 36, 24, 24);
-      // Final scene and display artifacts must both carry both rects: the
-      // display target shows real content and frame one survives frame two.
+      context.fillRect(40, 40, 20, 20); // bottom-right
+      const hooks = await hooksOf(a);
+      if (hooks) {
+        // Read the display surface right after the present, before the next
+        // composite can clear the unpreserved drawing buffer.
+        const { generation } = hooks.readScene();
+        await hooks.whenPresented(generation);
+      }
+      a.assert(
+        pixelsEqual(await displayPixel(a, 8, 8), [255, 0, 0, 255]),
+        "display surface shows the top-left marker, unflipped",
+      );
+      a.assert(
+        pixelsEqual(await displayPixel(a, 50, 50), [0, 255, 0, 255]),
+        "display surface shows the bottom-right marker, unflipped",
+      );
+      // The first frame stays visible across the rAF boundary; the second
+      // frame adds to it (retention on the display target, not just in the FBO).
+      await a.checkpoint();
+      context.fillStyle = "#0000ff";
+      context.fillRect(40, 4, 20, 20); // top-right joins in frame two
     },
   },
   {

@@ -479,10 +479,12 @@ class SceneDevice implements GPUDevice {
     if (generation !== this.generation) return;
     const { scene } = this.requireObjects();
     this.presentCount += 1;
+    // The scene texture stores device-top at v=1 (draws flip y into GL space),
+    // so the display blit samples it bottom-up: position (0,0) pairs with v=1.
     this.drawTexturedQuad(
       scene.texture,
       this.fullscreen(),
-      [0, 0, 1, 0, 0, 1, 1, 1],
+      [0, 1, 1, 1, 0, 0, 1, 0],
       1,
       "replace",
       "display",

@@ -118,3 +118,46 @@ export function pixelsEqual(actual: Pixel, expected: Pixel): boolean {
     actual[3] === expected[3]
   );
 }
+
+/**
+ * Read one pixel of the DISPLAY surface (device space, top-left origin). On
+ * native the canvas bitmap is what the compositor shows; on compat the target
+ * is a WebGL canvas, so the default framebuffer is read directly — only valid
+ * right after a present and before the next composite clears the unpreserved
+ * buffer. The harness attaches the target element with id "target".
+ */
+export async function displayPixel(
+  a: CaseAdapter,
+  x: number,
+  y: number,
+): Promise<Pixel> {
+  if (!isCompat(a)) {
+    const context = a.context as CanvasRenderingContext2D;
+    const data = context.getImageData(x, y, 1, 1).data;
+    return [
+      data[0] as number,
+      data[1] as number,
+      data[2] as number,
+      data[3] as number,
+    ];
+  }
+  const target = document.getElementById("target") as HTMLCanvasElement | null;
+  const gl = target?.getContext("webgl") as WebGLRenderingContext | null;
+  if (!gl) throw new Error("display surface is not a WebGL canvas");
+  const pixel = new Uint8Array(4);
+  gl.readPixels(
+    x,
+    gl.drawingBufferHeight - 1 - y,
+    1,
+    1,
+    gl.RGBA,
+    gl.UNSIGNED_BYTE,
+    pixel,
+  );
+  return [
+    pixel[0] as number,
+    pixel[1] as number,
+    pixel[2] as number,
+    pixel[3] as number,
+  ];
+}
