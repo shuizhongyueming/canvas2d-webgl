@@ -1,7 +1,7 @@
 import type { CompatGradient } from "../../../src/api.js";
 import type { CaseDefinition } from "../../types/testing.js";
 import { errorInfo, callRaw } from "./fixtures.js";
-import { isCompat, outcome } from "./shared.js";
+import { isCompat, outcome } from "../shared.js";
 
 type Ctx = CanvasRenderingContext2D;
 const asNative = (context: unknown): Ctx => context as Ctx;

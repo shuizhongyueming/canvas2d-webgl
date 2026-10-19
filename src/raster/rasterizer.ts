@@ -304,19 +304,22 @@ class NativeRasterizer implements Rasterizer {
       );
       replayPath(stage.ctx, path, 0, 0);
       if (mode === "stroke") {
+        // Stroke-time CTM is the draw-time transform: it scales the stroke
+        // width and is the space native interprets the stroke paint in.
         stage.ctx.setTransform(...state.transform);
         stage.ctx.lineWidth = state.lineWidth;
         stage.ctx.lineCap = state.lineCap;
         stage.ctx.lineJoin = state.lineJoin;
-        applyPaint(stage.ctx, state.stroke, "stroke", 0, 0, state.transform);
+        applyPaint(stage.ctx, state.stroke, "stroke");
         stage.ctx.stroke();
       } else {
-        // Patterns paint in the draw-time space; solids and gradients are
-        // transform-independent because gradient endpoints are pre-mapped.
-        if (state.fill.kind === "repeat-pattern")
-          stage.ctx.setTransform(...state.transform);
-        else stage.ctx.setTransform(1, 0, 0, 1, 0, 0);
-        applyPaint(stage.ctx, state.fill, "fill", 0, 0, state.transform);
+        // Gradients and patterns are evaluated in the draw-time space at fill
+        // time, so install the draw-time transform for them; solids are
+        // transform-independent. Path geometry is already construction-baked
+        // and the fill-time CTM never re-transforms it.
+        if (state.fill.kind === "solid") stage.ctx.setTransform(1, 0, 0, 1, 0, 0);
+        else stage.ctx.setTransform(...state.transform);
+        applyPaint(stage.ctx, state.fill, "fill");
         stage.ctx.fill();
       }
       ctx.putImageData(
@@ -405,7 +408,7 @@ class NativeRasterizer implements Rasterizer {
         ctx.lineCap = state.lineCap;
         ctx.lineJoin = state.lineJoin;
       }
-      applyPaint(ctx, paint, mode, bounds.x, bounds.y, state.transform);
+      applyPaint(ctx, paint, mode);
       if (mode === "fill") ctx.fillText(text, x, y);
       else ctx.strokeText(text, x, y);
     } catch (error) {

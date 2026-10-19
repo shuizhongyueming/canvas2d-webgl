@@ -2,7 +2,6 @@ import type { CompatGradient, CompatPattern, PaintStyle } from "../api.js";
 import type {
   FeatureDefinition,
   FeatureEnvironment,
-  Matrix,
   PaintRef,
 } from "../internal/contracts.js";
 import { ERROR_CODES, createCompatError } from "../contracts/errors.js";
@@ -19,23 +18,14 @@ export interface StylePaintRef extends PaintRef {
 
 /**
  * State-store seam owned by this feature (consumed by the state ticket):
- * keys "fill" and "stroke" hold live StylePaintRef objects, and
- * state.get("transform") must return the current Matrix so gradient creation
- * can record the creation-time transform required by the Paint contract.
+ * keys "fill" and "stroke" hold live StylePaintRef objects. Gradients keep
+ * only their user-space endpoints; the draw-time transform reaches consumers
+ * through DrawState.transform, so creation reads nothing beyond those keys.
  */
 export const PAINT_STATE_KEYS = Object.freeze({
   fill: "fill",
   stroke: "stroke",
-  transform: "transform",
 });
-
-function isMatrix(value: unknown): value is Matrix {
-  return (
-    Array.isArray(value) &&
-    value.length === 6 &&
-    value.every((component) => Number.isFinite(component))
-  );
-}
 
 type StyleMember = "fillStyle" | "strokeStyle";
 
@@ -109,18 +99,10 @@ export function paintFeature(environment: FeatureEnvironment): FeatureDefinition
         "Failed to execute 'createLinearGradient' on 'CanvasRenderingContext2D': The provided double value is non-finite.",
       );
     }
-    const transform = state.get(PAINT_STATE_KEYS.transform);
-    if (!isMatrix(transform)) {
-      throw createCompatError(
-        ERROR_CODES.CONTRACT,
-        "paint: state must expose the current transform Matrix",
-      );
-    }
     return new LinearGradientPaint(
       allocId(),
       [coords[0], coords[1]],
       [coords[2], coords[3]],
-      transform,
     ).publicValue;
   }
 

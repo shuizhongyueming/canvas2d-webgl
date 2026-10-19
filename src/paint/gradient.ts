@@ -1,5 +1,5 @@
 import type { CompatGradient } from "../api.js";
-import type { Color, Matrix, Paint, PaintRef } from "../internal/contracts.js";
+import type { Color, Paint, PaintRef } from "../internal/contracts.js";
 import { ERROR_CODES, createCompatError } from "../contracts/errors.js";
 import { classifyColorValue, parseSupportedColor } from "./color.js";
 import { nativeException, webidlDouble, webidlString } from "./native-error.js";
@@ -22,12 +22,10 @@ interface StopRecord {
  * mutation bumps `version`; Paint snapshots deep-freeze the stop list so
  * already-submitted draws never see later stops.
  *
- * Contract caveat (see issue #15): the frozen Paint contract documents the
- * gradient transform as creation-time, but Chromium probes show native
- * gradients evaluate in the DRAW-TIME user space, exactly like patterns. The
- * creation-time transform is still recorded here to satisfy the frozen type;
- * consumers must evaluate with the draw-time transform until the contract is
- * amended.
+ * The from/to endpoints are user-space coordinates evaluated through the
+ * DRAW-TIME transform (DrawState.transform) when rendering, exactly like
+ * patterns (HTML Standard, createLinearGradient; issue #33). The
+ * creation-time CTM has no effect and is deliberately not recorded.
  */
 export class LinearGradientPaint implements PaintRef {
   private stops: StopRecord[] = [];
@@ -38,7 +36,6 @@ export class LinearGradientPaint implements PaintRef {
     readonly id: number,
     private readonly from: readonly [number, number],
     private readonly to: readonly [number, number],
-    private readonly creationTransform: Matrix,
   ) {
     registry.add(this);
   }
@@ -103,7 +100,6 @@ export class LinearGradientPaint implements PaintRef {
       kind: "linear-gradient",
       id: this.id,
       version: this.currentVersion,
-      transform: Object.freeze([...this.creationTransform]) as Matrix,
       from: Object.freeze([...this.from]) as readonly [number, number],
       to: Object.freeze([...this.to]) as readonly [number, number],
       stops: Object.freeze(stops),

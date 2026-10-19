@@ -52,10 +52,10 @@ export function interpolateStops(
  * endpoints). Returns null when the gradient paints nothing: zero stops or a
  * zero-length gradient line (native paints nothing for degenerate lines).
  *
- * Native semantics (Chromium probes, issue #15): endpoints are interpreted in
- * the user space in effect AT DRAW TIME. Consumers must map device-space
- * fragments through the inverse of DrawState.transform — not through the
- * Paint.transform field, whose creation-time meaning is under contract review.
+ * Native semantics (HTML Standard, createLinearGradient; issue #33): endpoints
+ * are interpreted in the user space in effect AT DRAW TIME. Consumers map
+ * device-space fragments through the inverse of DrawState.transform; the
+ * creation-time transform is irrelevant and not recorded on the Paint.
  */
 export function linearGradientColorAt(
   paint: LinearGradientPaintSnapshot,
