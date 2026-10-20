@@ -206,20 +206,23 @@ export const cases: CaseDefinition[] = [
       context.beginPath();
       context.rect(4, 4, 24, 24);
       context.clip();
-      // A new path after clip must neither replace the clip nor make clip
-      // consume the path; the fill still paints through the old clip.
-      context.beginPath();
-      context.rect(0, 0, 32, 32);
+      // clip() does not consume the current path: an immediate fill paints the
+      // same rectangle through the new clip.
       context.fillStyle = "#ff0000";
       context.fill();
-      // clip() left the current path intact, so this second fill repeats it.
       context.fillStyle = "#0000ff";
+      context.fill();
+      // A later beginPath replaces the path but not the clip.
+      context.beginPath();
+      context.rect(16, 16, 16, 16);
+      context.fillStyle = "#00ff00";
       context.fill();
       context.restore();
       const scene = await dumpScene(a);
-      expectPixel(a, scene, 4, 4, BLUE, "clip survives beginPath and fill repeats the path");
-      expectPixel(a, scene, 27, 27, BLUE, "clip edge is the clip rectangle, not the fill path");
-      expectPixel(a, scene, 2, 2, TRANSPARENT, "new path outside the clip stays clipped");
+      expectPixel(a, scene, 4, 4, BLUE, "clip does not consume the current path");
+      expectPixel(a, scene, 16, 16, GREEN, "clip survives path replacement");
+      expectPixel(a, scene, 27, 27, GREEN, "replacement fill is cut at the clip edge");
+      expectPixel(a, scene, 2, 2, TRANSPARENT, "paint outside the clip stays clipped");
     },
   },
   {
