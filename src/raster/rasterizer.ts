@@ -27,6 +27,9 @@ import { replayPath } from "./replay.js";
 /** Native default; miterLimit is outside the support matrix. */
 const MITER_LIMIT = 10;
 const DEFAULT_MAX_TEXTURE_DIMENSION = 16384;
+/** Two valid, mutually distinct font serializations for the rejection probe. */
+const FONT_PROBE_A = "10px sans-serif";
+const FONT_PROBE_B = "16px monospace";
 
 export interface RasterizerOptions {
   createCanvas: (width: number, height: number) => NativeCanvas;
@@ -172,6 +175,21 @@ class NativeRasterizer implements Rasterizer {
     context.textAlign = state.textAlign;
     context.textBaseline = state.textBaseline;
     return context.measureText(text).width;
+  }
+
+  normalizeFont(font: string): string | null {
+    this.#assertLive();
+    const context = this.#measureContext();
+    // Native silently keeps the previous value when the assignment fails to
+    // parse. Probing from two distinct valid baselines separates the cases:
+    // rejection preserves each baseline, acceptance normalizes to one string.
+    context.font = FONT_PROBE_A;
+    context.font = font;
+    const fromA = context.font;
+    context.font = FONT_PROBE_B;
+    context.font = font;
+    const fromB = context.font;
+    return fromA === fromB ? fromA : null;
   }
 
   clearCache(): void {
