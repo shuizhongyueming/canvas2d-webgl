@@ -38,11 +38,12 @@ export function sourcePixels(source: TextureSource): SourcePixels {
     };
   if (
     typeof HTMLImageElement !== "undefined" &&
-    source instanceof HTMLImageElement
+    (source instanceof HTMLImageElement ||
+      Object.prototype.toString.call(source) === "[object HTMLImageElement]")
   )
     return {
-      width: source.naturalWidth,
-      height: source.naturalHeight,
+      width: (source as HTMLImageElement).naturalWidth,
+      height: (source as HTMLImageElement).naturalHeight,
       element: source,
     };
   const canvas = source as NativeCanvas;
@@ -79,8 +80,11 @@ export function uploadSourceTexture(
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, 1);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    const filter = isRasterSource(source) || isPatternBitmap(source)
+      ? gl.NEAREST
+      : gl.LINEAR;
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     if (data)

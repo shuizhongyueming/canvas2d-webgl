@@ -87,7 +87,7 @@ test('arity: below 3 throws the counted TypeError; 4/6/7/8 fail overload resolut
       (error) =>
         error instanceof TypeError &&
         error.message ===
-          "Failed to execute 'drawImage' on 'CanvasRenderingContext2D': No function was found that matched the signature provided.",
+          "Failed to execute 'drawImage' on 'CanvasRenderingContext2D': Overload resolution failed.",
     );
   assert.equal(ops.length, 0);
 });
@@ -213,17 +213,16 @@ test('out-of-bounds source rectangles clip proportionally on both rectangles', (
   assert.equal(ops.length, 1);
 });
 
-test('negative spans mirror and keep their sign through clipping', () => {
+test('negative spans extend backwards without mirroring pixels', () => {
   const { drawImage, ops } = setup();
   drawImage(fakeImage(), 4, 3, -4, -3, 20, 30, -8, -6);
   assert.equal(ops.length, 1);
-  assert.deepEqual(ops[0].source.sourceRect, { x: 4, y: 3, width: -4, height: -3 });
-  assert.deepEqual(ops[0].source.destinationRect, { x: 20, y: 30, width: -8, height: -6 });
+  assert.deepEqual(ops[0].source.sourceRect, { x: 0, y: 0, width: 4, height: 3 });
+  assert.deepEqual(ops[0].source.destinationRect, { x: 12, y: 24, width: 8, height: 6 });
   assert.deepEqual(ops[0].sourceBounds, { x: 12, y: 24, width: 8, height: 6 });
-  // Mirror clipped at the right edge: source 6..2 on a 4-wide image.
   drawImage(fakeImage(), 6, 0, -4, 3, 0, 0, 8, 3);
-  assert.deepEqual(ops[1].source.sourceRect, { x: 4, y: 0, width: -2, height: 3 });
-  assert.deepEqual(ops[1].source.destinationRect, { x: 4, y: 0, width: 4, height: 3 });
+  assert.deepEqual(ops[1].source.sourceRect, { x: 2, y: 0, width: 2, height: 3 });
+  assert.deepEqual(ops[1].source.destinationRect, { x: 0, y: 0, width: 4, height: 3 });
 });
 
 test('sourceBounds is the device-space hull under the draw transform', () => {

@@ -1,5 +1,5 @@
 import type { CaseDefinition } from "../../types/testing.js";
-import { isCompat, makeTarget, outcome } from "../shared.js";
+import { isCompat, outcome } from "../shared.js";
 
 const base = {
   kind: "semantic" as const,
@@ -10,48 +10,6 @@ const base = {
 };
 
 export const cases: CaseDefinition[] = [
-  {
-    ...base,
-    id: "canvas.context-stubs.not-implemented",
-    requirements: [
-      "context.drawImage",
-    ],
-    run(a) {
-      const context = a.context as unknown as Record<
-        string,
-        (...args: unknown[]) => unknown
-      >;
-      const source = makeTarget(1, 1);
-      const calls: Array<[string, () => unknown]> = [
-        ["drawImage", () => context.drawImage!(source, 0, 0)],
-      ];
-      // Approved drawing entries that no feature owns yet must report
-      // not-implemented; silently succeeding would be a contract violation.
-      // The rect ticket owns the three rect methods, the path ticket owns the
-      // path construction methods plus fill/stroke, the clip ticket owns
-      // clip, and the text ticket owns fillText/strokeText/measureText.
-      // drawImage is still unowned.
-      const expected = isCompat(a) ? "not-implemented" : "ok";
-      const results = calls.map(
-        ([name, invoke]) => [name, outcome(invoke)] as const,
-      );
-      for (const [name, result] of results)
-        a.assert(
-          typeof context[name] === "function",
-          `${name} is present as a stub`,
-        );
-      a.assert(
-        results.every(([, result]) => result === expected),
-        "unimplemented drawing entries report not-implemented on compat",
-      );
-      a.observe(
-        "codes",
-        results.every(([, result]) => result === expected)
-          ? "as-approved"
-          : Object.fromEntries(results),
-      );
-    },
-  },
   {
     ...base,
     id: "canvas.context-stubs.unsupported",

@@ -91,8 +91,8 @@ function deviceBounds(rect: Bounds, transform: Matrix): Bounds {
 
 /**
  * Clip one source axis to [0, limit] in the shared affine parameter t, where
- * source = s0 + t*(s1-s0) maps to destination = d0 + t*(d1-d0). Negative spans
- * (mirrored draws) keep their sign through the returned interval.
+ * source = s0 + t*(s1-s0) maps to destination = d0 + t*(d1-d0).
+ * Source and destination extents have already been normalized.
  */
 function clipAxis(
   s0: number,
@@ -162,7 +162,7 @@ export const imageFeature: FeatureFactory = (
       );
     if (count !== 3 && count !== 5 && count < 9)
       throw new TypeError(
-        "Failed to execute 'drawImage' on 'CanvasRenderingContext2D': No function was found that matched the signature provided.",
+        "Failed to execute 'drawImage' on 'CanvasRenderingContext2D': Overload resolution failed.",
       );
     const source = classify(args[0]);
     // WebIDL converts every double before the method body runs, so BigInt and
@@ -226,8 +226,23 @@ export const imageFeature: FeatureFactory = (
         number,
       ];
     }
-    // A zero source or destination extent paints nothing (native returns too).
     if (sw === 0 || sh === 0 || dw === 0 || dh === 0) return;
+    if (sw < 0) {
+      sx += sw;
+      sw = -sw;
+    }
+    if (sh < 0) {
+      sy += sh;
+      sh = -sh;
+    }
+    if (dw < 0) {
+      dx += dw;
+      dw = -dw;
+    }
+    if (dh < 0) {
+      dy += dh;
+      dh = -dh;
+    }
     // Clip the source rectangle to the image and the destination in the same
     // proportion; an empty intersection means nothing is visible.
     const xt = clipAxis(sx, sx + sw, intrinsicWidth);
