@@ -20,7 +20,12 @@ function freeze<T>(value: T): Readonly<T> {
   return value;
 }
 export const SUPPORT_MATRIX: readonly SupportRow[] = freeze<SupportRow[]>([
-  {"id": "context.drawImage","target": "context","name": "drawImage","kind": "method","owner": "image","policy": "supported","arities": [3,5,9],"sources": ["HTMLImageElement","native-canvas"]},
+  // drawImage sources are limited to CORS-clean images and native canvases
+  // (same-origin or valid CORS headers): every call uploads pixels through
+  // WebGL, so a tainted source throws SecurityError synchronously inside
+  // drawImage — an intentional deviation from native, which draws and taints
+  // the destination and only fails at readback (decision #48, following #41).
+  {"id": "context.drawImage","target": "context","name": "drawImage","kind": "method","owner": "image","policy": "supported","arities": [3,5,9],"sources": ["CORS-clean-HTMLImageElement","CORS-clean-native-canvas"]},
   {"id": "context.fillRect","target": "context","name": "fillRect","kind": "method","owner": "rect","policy": "supported","arities": [4]},
   {"id": "context.clearRect","target": "context","name": "clearRect","kind": "method","owner": "rect","policy": "supported","arities": [4]},
   {"id": "context.strokeRect","target": "context","name": "strokeRect","kind": "method","owner": "rect","policy": "supported","arities": [4]},

@@ -19,6 +19,28 @@ function disposedError(): Error & { code: ErrorCode } {
   return createCompatError(ERROR_CODES.DISPOSED, "canvas is disposed");
 }
 
+const compatCanvases = new WeakSet<object>();
+/**
+ * Non-enumerable mark on the caller's target. Symbol.for is agent-wide, so a
+ * second copy of the library (or another realm) still recognizes a facade by
+ * proxying the marked target; the WeakSet only covers this instance.
+ */
+const compatBrand = Symbol.for("canvas2d-webgl.compat-canvas");
+
+/**
+ * Internal brand for drawImage source rejection (IMG-03): a facade passes
+ * every canvas brand check because it proxies a real canvas, so only brand
+ * membership identifies it. Library-internal; never a package export.
+ */
+export function isCompatCanvas(value: unknown): boolean {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    (compatCanvases.has(value) ||
+      (value as Record<PropertyKey, unknown>)[compatBrand] === true)
+  );
+}
+
 /**
  * WebIDL unsigned long conversion for canvas dimensions: BigInt and Symbol
  * reject with a TypeError, non-finite numbers become 0, and the rest wrap
@@ -137,5 +159,16 @@ export function createFacade<T extends TargetCanvas>(
       return Reflect.has(targetCanvas, property);
     },
   };
-  return new Proxy(target, handler) as unknown as CompatCanvas<T>;
+  const facade = new Proxy(target, handler) as unknown as CompatCanvas<T>;
+  compatCanvases.add(facade);
+  try {
+    Object.defineProperty(target, compatBrand, {
+      value: true,
+      enumerable: false,
+      configurable: true,
+    });
+  } catch {
+    // A non-extensible target still works; this-instance WeakSet covers it.
+  }
+  return facade;
 }
