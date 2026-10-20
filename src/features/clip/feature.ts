@@ -78,10 +78,11 @@ export const clipFeature: FeatureFactory = (
   const path = environment?.path;
   const gpu = environment?.gpu;
   const raster = environment?.raster;
-  if (!state || !path || !gpu || !raster)
+  const lifecycle = environment?.lifecycle;
+  if (!state || !path || !gpu || !raster || !lifecycle)
     throw createCompatError(
       ERROR_CODES.CONTRACT,
-      "clip feature requires environment.state, path, gpu and raster",
+      "clip feature requires environment.state, path, gpu, raster and lifecycle",
     );
   if (!(path instanceof PathRecorder))
     throw createCompatError(
@@ -90,6 +91,27 @@ export const clipFeature: FeatureFactory = (
     );
   // Ids only need to be unique within this canvas instance.
   let nextId = 1;
+
+  // Clips own no GPU or native bitmap: a snapshot is a reference, its mask
+  // canvas belongs to the raster cache, and the session already drops current
+  // and saved clips (StateStore.reset / discardClips) before invalidating
+  // those masks (raster.clearCache). Registering keeps clip inside the one
+  // lifecycle contract, makes the ordering explicit, and reserves the place
+  // where future clip-owned resources must be released.
+  lifecycle.register({
+    reset() {
+      // state.reset() ran first and replaced the whole drawing state.
+    },
+    lost() {
+      // Drawing is paused; nothing is queued and no clip survives to redraw.
+    },
+    restored() {
+      // state.discardClips() ran first; stale mask canvases were cleared.
+    },
+    disposed() {
+      // No clip-owned resources to release.
+    },
+  });
 
   /** While lost, clip is silently ineffective and never queued (LIFE-02). */
   function assertUsable(): boolean {

@@ -40,10 +40,17 @@ function setup(overrides = {}) {
       return stubRasterSource(bounds);
     },
   };
-  const feature = clipFeature({ state, path, gpu, raster });
+  const registrations = [];
+  const lifecycle = {
+    register(hooks) {
+      registrations.push(hooks);
+      return () => {};
+    },
+  };
+  const feature = clipFeature({ state, path, gpu, raster, lifecycle });
   assert.equal(feature.id, 'clip');
   const clip = (...args) => feature.members.clip.value(...args);
-  return { state, path, gpu, raster, clipCalls, clip };
+  return { state, path, gpu, raster, lifecycle, registrations, clipCalls, clip };
 }
 
 function clipMessage(fn) {
@@ -64,6 +71,9 @@ test('the factory requires state, a PathRecorder, gpu and raster', () => {
   assert.throws(() => clipFeature({ state, path, gpu }), {
     code: 'contract-violation',
   });
+  assert.throws(() => clipFeature({ state, path, gpu, raster }), {
+    code: 'contract-violation',
+  });
   const fakeStore = {
     begin() {},
     append() {},
@@ -72,9 +82,31 @@ test('the factory requires state, a PathRecorder, gpu and raster', () => {
     },
     reset() {},
   };
-  assert.throws(() => clipFeature({ state, path: fakeStore, gpu, raster }), {
-    code: 'contract-violation',
-  });
+  assert.throws(
+    () => clipFeature({ state, path: fakeStore, gpu, raster, lifecycle: { register() {} } }),
+    { code: 'contract-violation' },
+  );
+});
+
+test('registers the unified lifecycle hooks as explicit no-ops', () => {
+  const { registrations, state, path, clip } = setup();
+  assert.equal(registrations.length, 1);
+  const hooks = registrations[0];
+  assert.deepEqual(Object.keys(hooks).sort(), [
+    'disposed',
+    'lost',
+    'reset',
+    'restored',
+  ]);
+  path.begin();
+  path.rect(0, 0, 8, 8, IDENTITY);
+  clip();
+  const captured = state.get('clip');
+  // The session drops clips through StateStore.reset/discardClips before
+  // running hooks and invalidates masks through raster.clearCache; the hooks
+  // themselves must not duplicate that cleanup or throw.
+  for (const name of Object.keys(hooks)) assert.doesNotThrow(() => hooks[name]());
+  assert.equal(state.get('clip'), captured);
 });
 
 test('clip captures the current path without consuming it', () => {
