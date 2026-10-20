@@ -477,42 +477,59 @@ class SceneDevice implements GPUDevice {
    * (DST_ALPHA, ZERO) through the depth + 1 test. When a clip is active its
    * levels occupy 0..depth, so all three passes stay inside the clip: pass 1
    * tests EQUAL depth, pass 2 tests EQUAL depth, and pass 3 tests EQUAL
-   * depth + 1. Canonical stencil state is restored before returning.
+   * depth + 1.
+   *
+   * That extra level does not exist at the maximum clip depth: depth + 1 would
+   * be 256 and the reference would clamp to 255, so pass 1 could not separate
+   * source coverage from the clip and pass 2 would erase the whole clip. The
+   * operation reports resource-limit instead of silently producing transparent
+   * pixels; plain drawing at the same depth remains supported. Canonical
+   * stencil state is restored through every exit path.
    */
   private compositeSourceIn(
     corners: number[],
     drawSource: (stencil: boolean) => void,
     clipDepth: number,
   ): void {
+    if (clipDepth >= MAX_CLIP_DEPTH)
+      throw createCompatError(
+        ERROR_CODES.RESOURCE_LIMIT,
+        `source-in needs one stencil level beyond clip depth ${clipDepth}`,
+      );
     const gl = this.gl;
-    if (clipDepth === 0) {
-      // No clip: start from a known-zero stencil like before.
-      this.bindSceneState();
-      gl.clearStencil(0);
+    try {
+      if (clipDepth === 0) {
+        // No clip: start from a known-zero stencil like before.
+        this.bindSceneState();
+        gl.clearStencil(0);
+        gl.stencilMask(0xff);
+        gl.clear(gl.STENCIL_BUFFER_BIT);
+        gl.enable(gl.STENCIL_TEST);
+      }
+      // Pass 1: mark source coverage at depth + 1 without touching color.
       gl.stencilMask(0xff);
-      gl.clear(gl.STENCIL_BUFFER_BIT);
-      gl.enable(gl.STENCIL_TEST);
+      gl.stencilFunc(
+        clipDepth === 0 ? gl.ALWAYS : gl.EQUAL,
+        clipDepth,
+        0xff,
+      );
+      gl.stencilOp(gl.KEEP, gl.KEEP, gl.INCR);
+      gl.colorMask(false, false, false, false);
+      this.drawSolidQuad(corners, TRANSPARENT, "replace", 1, true);
+      // Pass 2: clear the destination outside the coverage, inside the clip.
+      gl.stencilFunc(gl.EQUAL, clipDepth, 0xff);
+      gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);
+      gl.stencilMask(0x00);
+      gl.colorMask(true, true, true, true);
+      this.drawSolidQuad(this.fullscreen(), TRANSPARENT, "replace", 1, true);
+      // Pass 3: composite the source inside the coverage.
+      gl.stencilFunc(gl.EQUAL, clipDepth + 1, 0xff);
+      drawSource(true);
+    } finally {
+      // Covers mid-pass failures (missing texture, shader interface): no
+      // caller may inherit colorMask=false or a half-applied stencil test.
+      this.resetStencil();
     }
-    // Pass 1: mark source coverage at depth + 1 without touching color.
-    gl.stencilMask(0xff);
-    gl.stencilFunc(
-      clipDepth === 0 ? gl.ALWAYS : gl.EQUAL,
-      clipDepth,
-      0xff,
-    );
-    gl.stencilOp(gl.KEEP, gl.KEEP, gl.INCR);
-    gl.colorMask(false, false, false, false);
-    this.drawSolidQuad(corners, TRANSPARENT, "replace", 1, true);
-    // Pass 2: clear the destination outside the coverage, inside the clip.
-    gl.stencilFunc(gl.EQUAL, clipDepth, 0xff);
-    gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);
-    gl.stencilMask(0x00);
-    gl.colorMask(true, true, true, true);
-    this.drawSolidQuad(this.fullscreen(), TRANSPARENT, "replace", 1, true);
-    // Pass 3: composite the source inside the coverage.
-    gl.stencilFunc(gl.EQUAL, clipDepth + 1, 0xff);
-    drawSource(true);
-    this.resetStencil();
   }
 
   private fullscreen(): number[] {

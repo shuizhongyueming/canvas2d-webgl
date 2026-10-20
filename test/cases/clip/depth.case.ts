@@ -5,7 +5,7 @@ import type {
   RasterSource,
 } from "../../../src/internal/contracts.js";
 import {
-  IDENTITY,
+  BLUE,
   RED,
   drawState,
   makeRenderer,
@@ -59,12 +59,17 @@ function clipChain(depth: number, mask: RasterSource): ClipSnapshot {
   return parent;
 }
 
-function drawClipped(device: {
-  generation: number;
-}, clip: ClipSnapshot): DrawOperation {
+type CompositeMode = DrawOperation["state"]["composite"];
+
+function drawClipped(
+  device: { generation: number },
+  clip: ClipSnapshot,
+  composite: CompositeMode = "source-over",
+  color: readonly [number, number, number, number] = RED,
+): DrawOperation {
   return {
-    ...rectDraw(device.generation, { x: 0, y: 0, width: 4, height: 4 }, RED),
-    state: drawState({ clip }),
+    ...rectDraw(device.generation, { x: 0, y: 0, width: 4, height: 4 }, color),
+    state: drawState({ clip, composite }),
     clip,
   };
 }
@@ -112,6 +117,52 @@ export const cases: CaseDefinition[] = [
         a.assert(
           pixelAt(unchanged, 1, 1).join(",") === "255,0,0,255",
           "the rejected draw does not alter the scene",
+        );
+
+        // source-in reserves one extra stencil level for source coverage.
+        // At depth 254 it still has room and composites normally.
+        const full = { x: 0, y: 0, width: 4, height: 4 };
+        renderer.device.draw(rectDraw(renderer.device.generation, full, BLUE));
+        const sourceIn254 = clipChain(254, mask);
+        renderer.device.draw(
+          drawClipped(renderer.device, sourceIn254, "source-in"),
+        );
+        const composited = renderer.hooks.readScene();
+        a.observe("sourceInAt254", pixelAt(composited, 1, 1));
+        a.assert(
+          pixelAt(composited, 1, 1).join(",") === "255,0,0,255",
+          "source-in composites through 254 clip levels",
+        );
+
+        // At depth 255 there is no value left for source coverage. The draw
+        // must report resource-limit and leave the scene untouched instead of
+        // clamping the reference and silently clearing the clip.
+        renderer.device.draw(rectDraw(renderer.device.generation, full, BLUE));
+        let sourceInCode = "ok";
+        try {
+          renderer.device.draw(
+            drawClipped(renderer.device, deepest, "source-in"),
+          );
+        } catch (error) {
+          sourceInCode = (error as { code?: string }).code ?? "unknown";
+        }
+        a.observe("sourceInAt255", sourceInCode);
+        a.assert(
+          sourceInCode === "resource-limit",
+          "source-in at 255 clip levels reports resource-limit",
+        );
+        const afterSourceIn = renderer.hooks.readScene();
+        a.assert(
+          pixelAt(afterSourceIn, 1, 1).join(",") === "0,0,255,255",
+          "the rejected source-in does not clear the clip region",
+        );
+        a.observe(
+          "texturesAfterSourceIn",
+          renderer.hooks.resourceCounts().textures,
+        );
+        a.assert(
+          renderer.hooks.resourceCounts().textures === 0,
+          "rejected source-in still releases every mask texture",
         );
       } finally {
         renderer.device.dispose();
