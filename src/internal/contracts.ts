@@ -208,6 +208,12 @@ export interface Rasterizer {
     bounds: Bounds,
   ): RasterSource;
   measureWidth(text: string, state: DrawState): number;
+  /**
+   * Validate a candidate font string against the native parser and return the
+   * native normalized serialization; null means native rejected the assignment
+   * (the canvas font setter then ignores the value, exactly like native).
+   */
+  normalizeFont(font: string): string | null;
   clearCache(): void;
   dispose(): void;
 }
