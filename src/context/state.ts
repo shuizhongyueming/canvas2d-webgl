@@ -190,6 +190,10 @@ export function createStateStore(defaults: StateStoreDefaults): StateStore {
       stack.length = 0;
       current = initial();
     },
+    discardClips() {
+      current.clip = null;
+      for (const saved of stack) saved.clip = null;
+    },
     snapshot(): DrawState {
       return Object.freeze({
         transform: Object.freeze([...current.transform]) as Matrix,

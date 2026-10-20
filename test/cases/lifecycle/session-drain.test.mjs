@@ -55,6 +55,7 @@ function fakeParts() {
       snapshot() {},
       set() {},
       get() {},
+      discardClips() {},
     },
     path: {
       begin() {},

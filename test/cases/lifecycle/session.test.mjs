@@ -215,13 +215,18 @@ test("restoration rebuilds through the device, drops the clip and clears caches"
       assert.equal(state.get("clip"), null);
     },
   });
+  // A clip saved on the stack must not be resurrected by restore() either.
   state.set("clip", makeClip(5));
+  state.save();
+  state.set("clip", makeClip(6));
   session.notifyLost();
 
   session.notifyRestored();
   session.notifyRestored(); // not lost anymore, ignored
   assert.equal(device.restoreCalls, 1);
   assert.equal(state.get("clip"), null);
+  state.restore();
+  assert.equal(state.get("clip"), null, "saved clips are discarded too");
   assert.equal(raster.clearCalls, 1);
   assert.deepEqual(order, ["feature"]);
   assert.deepEqual(events, ["lost", "restored"]);

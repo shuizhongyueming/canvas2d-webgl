@@ -208,6 +208,11 @@ export interface StateStore {
   save(): void;
   restore(): void;
   reset(): void;
+  /**
+   * Drop clip references in the current state and every saved state. A lost
+   * generation invalidates pending clips; restore() must never resurrect one.
+   */
+  discardClips(): void;
   /** Captures current live paints into immutable versions for this draw. */
   snapshot(): DrawState;
   set(name: string, value: unknown): void;

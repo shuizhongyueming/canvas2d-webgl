@@ -134,9 +134,9 @@ export function createSession(parts: SessionParts): CanvasSession {
       // present before any caller redraw joins the same checkpoint.
       device.restore();
       drain([
-        // The clip snapshot belongs to the lost generation; a restored context
-        // starts without an effective clip.
-        () => state.set("clip", null),
+        // Clip snapshots belong to the lost generation, including the ones
+        // held by the save stack; a restored context starts with no clip.
+        () => state.discardClips(),
         () => raster.clearCache(),
         () => lifecycle.restored(),
       ]);
