@@ -181,6 +181,9 @@ const clipped: CaseDefinition[] = ENTRIES.flatMap((entry) =>
         if (mode === "source-in") {
           // source-in multiplies the whole effective clip by the source
           // alpha, so every clip pixel the source does not cover is cleared.
+          // The text entry only asserts the cleared interior: glyph interior
+          // coverage is left to the render pair, because it depends on the
+          // platform font rasterizer.
           a.assert(
             transparentIn(scene, CLIP.x + 16, CLIP.y + 16, 8, 8) === 64,
             "source-in clears the clip interior outside the source",

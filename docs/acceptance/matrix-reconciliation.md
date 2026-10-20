@@ -49,22 +49,28 @@
 
 额外证据（特性票或本票自行增加的用例）与矩阵必需用例分开计数，避免把额外用例当成矩阵覆盖。
 
+分组小计的读法是 `<总数> (<semantic-pass> / <pending-review>)`，而每条用例自身会标「额外证据」；合计行给出 `(矩阵必需 N，额外 M)`。引用数字时请一并给出必需/额外，否则容易把额外用例误读成矩阵覆盖。
+
 ## 生成
 
 ```sh
 pnpm run test:browser --output test-results/24-acceptance
-pnpm run test:matrix --run test-results/24-acceptance/<runId>/run.json --out test-results/24-acceptance/<runId>/matrix.md
+pnpm run test:matrix test-results/24-acceptance/<runId>/run.json --out test-results/24-acceptance/<runId>/matrix.md
 ```
 
-`test:matrix` 在缺定义或存在语义失败时退出 1；待评审属于预期未完成状态，不改变退出码，也不会被写成通过。脚本只读运行产物，不重新采集、不重新判定评审。
+`test:matrix` 取首个非 `--` 参数作为 run.json 路径（不接受 `--run=` 写法）。它在缺定义或存在语义失败时退出 1；待评审属于预期未完成状态，不改变退出码，也不会被写成通过。脚本只读运行产物，不重新采集、不重新判定评审。
+
+对账表把矩阵派生出的必需用例与特性票/本票自行增加的额外证据分开计数：`<总数> (<必需> / <额外>)`。分组小计只用于阅读，额外证据不计入矩阵覆盖。
 
 ## 渲染对评审索引
 
 ```sh
-pnpm run test:review-index --run <run.json> --out <run目录>/review-index.md
+pnpm run test:review-index <run.json> --out <run目录>/review-index.md
 ```
 
-索引逐用例列出差异像素数、最大通道差、边缘翻转、低 alpha 差与包围框，并在一个真实产物上做局部错误检测反例：改动几个像素各一个通道单位，要求定位器报出同样的坐标数。统计列只帮助阅读，不构成容差；索引不写评审结论，也不改变任何用例状态。评审记录仍按 `reviews.template.json` 填写后交给 `test:acceptance`。
+索引逐用例列出差异像素数、最大通道差、边缘翻转、低 alpha 差与包围框。统计列只帮助阅读，不构成容差；索引不写评审结论，也不改变任何用例状态。评审记录仍按 `reviews.template.json` 填写后交给 `test:acceptance`。
+
+局部错误检测反例对**逐像素一致**的配对才有判别力：注入若干单通道差后要求定位集合与注入点完全相同（`exact`）。对本身已有差异的配对，注入点会与既有差异混在一起，`exact` 不再可判定——这类配对只能验证「注入点包含于定位结果」，因此反例固定选取一致配对，避免把工具未隐藏错误的结论错误地套用到有差异产物上。
 
 ## 排除项
 
