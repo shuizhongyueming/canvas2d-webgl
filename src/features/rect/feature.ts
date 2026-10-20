@@ -136,9 +136,20 @@ export const rectFeature: FeatureFactory = (
     const rect = rectArguments("fillRect", args);
     if (!rect || !assertUsable()) return;
     const [x, y, width, height] = rect;
-    // A zero-area rect covers no pixels; native paints nothing.
-    if (width === 0 || height === 0) return;
+    if (width === 0 && height === 0) return;
     const snapshot = state.snapshot();
+    if (width === 0 || height === 0) {
+      if (snapshot.composite === "source-in")
+        gpu.draw({
+          generation: gpu.generation,
+          kind: "draw",
+          state: snapshot,
+          source: { kind: "empty" },
+          sourceBounds: { x, y, width: 0, height: 0 },
+          clip: snapshot.clip,
+        });
+      return;
+    }
     if (snapshot.fill.kind !== "solid") {
       drawRasterRect(x, y, width, height, snapshot, "fill");
       return;

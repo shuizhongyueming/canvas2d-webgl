@@ -1,6 +1,4 @@
-import type {
-  CompositeMode,
-} from "../../api.js";
+import type { CompositeMode } from "../../api.js";
 import type {
   FeatureDefinition,
   FeatureFactory,
@@ -29,87 +27,11 @@ const SUPPORTED_MODES: ReadonlySet<string> = new Set([
 
 /** Spec-recognized operators the support matrix does not cover. */
 const RECOGNIZED_MODES: ReadonlySet<string> = new Set([
-  "clear",
-  "copy",
-  "destination",
-  "destination-over",
-  "destination-in",
-  "destination-out",
-  "destination-atop",
-  "source-out",
-  "xor",
-  "normal",
-  "multiply",
-  "screen",
-  "overlay",
-  "darken",
-  "lighten",
-  "color-dodge",
-  "color-burn",
-  "hard-light",
-  "soft-light",
-  "difference",
-  "exclusion",
-  "hue",
-  "saturation",
-  "color",
-  "luminosity",
-  "plus-darker",
-  "plus-lighter",
+  "clear", "copy", "normal", "destination-over", "destination-in", "destination-out",
+  "destination-atop", "source-out", "xor", "multiply", "screen", "overlay",
+  "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light",
+  "difference", "exclusion", "hue", "saturation", "color", "luminosity",
 ]);
-
-const NUMBER = "[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)";
-const NUMBER_OR_PERCENT = new RegExp(`^${NUMBER}%?$`);
-const LENGTH = new RegExp(
-  `^(${NUMBER}(px|em|rem|ex|ch|vw|vh|vmin|vmax|cm|mm|in|pt|pc|q)?|0)$`,
-  "i",
-);
-const ANGLE = new RegExp(`^${NUMBER}(deg|grad|rad|turn)$`, "i");
-
-function filterArguments(name: string, args: string): boolean {
-  switch (name) {
-    case "blur":
-      return LENGTH.test(args);
-    case "brightness":
-    case "contrast":
-    case "saturate":
-      return NUMBER_OR_PERCENT.test(args);
-    case "grayscale":
-    case "invert":
-    case "opacity":
-    case "sepia":
-      return NUMBER_OR_PERCENT.test(args);
-    case "hue-rotate":
-      return ANGLE.test(args);
-    case "drop-shadow":
-    case "url":
-      return args.length > 0;
-    default:
-      return false;
-  }
-}
-
-/**
- * Whether the value parses as a CSS <filter-value-list> (and is therefore
- * spec-legal but outside the support matrix). Parse failures are ignored by
- * native and by us. Function arguments are validated per grammar; url() with
- * nested parentheses is treated as a parse failure.
- */
-function isLegalFilterList(value: string): boolean {
-  const trimmed = value.trim();
-  if (!trimmed) return false;
-  let tokens = 0;
-  let valid = 0;
-  const rest = trimmed.replace(
-    /([a-zA-Z][a-zA-Z-]*)\(([^()]*)\)/g,
-    (whole, name: string, args: string) => {
-      tokens += 1;
-      if (filterArguments(name.toLowerCase(), args.trim())) valid += 1;
-      return " ";
-    },
-  );
-  return tokens > 0 && tokens === valid && rest.trim() === "";
-}
 
 export const compositeFeature: FeatureFactory = (
   environment,
@@ -120,6 +42,32 @@ export const compositeFeature: FeatureFactory = (
       ERROR_CODES.CONTRACT,
       "composite feature requires environment.state",
     );
+  let parser: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null = null;
+  function isLegalFilterList(value: string): boolean {
+    if (!parser) {
+      const canvas = environment.createOffscreenCanvas?.(1, 1);
+      const context = canvas?.getContext("2d");
+      if (!canvas || !context || !("filter" in context)) {
+        if (canvas) {
+          canvas.width = 0;
+          canvas.height = 0;
+        }
+        throw createCompatError(ERROR_CODES.CAPABILITY, "native filter parser is unavailable");
+      }
+      parser = context;
+      environment.resources.register(() => {
+        canvas.width = 0;
+        canvas.height = 0;
+        parser = null;
+      });
+    }
+    parser.filter = "none";
+    parser.filter = value;
+    if (parser.filter !== "none") return true;
+    parser.filter = "brightness(120%)";
+    parser.filter = value;
+    return parser.filter !== "brightness(120%)";
+  }
   return {
     id: "composite",
     members: {
