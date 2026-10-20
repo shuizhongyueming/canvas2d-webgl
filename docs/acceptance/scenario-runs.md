@@ -24,7 +24,7 @@
 
 | 字段 | 值 |
 | --- | --- |
-| `browser` | UA 实测 `Chrome/154.0.0.0`；ego-browser 内置 Chromium（具体构建号待核验，UA 与 Playwright bundled 156 不一致，以 UA 为准） |
+| `browser` | ego-browser 内置 Chromium `154.0.8037.44`（评审在 ego Framework 二进制中佐证）；UA 因 UA reduction 显示为 `Chrome/154.0.0.0` |
 | `platform` | `MacIntel` |
 | `timezone` | `Asia/Shanghai` |
 | `dpr` | 2 |
@@ -67,7 +67,7 @@
   "date": "2026-10-20",
   "operator": "kimi-code-agent",
   "execution": "executed",
-  "savePreset": { "key": "stickmanfuryv4", "value": null, "appliedVia": "devtools" },
+  "savePreset": null,
   "cheatKeysUsed": [],
   "stepsExecuted": [
     "启动本地静态服务器指向游戏 src/，并将库 dist 挂到 /__compat/",
@@ -78,18 +78,18 @@
   "notifications": [],
   "randomness": { "fact": "Math.random 无种子机制（#8 事实：静态 135 处）", "runNotes": "本次未观察到需要说明的随机差异" },
   "apiTrace": [
-    { "member": "canvas.width", "kind": "property-set", "signature": "number", "count": 1 },
-    { "member": "canvas.height", "kind": "property-set", "signature": "number", "count": 1 },
-    { "member": "drawImage", "kind": "method-call", "signature": "3/5/9-arg; HTMLImageElement", "count": 12 },
-    { "member": "fillRect", "kind": "method-call", "signature": "4-arg", "count": 8 },
-    { "member": "fillStyle", "kind": "property-set", "signature": "string:hex/rgba", "count": 9 },
-    { "member": "fillText", "kind": "method-call", "signature": "3-arg", "count": 5 },
-    { "member": "font", "kind": "property-set", "signature": "string", "count": 4 },
-    { "member": "save", "kind": "method-call", "signature": "0-arg", "count": 6 },
-    { "member": "restore", "kind": "method-call", "signature": "0-arg", "count": 6 },
-    { "member": "translate", "kind": "method-call", "signature": "2-arg", "count": 5 },
-    { "member": "rotate", "kind": "method-call", "signature": "1-arg", "count": 4 },
-    { "member": "textAlign", "kind": "property-set", "signature": "string:center", "count": 4 }
+    { "member": "canvas.width", "kind": "property-set", "signature": "number", "count": null, "countNote": "启动段共 60 条轨迹，逐成员计数未单独记录" },
+    { "member": "canvas.height", "kind": "property-set", "signature": "number", "count": null, "countNote": "同上" },
+    { "member": "context.drawImage", "kind": "method-call", "signature": "3/5/9-arg; HTMLImageElement", "count": null, "countNote": "同上" },
+    { "member": "context.fillRect", "kind": "method-call", "signature": "4-arg", "count": null, "countNote": "同上" },
+    { "member": "context.fillStyle", "kind": "property-set", "signature": "string:hex/rgba", "count": null, "countNote": "同上" },
+    { "member": "context.fillText", "kind": "method-call", "signature": "3-arg", "count": null, "countNote": "同上" },
+    { "member": "context.font", "kind": "property-set", "signature": "string", "count": null, "countNote": "同上" },
+    { "member": "context.save", "kind": "method-call", "signature": "0-arg", "count": null, "countNote": "同上" },
+    { "member": "context.restore", "kind": "method-call", "signature": "0-arg", "count": null, "countNote": "同上" },
+    { "member": "context.translate", "kind": "method-call", "signature": "2-arg", "count": null, "countNote": "同上" },
+    { "member": "context.rotate", "kind": "method-call", "signature": "1-arg", "count": null, "countNote": "同上" },
+    { "member": "context.textAlign", "kind": "property-set", "signature": "string:center", "count": null, "countNote": "同上" }
   ],
   "unsupportedApiHits": [],
   "outOfMatrixHits": [],
@@ -125,7 +125,7 @@
   "date": "2026-10-20",
   "operator": "kimi-code-agent",
   "execution": "executed",
-  "savePreset": { "key": "stickmanfuryv4", "value": "默认存档（未预设）", "appliedVia": "devtools" },
+  "savePreset": null,
   "cheatKeysUsed": [],
   "stepsExecuted": [
     "等待 gameState === 'game'",
@@ -136,11 +136,11 @@
   "notifications": [],
   "randomness": { "fact": "Math.random 无种子机制（#8 事实：静态 135 处）", "runNotes": "敌人行为由无种子随机驱动；本场景只验证 hover 的 filter 路径，未做逐帧断言" },
   "apiTrace": [
-    { "member": "filter", "kind": "property-set", "signature": "string:brightness(120%)", "count": 2 },
-    { "member": "globalAlpha", "kind": "property-set", "signature": "number:1", "count": 2 },
-    { "member": "drawImage", "kind": "method-call", "signature": "9-arg; HTMLCanvasElement", "count": 4 },
-    { "member": "save", "kind": "method-call", "signature": "0-arg", "count": 2 },
-    { "member": "restore", "kind": "method-call", "signature": "0-arg", "count": 2 }
+    { "member": "context.filter", "kind": "property-set", "signature": "string:brightness(120%)", "count": 2 },
+    { "member": "context.globalAlpha", "kind": "property-set", "signature": "number:1", "count": null, "countNote": "未逐次计数" },
+    { "member": "context.drawImage", "kind": "method-call", "signature": "9-arg; HTMLCanvasElement", "count": null, "countNote": "未逐次计数" },
+    { "member": "context.save", "kind": "method-call", "signature": "0-arg", "count": null, "countNote": "未逐次计数" },
+    { "member": "context.restore", "kind": "method-call", "signature": "0-arg", "count": null, "countNote": "未逐次计数" }
   ],
   "unsupportedApiHits": [],
   "outOfMatrixHits": [],
@@ -176,7 +176,7 @@
   "date": "2026-10-20",
   "operator": "kimi-code-agent",
   "execution": "executed",
-  "savePreset": { "key": "stickmanfuryv4", "value": "默认存档（未预设）", "appliedVia": "devtools" },
+  "savePreset": null,
   "cheatKeysUsed": [],
   "stepsExecuted": [
     "调用 openCustomise() 进入换装界面",
@@ -188,9 +188,9 @@
   "notifications": [],
   "randomness": { "fact": "Math.random 无种子机制（#8 事实：静态 135 处）", "runNotes": "换装预览动画受无种子随机影响，未做逐帧断言" },
   "apiTrace": [
-    { "member": "drawImage", "kind": "method-call", "signature": "5-arg; native-canvas", "count": 3925, "sourceRef": "tint-canvas-A" },
-    { "member": "clearRect", "kind": "method-call", "signature": "4-arg", "count": 308 },
-    { "member": "globalCompositeOperation", "kind": "property-set", "signature": "string:source-atop", "count": 308 }
+    { "member": "context.drawImage", "kind": "method-call", "signature": "5-arg; native-canvas", "count": 3925, "sourceRef": "tint-canvas-A", "countNote": "canvas 源调用总数；单个源 id 最多重复 308 次" },
+    { "member": "context.clearRect", "kind": "method-call", "signature": "4-arg", "count": null, "countNote": "已观察到，未逐次计数" },
+    { "member": "context.globalCompositeOperation", "kind": "property-set", "signature": "string:source-atop", "count": null, "countNote": "已观察到，未逐次计数" }
   ],
   "unsupportedApiHits": [],
   "outOfMatrixHits": [],
@@ -229,7 +229,7 @@
   "date": "2026-10-20",
   "operator": "kimi-code-agent",
   "execution": "executed",
-  "savePreset": { "key": "stickmanfuryv4", "value": "默认存档；进度 0 → 25", "appliedVia": "devtools" },
+  "savePreset": { "key": "stickmanfuryv4", "value": "0,0,0,3,0,2,0,1,0,0,0,...（默认存档原值，完整串见仓外证据）", "appliedVia": "devtools" },
   "cheatKeysUsed": ["2：杀光敌人以进入结算"],
   "stepsExecuted": [
     "作弊键 2 杀光当前关卡敌人",
@@ -239,9 +239,9 @@
   "notifications": [],
   "randomness": { "fact": "Math.random 无种子机制（#8 事实：静态 135 处）", "runNotes": "庆祝文字键从 congratsKeys 随机选取，本次未记录具体值" },
   "apiTrace": [
-    { "member": "fillRect", "kind": "method-call", "signature": "4-arg（结算遮罩与进度条）", "count": "见全量聚合" },
-    { "member": "font", "kind": "property-set", "signature": "string（结算文字）", "count": "见全量聚合" },
-    { "member": "fillText", "kind": "method-call", "signature": "3-arg（进度百分比文字）", "count": "见全量聚合" }
+    { "member": "context.fillRect", "kind": "method-call", "signature": "4-arg（结算遮罩与进度条）", "count": null, "countNote": "未按场景切分计数" },
+    { "member": "context.font", "kind": "property-set", "signature": "string（结算文字）", "count": null, "countNote": "未按场景切分计数" },
+    { "member": "context.fillText", "kind": "method-call", "signature": "3-arg（进度百分比文字）", "count": null, "countNote": "未按场景切分计数" }
   ],
   "unsupportedApiHits": [],
   "outOfMatrixHits": [],
@@ -278,7 +278,7 @@
   "date": "2026-10-20",
   "operator": "kimi-code-agent",
   "execution": "executed",
-  "savePreset": { "key": "stickmanfuryv4", "value": "setWeaponUnlockProgress(100) 前置构造；非自然累积", "appliedVia": "devtools" },
+  "savePreset": { "key": "stickmanfuryv4", "value": "进度经 setWeaponUnlockProgress(100) 构造，非自然累积", "appliedVia": "devtools" },
   "cheatKeysUsed": ["2：杀光敌人以进入结算"],
   "stepsExecuted": [
     "setWeaponUnlockProgress(100) 构造解锁分支前置（非自然进度累积）",
@@ -289,8 +289,8 @@
   "notifications": [],
   "randomness": { "fact": "Math.random 无种子机制（#8 事实：静态 135 处）", "runNotes": "解锁粒子效果由无种子随机驱动，未做逐帧断言" },
   "apiTrace": [
-    { "member": "fillRect", "kind": "method-call", "signature": "4-arg（解锁版遮罩）", "count": "见全量聚合" },
-    { "member": "drawImage", "kind": "method-call", "signature": "9-arg; HTMLImageElement（武器图标）", "count": "见全量聚合" }
+    { "member": "context.fillRect", "kind": "method-call", "signature": "4-arg（解锁版遮罩）", "count": null, "countNote": "未按场景切分计数" },
+    { "member": "context.drawImage", "kind": "method-call", "signature": "9-arg; HTMLImageElement（武器图标）", "count": null, "countNote": "未按场景切分计数" }
   ],
   "unsupportedApiHits": [],
   "outOfMatrixHits": [],
@@ -327,7 +327,7 @@
   "date": "2026-10-20",
   "operator": "kimi-code-agent",
   "execution": "executed",
-  "savePreset": { "key": "stickmanfuryv4", "value": "默认存档", "appliedVia": "devtools" },
+  "savePreset": null,
   "cheatKeysUsed": [],
   "stepsExecuted": [
     "覆盖 innerWidth/innerHeight 为 1100×700（ego-browser 下 CDP metrics override 不触发页面 resize 事件）",
@@ -338,8 +338,8 @@
   "notifications": [],
   "randomness": { "fact": "Math.random 无种子机制（#8 事实：静态 135 处）", "runNotes": "缩放过程未观察到随机差异" },
   "apiTrace": [
-    { "member": "canvas.width", "kind": "property-set", "signature": "number:1335.7142857142858 / 1728 / 1458.5898709036744", "count": 3 },
-    { "member": "canvas.height", "kind": "property-set", "signature": "number:850 / 1007 / 850", "count": 3 }
+    { "member": "canvas.width", "kind": "property-set", "signature": "number:1335.7142857142858 / 1728 / 1458.5898709036744", "count": 3, "countNote": "两次 resizeCanvas 合计；含恢复步骤" },
+    { "member": "canvas.height", "kind": "property-set", "signature": "number:850 / 1007 / 850", "count": 3, "countNote": "同上" }
   ],
   "unsupportedApiHits": [],
   "outOfMatrixHits": [],
@@ -375,7 +375,7 @@
   "date": "2026-10-20",
   "operator": "kimi-code-agent",
   "execution": "executed",
-  "savePreset": { "key": "stickmanfuryv4", "value": "默认存档", "appliedVia": "devtools" },
+  "savePreset": null,
   "cheatKeysUsed": [],
   "stepsExecuted": [
     "取 #canvas 的 WebGL context 与 WEBGL_lose_context 扩展",
@@ -389,7 +389,7 @@
   ],
   "randomness": { "fact": "Math.random 无种子机制（#8 事实：静态 135 处）", "runNotes": "恢复后场景内容由无种子随机驱动，只验证继续绘制" },
   "apiTrace": [
-    { "member": "fillRect", "kind": "method-call", "signature": "4-arg（恢复后重绘）", "count": "见全量聚合" }
+    { "member": "context.fillRect", "kind": "method-call", "signature": "4-arg（恢复后重绘）", "count": null, "countNote": "未按场景切分计数" }
   ],
   "unsupportedApiHits": [],
   "outOfMatrixHits": [],
@@ -423,7 +423,8 @@
   "schemaVersion": 1,
   "runId": "2026-10-20-ego-chromium154-metal",
   "date": "2026-10-20",
-  "environmentRef": "见上文「环境」表",
+  "environmentId": "ego-chromium154-metal",
+  "environmentRef": "见上文「环境」表（哈希待核验）",
   "game": "unknown-epic-rage 本地工作副本（无 commit，待核验）",
   "library": { "commit": "035ee8f", "dirty": true, "sourceHash": "4bc0a08a3ebc66c78aa2aa9613dbffa21a6fd2d4baab034fb089d0999ba8d58b" },
   "scenarios": [
@@ -436,46 +437,51 @@
     { "scenarioId": "SCN-07", "execution": "executed", "review": "pending-review", "verdict": "not-accepted" }
   ],
   "triggered": [
-    { "member": "lineTo", "scenarios": ["SCN-01..07（整段会话）"], "totalCount": 38368 },
-    { "member": "translate", "scenarios": ["SCN-01..07"], "totalCount": 24477 },
-    { "member": "rotate", "scenarios": ["SCN-01..07"], "totalCount": 20887 },
-    { "member": "fillStyle", "scenarios": ["SCN-01..07"], "totalCount": 15909 },
-    { "member": "save", "scenarios": ["SCN-01..07"], "totalCount": 15828 },
-    { "member": "restore", "scenarios": ["SCN-01..07"], "totalCount": 15826 },
-    { "member": "beginPath", "scenarios": ["SCN-01..07"], "totalCount": 12535 },
-    { "member": "fill", "scenarios": ["SCN-01..07"], "totalCount": 12317 },
-    { "member": "moveTo", "scenarios": ["SCN-01..07"], "totalCount": 11990 },
-    { "member": "closePath", "scenarios": ["SCN-01..07"], "totalCount": 11990 },
-    { "member": "drawImage", "scenarios": ["SCN-01..07"], "totalCount": 10937 },
-    { "member": "scale", "scenarios": ["SCN-01..07"], "totalCount": 3243 },
-    { "member": "fillRect", "scenarios": ["SCN-01..07"], "totalCount": 2720 },
-    { "member": "arc", "scenarios": ["SCN-01..07"], "totalCount": 545 },
-    { "member": "font", "scenarios": ["SCN-01..07"], "totalCount": 435 },
-    { "member": "textAlign", "scenarios": ["SCN-01..07"], "totalCount": 327 },
-    { "member": "fillText", "scenarios": ["SCN-01..07"], "totalCount": 327 },
-    { "member": "globalAlpha", "scenarios": ["SCN-01..07"], "totalCount": 324 },
-    { "member": "rect", "scenarios": ["SCN-01..07"], "totalCount": 218 },
-    { "member": "clip", "scenarios": ["SCN-01..07"], "totalCount": 218 },
-    { "member": "textBaseline", "scenarios": ["SCN-01..07"], "totalCount": 216 },
-    { "member": "measureText", "scenarios": ["SCN-01..07"], "totalCount": 216 },
-    { "member": "lineCap", "scenarios": ["SCN-01..07"], "totalCount": 108 },
-    { "member": "canvas.height", "scenarios": ["SCN-01..07"], "totalCount": 18 },
-    { "member": "canvas.width", "scenarios": ["SCN-01..07"], "totalCount": 18 },
-    { "member": "createPattern", "scenarios": ["SCN-01..07"], "totalCount": 3 }
+    { "member": "context.lineTo", "sessionScope": true, "totalCount": 38368 },
+    { "member": "context.translate", "sessionScope": true, "totalCount": 24477 },
+    { "member": "context.rotate", "sessionScope": true, "totalCount": 20887 },
+    { "member": "context.fillStyle", "sessionScope": true, "totalCount": 15909 },
+    { "member": "context.save", "sessionScope": true, "totalCount": 15828 },
+    { "member": "context.restore", "sessionScope": true, "totalCount": 15826 },
+    { "member": "context.beginPath", "sessionScope": true, "totalCount": 12535 },
+    { "member": "context.fill", "sessionScope": true, "totalCount": 12317 },
+    { "member": "context.moveTo", "sessionScope": true, "totalCount": 11990 },
+    { "member": "context.closePath", "sessionScope": true, "totalCount": 11990 },
+    { "member": "context.drawImage", "sessionScope": true, "totalCount": 10937 },
+    { "member": "context.scale", "sessionScope": true, "totalCount": 3243 },
+    { "member": "context.fillRect", "sessionScope": true, "totalCount": 2720 },
+    { "member": "context.arc", "sessionScope": true, "totalCount": 545 },
+    { "member": "context.font", "sessionScope": true, "totalCount": 435 },
+    { "member": "context.textAlign", "sessionScope": true, "totalCount": 327 },
+    { "member": "context.fillText", "sessionScope": true, "totalCount": 327 },
+    { "member": "context.globalAlpha", "sessionScope": true, "totalCount": 324 },
+    { "member": "context.rect", "sessionScope": true, "totalCount": 218 },
+    { "member": "context.clip", "sessionScope": true, "totalCount": 218 },
+    { "member": "context.textBaseline", "sessionScope": true, "totalCount": 216 },
+    { "member": "context.measureText", "sessionScope": true, "totalCount": 216 },
+    { "member": "context.lineCap", "sessionScope": true, "totalCount": 108 },
+    { "member": "canvas.height", "sessionScope": true, "totalCount": 18 },
+    { "member": "canvas.width", "sessionScope": true, "totalCount": 18 },
+    { "member": "context.createPattern", "sessionScope": true, "totalCount": 3 },
+    { "member": "context.filter", "sessionScope": false, "note": "SCN-02 快照记录 2 次 set；发生在 200000 条缓冲区写满之后，未进入全会话聚合" },
+    { "member": "context.clearRect", "sessionScope": false, "note": "SCN-03 快照记录到该调用；发生在缓冲区写满之后，未进入全会话聚合" },
+    { "member": "context.globalCompositeOperation", "sessionScope": false, "note": "SCN-03 快照记录到 source-atop；发生在缓冲区写满之后，未进入全会话聚合" }
   ],
   "untriggered": [
-    { "member": "context.stroke / lineWidth / lineJoin / miterLimit / setLineDash", "fallback": { "layer": "ACC-03", "evidenceRef": "test/cases/path/stroke.case.ts（#19）" } },
-    { "member": "context.strokeRect / strokeText", "fallback": { "layer": "ACC-03", "evidenceRef": "test/cases/rect/stroke.case.ts、test/cases/text/render.case.ts（#17/#20）" } },
-    { "member": "context.createLinearGradient / createRadialGradient / addColorStop", "fallback": { "layer": "ACC-02", "evidenceRef": "test/cases/raster/gradient.case.ts（#33/#38）" } },
-    { "member": "context.setTransform / transform / resetTransform", "fallback": { "layer": "ACC-02", "evidenceRef": "test/cases/state/transform.case.ts（#12）" } },
-    { "member": "context.setLineDash / getLineDash / lineDashOffset", "fallback": { "layer": "ACC-03", "evidenceRef": "test/cases/path/*（#19）" } },
-    { "member": "context.arcTo / ellipse / quadraticCurveTo / bezierCurveTo", "fallback": { "layer": "ACC-03", "evidenceRef": "test/cases/path/fill.case.ts（#19）" } },
-    { "member": "context.globalCompositeOperation（四模式）", "fallback": { "layer": "ACC-03", "evidenceRef": "test/cases/composite/render.case.ts（#22）" } },
-    { "member": "context.createImageData / getImageData / putImageData", "fallback": { "layer": "ACC-02", "evidenceRef": "test/cases/canvas/*（#16）" } },
-    { "member": "canvas.toDataURL / toBlob", "fallback": { "layer": "ACC-02", "evidenceRef": "test/cases/canvas/*（#16）；本次 SCN 执行中 toDataURL 实际可用（27355 B PNG）" } },
-    { "member": "context.shadowBlur / shadowColor / shadowOffsetX / shadowOffsetY", "fallback": { "layer": "ACC-02", "evidenceRef": "test/cases/state/properties.case.ts（#12）" } },
-    { "member": "context.textAlign 之外的 textBaseline 组合、direction", "fallback": { "layer": "ACC-03", "evidenceRef": "test/cases/text/properties.case.ts（#20）" } },
-    { "member": "其余 SUPPORT_MATRIX 成员", "fallback": { "layer": "ACC-02", "evidenceRef": "`pnpm run test:matrix`（#24）输出的逐成员状态为准" } }
+    { "member": "context.strokeRect", "fallback": { "layer": "ACC-03", "evidenceRef": "test/cases/rect/stroke.case.ts（#17）" } },
+    { "member": "context.arcTo", "fallback": { "layer": "ACC-03", "evidenceRef": "test/cases/path/fill.case.ts（#19）" } },
+    { "member": "context.quadraticCurveTo", "fallback": { "layer": "ACC-03", "evidenceRef": "test/cases/path/fill.case.ts（#19）" } },
+    { "member": "context.ellipse", "fallback": { "layer": "ACC-03", "evidenceRef": "test/cases/path/fill.case.ts（#19）" } },
+    { "member": "context.stroke", "fallback": { "layer": "ACC-03", "evidenceRef": "test/cases/path/stroke.case.ts（#19）" } },
+    { "member": "context.setTransform", "fallback": { "layer": "ACC-02", "evidenceRef": "test/cases/state/transform.case.ts（#12）" } },
+    { "member": "context.strokeText", "fallback": { "layer": "ACC-03", "evidenceRef": "test/cases/text/render.case.ts（#20）" } },
+    { "member": "context.createLinearGradient", "fallback": { "layer": "ACC-02", "evidenceRef": "test/cases/raster/gradient.case.ts（#38）" } },
+    { "member": "context.strokeStyle", "fallback": { "layer": "ACC-02", "evidenceRef": "test/cases/state/properties.case.ts（#12）" } },
+    { "member": "context.lineWidth", "fallback": { "layer": "ACC-02", "evidenceRef": "test/cases/state/properties.case.ts（#12）" } },
+    { "member": "context.lineJoin", "fallback": { "layer": "ACC-02", "evidenceRef": "test/cases/state/properties.case.ts（#12）" } },
+    { "member": "canvas.getContext", "fallback": { "layer": "ACC-02", "evidenceRef": "test/cases/canvas/factory.case.ts（#16）；本场景中经注入拦截调用，未进入 context 轨迹" } },
+    { "member": "canvas.dispose", "fallback": { "layer": "ACC-03", "evidenceRef": "test/cases/lifecycle/dispose.case.ts（#23）" } },
+    { "member": "gradient.addColorStop", "fallback": { "layer": "ACC-02", "evidenceRef": "test/cases/raster/gradient.case.ts（#38）" } }
   ],
   "outOfMatrix": [],
   "overall": "not-accepted"
@@ -486,9 +492,12 @@
 
 1. 七场景 `review.status` 均为 `pending-review`（缺人工+AI 双方记录）；
 2. `review.human` / `review.ai` 均为 `null`；
-3. `library.dirty = true`（既有未跟踪 `.pnpm-store/`），正式 acceptance 要求 `dirty === false`；
+3. `library.dirty = true`（未跟踪的 `.pnpm-store/`；本 PR 已把它加入 `.gitignore`，后续运行可达到 `dirty === false`），正式 acceptance 要求 `dirty === false`；
 4. `untriggered` 中「其余 SUPPORT_MATRIX 成员」一项尚未逐成员绑定具体用例 ID（`test:matrix` 输出可作为权威清单，但当前未在本文档展开）；
-5. **触发统计的覆盖限度**：采集器单会话上限 200000 条，统计时已达上限（`total: 200000`），因此 `triggered` 的 26 个成员是「上限内出现过」的集合，不代表整场游戏中出现过的全部成员；上限之前被截断的调用未计入。`triggered.totalCount` 是整场会话的聚合，**未按场景切分**——SCN-01..07 的 `scenarios` 字段标为整段会话，而非逐场景归属。
+5. **触发统计的口径（两个来源）**：
+   - `sessionScope: true` 的 26 项来自**全会话聚合**，其计数之和恰为 **200000**，说明该聚合就是采集缓冲区本身（上限 200000 条，写满后不再记录）。因此它覆盖的是**会话前段**，不含写满之后发生的调用。
+   - `sessionScope: false` 的 3 项（`context.filter`、`context.clearRect`、`context.globalCompositeOperation`）来自**各场景执行当时的快照**，它们发生在缓冲区写满之后，故不在全会话聚合中，但确定已触发。
+   - 两者合并得到 29 个「已观察触发」的 supported 成员；**不能**把任一来源单独当作完整调用面。
 
 ## 结论边界（必须与上文一致）
 
