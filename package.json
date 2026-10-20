@@ -23,6 +23,8 @@
     "test:browser": "node scripts/testing.mjs browser",
     "test:report": "node scripts/testing.mjs report",
     "test:acceptance": "node scripts/testing.mjs acceptance",
+    "test:matrix": "node scripts/acceptance-matrix.mjs",
+    "pretest:matrix": "pnpm run build",
     "verify": "pnpm run check && pnpm run test:unit",
     "pretest:unit": "pnpm run build",
     "pretest:browser": "pnpm run build",
