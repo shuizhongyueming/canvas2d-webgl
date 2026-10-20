@@ -68,13 +68,16 @@ export const TICKETS = Object.freeze([
   },
 ]);
 
-/** Required cases are attributed by member owner first, then by spec prefix. */
+/**
+ * Attribution order: the case id's own spec prefix (an interaction case names
+ * the ticket that introduced it), then a required requirement's prefix, then
+ * the matrix owner of the members it exercises. A member that also appears in
+ * a cross-feature case does not take the case away from that interaction.
+ */
 export function ticketOf(entry, ownerOf) {
-  const owners = entry.requirements
-    .map((requirement) => ownerOf.get(requirement))
-    .filter((owner) => owner !== undefined);
   for (const ticket of TICKETS)
-    if (owners.some((owner) => ticket.rows.includes(owner))) return ticket;
+    if (ticket.prefixes.some((prefix) => entry.id.startsWith(prefix)))
+      return ticket;
   for (const ticket of TICKETS)
     if (
       entry.requirements.some((requirement) =>
@@ -82,6 +85,11 @@ export function ticketOf(entry, ownerOf) {
       )
     )
       return ticket;
+  const owners = entry.requirements
+    .map((requirement) => ownerOf.get(requirement))
+    .filter((owner) => owner !== undefined);
+  for (const ticket of TICKETS)
+    if (owners.some((owner) => ticket.rows.includes(owner))) return ticket;
   return undefined;
 }
 

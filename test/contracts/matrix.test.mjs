@@ -11,9 +11,11 @@ test('required cases are attributed to the ticket that owns their members', () =
   assert.equal(ticketOf(entry('c', ['context.filter']), ownerOf).id, 'shuizhongyueming/canvas2d-webgl#22');
   assert.equal(ticketOf(entry('d', ['ACC-03']), ownerOf).id, 'shuizhongyueming/canvas2d-webgl#24');
   assert.equal(ticketOf(entry('e', ['LIFE-01']), ownerOf).id, 'shuizhongyueming/canvas2d-webgl#23');
-  // A member outranks a prefix: an interaction case that names drawImage still
-  // belongs to the image ticket.
-  assert.equal(ticketOf(entry('f', ['ACC-03', 'context.drawImage']), ownerOf).id, 'shuizhongyueming/canvas2d-webgl#18');
+  // A cross-feature case id decides its ticket even when it drives members
+  // owned by other tickets.
+  assert.equal(ticketOf(entry('ACC-03.entry-fillRect-source-in', ['ACC-03', 'context.fillRect']), ownerOf).id, 'shuizhongyueming/canvas2d-webgl#24');
+  // Without a prefix anywhere, the member owner decides.
+  assert.equal(ticketOf(entry('f', ['context.drawImage']), ownerOf).id, 'shuizhongyueming/canvas2d-webgl#18');
   assert.equal(ticketOf(entry('g', ['CAN-02']), ownerOf).id, 'earlier');
 });
 
