@@ -16,6 +16,7 @@
 | [scenarios.md](scenarios.md) | 七场景验收清单：每场景的入口、操作序列、等待条件、字体/存档/作弊键前置、brightness 与动态源证据点，以及执行时机与待核验项汇总。 |
 | [evidence-format.md](evidence-format.md) | 证据格式定义：场景运行记录、API 轨迹条目、已触发/未触发/矩阵外对账报告、人工+AI 评审记录、判定规则与仓外引用方式。 |
 | [environment-template.md](environment-template.md) | 环境记录模板：浏览器、GPU、DPR、字体、存档预设、采集器等复现信息的必填字段。 |
+| [scenario-runs.md](scenario-runs.md) | 七场景执行记录：本次执行标识、环境、每场景步骤与证据要点、结论边界与复现方式（运行产物仓外）。 |
 | [matrix-reconciliation.md](matrix-reconciliation.md) | 支持矩阵覆盖对账口径：必需用例目录、按前置票分组、状态词汇与 `test:matrix` 生成方式。 |
 
 ## 边界（不可违反）
