@@ -122,17 +122,21 @@ export const cases: CaseDefinition[] = [
         string,
         (...args: unknown[]) => unknown
       >;
-      let pathSurvives: boolean;
+      // Path survival itself stays pending: compat has no public path until
+      // the path feature lands (#19), so asserting the stub codes would pass
+      // the case without any path evidence. Both sides pin the pending seam;
+      // the compat branch still exercises the stubs and reports through the
+      // as-approved observation, which trips the cross-side comparison if the
+      // stub codes ever change.
+      let pathMembers = "as-approved";
       if (isCompat(a)) {
-        // Path recording lands with the path feature; rect members never read
-        // or mutate environment.path, so structurally there is nothing a rect
-        // call could disturb. Pin the pending seam instead of faking a path.
         const codes = [
           outcome(() => context.beginPath!()),
           outcome(() => context.rect!(1, 1, 4, 4)),
           outcome(() => context.fill!()),
         ];
-        pathSurvives = codes.every((code) => code === "not-implemented");
+        if (!codes.every((code) => code === "not-implemented"))
+          pathMembers = codes.join(",");
         a.context.fillStyle = "#ff0000";
         a.context.fillRect(0, 0, 8, 8);
         a.context.clearRect(2, 2, 4, 4);
@@ -145,17 +149,11 @@ export const cases: CaseDefinition[] = [
         native.fillRect(0, 0, 8, 8);
         native.clearRect(6, 6, 4, 4);
         native.strokeRect(8, 8, 4, 4);
-        // None of the rect members above may consume or reset the open path.
         native.fillStyle = "#00ff00";
         native.fill();
-        const pixel = native.getImageData(3, 3, 1, 1).data;
-        pathSurvives = pixel[1] === 255 && pixel[3] === 255;
       }
-      a.assert(
-        pathSurvives,
-        "fillRect/clearRect/strokeRect leave the current path intact",
-      );
-      a.observe("pathSurvives", pathSurvives);
+      a.observe("pathMembers", pathMembers);
+      a.observe("pathSurvives", "pending-#19");
     },
   },
 ];

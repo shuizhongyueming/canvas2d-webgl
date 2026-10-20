@@ -157,7 +157,7 @@ export const cases: CaseDefinition[] = [
       context.fillRect(2, 2, 12, 12);
       context.globalAlpha = 0.5;
       // Path bookkeeping before the reset: real on native, still pending on
-      // compat (the path feature owns it; the session resets the store).
+      // compat (the path feature owns it).
       let pathRecording = "as-approved";
       if (isCompat(a)) {
         const attempt = outcome(() =>
@@ -176,17 +176,10 @@ export const cases: CaseDefinition[] = [
         "same-size assignment clears the bitmap",
       );
       a.assert(context.globalAlpha === 1, "drawing state resets");
-      let pathReset: boolean;
-      if (isCompat(a)) {
-        // The path store was reset by the session; no public path exists yet.
-        pathReset = true;
-      } else {
-        const native = context as CanvasRenderingContext2D;
-        native.fillStyle = "#00ff00";
-        native.fill(); // the reset path paints nothing
-        pathReset = native.getImageData(6, 6, 1, 1).data[3] === 0;
-      }
-      a.assert(pathReset, "same-size assignment resets the current path");
+      // Path reset is owned by the path feature: there is no public path on
+      // compat yet, so the reset of the current path stays pending instead of
+      // asserting hardcoded evidence. Tracked by #19.
+      a.observe("pathReset", "pending-#19");
       context.fillStyle = "#0000ff";
       context.fillRect(4, 4, 4, 4);
       await a.checkpoint();
@@ -196,7 +189,7 @@ export const cases: CaseDefinition[] = [
         "the canvas stays drawable after a same-size reset",
       );
       a.observe("pathRecording", pathRecording);
-      a.observe("resetSemantics", "cleared+state+path");
+      a.observe("resetSemantics", "cleared+state");
     },
   },
 ];
