@@ -165,6 +165,7 @@ export const cases: CaseDefinition[] = [
     ...base,
     id: "ACC-03.brightness-alpha",
     requirements: ["ACC-03"],
+    kind: "render",
     async run(a) {
       const context = a.context;
       context.fillStyle = "#000000";
