@@ -72,6 +72,31 @@ export const cases: CaseDefinition[] = [
       a.assert(scene.count((p) => pixelsEqual(p, TRANSPARENT)) === 48 * 48, `${variant} is an empty source, not a skipped operation`);
     },
   })),
+  {
+    ...base,
+    id: "composite.normal-alias-renders-as-source-over",
+    requirements: ["context.globalCompositeOperation", "context.fillRect"],
+    async run(a) {
+      const context = a.context;
+      context.fillStyle = "#0000ff";
+      context.fillRect(0, 0, 48, 48);
+      // Left half sets the CSS spelling; right half sets source-over. Chromium
+      // normalizes the alias, so both halves must be byte-identical. Reflect.set
+      // bypasses the declared CompositeMode union, like the contract case.
+      Reflect.set(context, "globalCompositeOperation", "normal");
+      a.assert(context.globalCompositeOperation === "source-over", "alias reads back as source-over");
+      context.fillStyle = "rgba(255,0,0,0.5)";
+      context.fillRect(0, 0, 24, 48);
+      context.globalCompositeOperation = "source-over";
+      context.fillStyle = "rgba(255,0,0,0.5)";
+      context.fillRect(24, 0, 24, 48);
+      const scene = await dumpScene(a);
+      for (const [x, y] of [[8, 8], [12, 24], [20, 40]] as const) {
+        a.assert(pixelsEqual(scene.pixel(x, y), scene.pixel(x + 24, y)), `alias half matches source-over at ${x},${y}`);
+        a.assert(!pixelsEqual(scene.pixel(x, y), [0, 0, 255, 255]), `alias half actually painted at ${x},${y}`);
+      }
+    },
+  },
   ...modes.map((mode): CaseDefinition => ({
     ...base,
     id: `composite.empty-source.${mode}`,

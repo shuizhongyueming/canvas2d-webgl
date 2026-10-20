@@ -31,12 +31,17 @@ export const cases: CaseDefinition[] = [
     run(a) {
       const context = a.context;
       a.assert(context.globalCompositeOperation === "source-over", "native initial mode");
-      for (const value of ["garbage", "plus-lighter", "plus-darker", "destination", "SOURCE-OVER", " source-in ", null, undefined]) {
+      // Chromium 156 reads "normal" back as source-over (acceptance alias),
+      // while case/whitespace variants and unknown tokens leave the mode.
+      context.globalCompositeOperation = "lighter";
+      Reflect.set(context, "globalCompositeOperation", "normal");
+      a.assert(String(context.globalCompositeOperation) === "source-over", "normal aliases source-over");
+      for (const value of ["garbage", "Normal", "NORMAL", " normal ", "plus-lighter", "plus-darker", "destination", "SOURCE-OVER", " source-in ", null, undefined]) {
         context.globalCompositeOperation = "lighter";
         Reflect.set(context, "globalCompositeOperation", value);
         a.assert(context.globalCompositeOperation === "lighter", `invalid mode ignored: ${value}`);
       }
-      for (const value of ["copy", "clear", "normal", "destination-in", "xor", "multiply", "hue"]) {
+      for (const value of ["copy", "clear", "destination-in", "xor", "multiply", "hue"]) {
         const result = outcome(() => { Reflect.set(context, "globalCompositeOperation", value); });
         a.assert(result === (isCompat(a) ? "unsupported-api" : "ok"), `legal mode classified: ${value}`);
       }

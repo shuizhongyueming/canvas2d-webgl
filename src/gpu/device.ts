@@ -517,6 +517,10 @@ class SceneDevice implements GPUDevice {
         b * alpha,
         alpha,
       ];
+      // Stencil coverage on this solid path is binary. AA-sensitive source-in
+      // sources (transforms, fractional edges) are rasterized by the feature
+      // layer into a native asset before reaching the device; this path is for
+      // device-level seams whose caller accepts hard coverage.
       if (operation.state.composite === "source-in")
         this.compositeSourceIn(corners, (stencil) =>
           this.drawSolidQuad(corners, color, "source-in", brightness, stencil),

@@ -62,7 +62,7 @@ test('spec-recognized composite modes outside the matrix are reported, value unc
   const { get, set } = setup();
   set('globalCompositeOperation', 'source-atop');
   for (const mode of [
-    'clear', 'copy', 'normal', 'destination-over', 'destination-in',
+    'clear', 'copy', 'destination-over', 'destination-in',
     'destination-out', 'destination-atop', 'source-out', 'xor',
     'multiply', 'screen', 'overlay', 'darken', 'lighten', 'color-dodge',
     'color-burn', 'hard-light', 'soft-light', 'difference', 'exclusion',
@@ -75,10 +75,22 @@ test('spec-recognized composite modes outside the matrix are reported, value unc
   }
 });
 
+test('the CSS normal spelling aliases source-over like Chromium', () => {
+  const { get, set } = setup();
+  set('globalCompositeOperation', 'lighter');
+  set('globalCompositeOperation', 'normal');
+  assert.equal(get('globalCompositeOperation'), 'source-over');
+  set('globalCompositeOperation', 'source-in');
+  set('globalCompositeOperation', 'normal');
+  assert.equal(get('globalCompositeOperation'), 'source-over');
+});
+
 test('unrecognized composite spellings are silently ignored like native', () => {
   const { get, set } = setup();
   set('globalCompositeOperation', 'lighter');
-  for (const junk of ['garbage', 'source_over', 'SOURCE-OVER', '', ' source-over ', 'null']) {
+  // Only the exact lowercase "normal" aliases source-over; case and
+  // whitespace variants stay unknown, like native.
+  for (const junk of ['garbage', 'Normal', 'NORMAL', ' normal ', 'source_over', 'SOURCE-OVER', '', ' source-over ', 'null']) {
     set('globalCompositeOperation', junk);
     assert.equal(get('globalCompositeOperation'), 'lighter', JSON.stringify(junk));
   }
@@ -102,6 +114,28 @@ test('filter classification requires a native parser when no factory is supplied
   const { get, set } = setup();
   assert.throws(() => set('filter', 'blur()'), { code: 'capability-unavailable' });
   assert.equal(get('filter'), 'none');
+});
+
+test('a disposed canvas classifies filter values without caching a new parser', () => {
+  const state = createStateStore({ fill: stubPaint(1), stroke: stubPaint(2) });
+  const context = { filter: 'none' };
+  const canvas = { width: 1, height: 1, getContext: () => context };
+  let registrations = 0;
+  const feature = compositeFeature({
+    state,
+    gpu: { status: 'disposed' },
+    createOffscreenCanvas: () => canvas,
+    resources: {
+      register() {
+        registrations += 1;
+        return () => {};
+      },
+    },
+  });
+  const setFilter = (value) => feature.members.filter.set.call(undefined, value);
+  assert.throws(() => setFilter('blur(5px)'), { code: 'unsupported-api' });
+  assert.equal(registrations, 0, 'the drained owner never receives another cleanup');
+  assert.equal(canvas.width, 0, 'the throwaway parser canvas is released immediately');
 });
 
 test('coerced values follow WebIDL DOMString conversion', () => {
