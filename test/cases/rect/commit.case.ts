@@ -87,16 +87,20 @@ export const cases: CaseDefinition[] = [
     height: 64,
     async run(a) {
       const context = a.context;
+      // Take the hooks before drawing: the hook lookup crosses the compiler
+      // boundary and its await must not consume the microtask window in which
+      // the present lands, or the unpreserved drawing buffer is cleared
+      // before the display read.
+      const hooks = await hooksOf(a);
       // Asymmetric markers: a flipped or swapped present is caught both by the
       // in-case display probe and by the review of the display artifacts.
       context.fillStyle = "#ff0000";
       context.fillRect(4, 4, 24, 24); // top-left
       context.fillStyle = "#00ff00";
       context.fillRect(40, 40, 20, 20); // bottom-right
-      const hooks = await hooksOf(a);
       if (hooks) {
-        // Read the display surface right after the present, before the next
-        // composite can clear the unpreserved drawing buffer.
+        // Read the display surface in the microtask right after the present,
+        // before the next composite can clear the unpreserved drawing buffer.
         const { generation } = hooks.readScene();
         await hooks.whenPresented(generation);
       }

@@ -121,10 +121,12 @@ export function pixelsEqual(actual: Pixel, expected: Pixel): boolean {
 
 /**
  * Read one pixel of the DISPLAY surface (device space, top-left origin). On
- * native the canvas bitmap is what the compositor shows; on compat the target
- * is a WebGL canvas, so the default framebuffer is read directly — only valid
- * right after a present and before the next composite clears the unpreserved
- * buffer. The harness attaches the target element with id "target".
+ * native the canvas bitmap is what the compositor shows. On compat the target
+ * is a WebGL canvas: present() rebinds the scene FBO when it returns, so the
+ * default framebuffer is bound explicitly here; and the drawing buffer is not
+ * preserved, so the read is only valid in the microtask window right after
+ * whenPresented() resolves, before the next composite clears it. The harness
+ * attaches the target element with id "target".
  */
 export async function displayPixel(
   a: CaseAdapter,
@@ -144,6 +146,10 @@ export async function displayPixel(
   const target = document.getElementById("target") as HTMLCanvasElement | null;
   const gl = target?.getContext("webgl") as WebGLRenderingContext | null;
   if (!gl) throw new Error("display surface is not a WebGL canvas");
+  // present() leaves the scene FBO bound; the display lives on the default
+  // framebuffer. Draw entry points re-establish scene state themselves, so
+  // this rebinding cannot disturb later draws.
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   const pixel = new Uint8Array(4);
   gl.readPixels(
     x,
