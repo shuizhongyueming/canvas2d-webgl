@@ -204,15 +204,7 @@ class NativeRasterizer implements Rasterizer {
     return this.#measure.context;
   }
 
-  /**
-   * One grow-only staging canvas, retained across misses and released on
-   * dispose. Native curve rasterization is not translation-invariant: conic
-   * generation and device-space flattening depend on the absolute coordinates
-   * and the construction transform, so an asset only byte-matches the native
-   * scene render when it is painted at the exact scene position and cropped.
-   * The stage therefore shares the scene origin and spans down to the asset's
-   * far corner. Readback happens on every miss, so it stays CPU-backed.
-   */
+  /** Native coverage depends on the canvas extent as well as scene coordinates. */
   #stageContext(
     width: number,
     height: number,
@@ -224,11 +216,9 @@ class NativeRasterizer implements Rasterizer {
         context: context2d(canvas, { willReadFrequently: true }),
       };
     } else {
-      // Any width/height assignment resets the bitmap and the context state, so
-      // only grow the dimension that actually changed; both are rebuilt below.
       const canvas = this.#stage.canvas;
-      if (width > canvas.width) canvas.width = width;
-      if (height > canvas.height) canvas.height = height;
+      if (width !== canvas.width) canvas.width = width;
+      if (height !== canvas.height) canvas.height = height;
     }
     const { canvas, context } = this.#stage;
     context.setTransform(1, 0, 0, 1, 0, 0);
@@ -347,27 +337,21 @@ class NativeRasterizer implements Rasterizer {
       // Paint at the exact scene position with the recorded transforms
       // verbatim, then crop the coverage window; translating the geometry into
       // a tight canvas would rasterize curves differently than the native scene.
-      const stage = this.#stageContext(
-        bounds.x + bounds.width,
-        bounds.y + bounds.height,
-      );
+      const scene = this.#scene();
+      const stage = this.#stageContext(scene.width, scene.height);
       replayPath(stage.ctx, path, 0, 0);
-      if (mode === "stroke") {
-        // Stroke-time CTM is the draw-time transform: it scales the stroke
-        // width and is the space native interprets the stroke paint in.
+      const lastTransform = path.commands[path.commands.length - 1]?.transform;
+      if (!lastTransform || !lastTransform.every((value, index) => value === state.transform[index]))
         stage.ctx.setTransform(...state.transform);
+      if (mode === "stroke") {
+        // Stroke-time CTM scales the width and evaluates the stroke paint.
+        // Reinstalling an identical CTM would rebase native path geometry.
         stage.ctx.lineWidth = state.lineWidth;
         stage.ctx.lineCap = state.lineCap;
         stage.ctx.lineJoin = state.lineJoin;
         applyPaint(stage.ctx, state.stroke, "stroke", this.#patternSource);
         stage.ctx.stroke();
       } else {
-        // Gradients and patterns are evaluated in the draw-time space at fill
-        // time, so install the draw-time transform for them; solids are
-        // transform-independent. Path geometry is already construction-baked
-        // and the fill-time CTM never re-transforms it.
-        if (state.fill.kind === "solid") stage.ctx.setTransform(1, 0, 0, 1, 0, 0);
-        else stage.ctx.setTransform(...state.transform);
         applyPaint(stage.ctx, state.fill, "fill", this.#patternSource);
         stage.ctx.fill();
       }

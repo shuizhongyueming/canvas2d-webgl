@@ -114,13 +114,13 @@ export const rectFeature: FeatureFactory = (
     recorder.rect(x, y, width, height, snapshot.transform);
     const source = raster.path(recorder.snapshot(), snapshot, mode);
     try {
-      // An empty asset is fully outside the scene: nothing to composite.
-      if (source.bounds.width <= 0 || source.bounds.height <= 0) return;
       gpu.draw({
         generation: gpu.generation,
         kind: "draw",
         state: snapshot,
-        source,
+        source: source.bounds.width <= 0 || source.bounds.height <= 0
+          ? { kind: "empty" }
+          : source,
         sourceBounds: source.bounds,
         clip: snapshot.clip,
       });

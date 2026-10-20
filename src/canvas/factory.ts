@@ -19,6 +19,7 @@ import { createContext } from "../context/context.js";
 import { stateFeature } from "../context/feature.js";
 import { createStateStore } from "../context/state.js";
 import { rectFeature } from "../features/rect/feature.js";
+import { pathFeature } from "../features/path/feature.js";
 import { PathRecorder } from "../path/recorder.js";
 import { createRasterizer } from "../raster/rasterizer.js";
 import {
@@ -138,6 +139,7 @@ export function createCompatCanvas<T extends TargetCanvas>(
       stateFeature,
       paintFeature,
       rectFeature,
+      pathFeature,
       canvasFeature,
     ]) as CompatContext<T>;
     facade = createFacade(targetCanvas, session, device, context);

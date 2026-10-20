@@ -14,9 +14,12 @@ export function replayPath(
   offsetY: number,
 ): void {
   ctx.beginPath();
+  let previous: readonly number[] | null = null;
   for (const command of path.commands) {
-    const [a, b, c, d, e, f] = offsetMatrix(command.transform, offsetX, offsetY);
-    ctx.setTransform(a, b, c, d, e, f);
+    const matrix = offsetMatrix(command.transform, offsetX, offsetY);
+    if (!previous || !matrix.every((value, index) => value === previous![index]))
+      ctx.setTransform(...matrix);
+    previous = matrix;
     switch (command.op) {
       case "closePath":
         ctx.closePath();

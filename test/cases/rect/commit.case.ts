@@ -1,5 +1,4 @@
 import type { CaseDefinition } from "../../types/testing.js";
-import { isCompat, outcome } from "../shared.js";
 import { displayPixel, dumpScene, hooksOf, pixelsEqual } from "./helpers.js";
 
 const base = {
@@ -148,7 +147,7 @@ export const cases: CaseDefinition[] = [
   {
     ...base,
     id: "CAN-04.same-size-reset",
-    requirements: ["CAN-04", "canvas.width", "context.fillRect"],
+    requirements: ["CAN-04", "canvas.width", "context.fillRect", "context.beginPath", "context.rect", "context.fill"],
     width: 16,
     height: 16,
     async run(a) {
@@ -156,19 +155,9 @@ export const cases: CaseDefinition[] = [
       context.fillStyle = "#ff0000";
       context.fillRect(2, 2, 12, 12);
       context.globalAlpha = 0.5;
-      // Path bookkeeping before the reset: real on native, still pending on
-      // compat (the path feature owns it).
-      let pathRecording = "as-approved";
-      if (isCompat(a)) {
-        const attempt = outcome(() =>
-          (context as unknown as { beginPath(): unknown }).beginPath(),
-        );
-        if (attempt !== "not-implemented") pathRecording = attempt;
-      } else {
-        const native = context as CanvasRenderingContext2D;
-        native.beginPath();
-        native.rect(4, 4, 8, 8);
-      }
+      // A live current path before the reset, identical on both sides.
+      context.beginPath();
+      context.rect(4, 4, 8, 8);
       a.canvas.width = 16; // Assigning the same value is a full reset (CAN-04).
       const cleared = await dumpScene(a);
       a.assert(
@@ -176,11 +165,15 @@ export const cases: CaseDefinition[] = [
         "same-size assignment clears the bitmap",
       );
       a.assert(context.globalAlpha === 1, "drawing state resets");
-      // Path reset is owned by the path feature: there is no public path on
-      // compat yet, so the reset of the current path stays pending instead of
-      // asserting hardcoded evidence. Tracked by #19.
-      a.observe("pathReset", "pending-#19");
+      // The reset also drops the current path: filling now paints nothing,
+      // because the recorded rect is gone (CAN-04 path semantics).
       context.fillStyle = "#0000ff";
+      context.fill();
+      const afterFill = await dumpScene(a);
+      a.assert(
+        afterFill.count((pixel) => pixel[3] !== 0) === 0,
+        "the current path resets with the bitmap, so fill() paints nothing",
+      );
       context.fillRect(4, 4, 4, 4);
       await a.checkpoint();
       const redrawn = await dumpScene(a);
@@ -188,8 +181,7 @@ export const cases: CaseDefinition[] = [
         pixelsEqual(redrawn.pixel(5, 5), [0, 0, 255, 255]),
         "the canvas stays drawable after a same-size reset",
       );
-      a.observe("pathRecording", pathRecording);
-      a.observe("resetSemantics", "cleared+state");
+      a.observe("resetSemantics", "cleared+state+path");
     },
   },
 ];

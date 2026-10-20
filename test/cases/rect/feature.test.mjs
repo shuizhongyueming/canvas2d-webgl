@@ -196,13 +196,16 @@ test('strokeRect uses the stroke asset service with the draw-time transform', ()
   assert.equal(rasterCalls[0].source.releases, 1);
 });
 
-test('an empty raster asset composites nothing but is still released', () => {
-  const { members, ops, rasterCalls } = setup({
+test('an empty raster asset preserves the composite operation and releases its lease', () => {
+  const { state, members, ops, rasterCalls } = setup({
     rasterBounds: { x: 0, y: 0, width: 0, height: 0 },
   });
+  state.set('composite', 'source-in');
   members.strokeRect.value(1000, 1000, 4, 4);
   assert.equal(rasterCalls.length, 1);
-  assert.equal(ops.length, 0);
+  assert.equal(ops.length, 1);
+  assert.deepEqual(ops[0].source, { kind: 'empty' });
+  assert.equal(ops[0].state.composite, 'source-in');
   assert.equal(rasterCalls[0].source.releases, 1);
 });
 
