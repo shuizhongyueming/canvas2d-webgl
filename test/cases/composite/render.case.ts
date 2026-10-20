@@ -165,8 +165,7 @@ export const cases: CaseDefinition[] = [
     ...base,
     id: "ACC-03.brightness-alpha",
     requirements: ["ACC-03"],
-    kind: "render",
-    run(a) {
+    async run(a) {
       const context = a.context;
       context.fillStyle = "#000000";
       context.fillRect(0, 0, 24, 48);
@@ -181,6 +180,9 @@ export const cases: CaseDefinition[] = [
       context.fillRect(24, 0, 24, 24);
       context.fillStyle = "#808080";
       context.fillRect(24, 24, 24, 24);
+      const scene = await dumpScene(a);
+      a.assert(pixelsEqual(scene.pixel(8, 8), [128, 128, 128, 255]), "brightness clamps source channels before global alpha");
+      a.assert(scene.pixel(32, 8)[3] === 128, "brightness preserves source alpha");
     },
   },
   {

@@ -13,8 +13,8 @@ import { PathRecorder } from "../../path/recorder.js";
 /**
  * Rectangle drawing: fillRect/clearRect/strokeRect.
  *
- * Solid fills and clears reach the GPU as plain transformed quads; gradient
- * and pattern fills and every strokeRect go through the approved native asset
+ * Solid fills and clears reach the GPU as plain transformed quads; source-in
+ * fills, gradient/pattern fills and every strokeRect use the native asset
  * service (a recorded rect path rasterized by the rasterizer), so those share
  * the native rasterizer's coverage and paint evaluation. None of these members
  * touch the current path: the recorder below is feature-private and never
@@ -150,7 +150,7 @@ export const rectFeature: FeatureFactory = (
         });
       return;
     }
-    if (snapshot.fill.kind !== "solid") {
+    if (snapshot.fill.kind !== "solid" || snapshot.composite === "source-in") {
       drawRasterRect(x, y, width, height, snapshot, "fill");
       return;
     }
