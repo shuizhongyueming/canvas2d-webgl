@@ -19,6 +19,17 @@ function disposedError(): Error & { code: ErrorCode } {
   return createCompatError(ERROR_CODES.DISPOSED, "canvas is disposed");
 }
 
+const compatCanvases = new WeakSet<object>();
+
+/**
+ * Internal brand for drawImage source rejection (IMG-03): a facade passes
+ * every canvas brand check because it proxies a real canvas, so only registry
+ * membership identifies it. Library-internal; never a package export.
+ */
+export function isCompatCanvas(value: unknown): boolean {
+  return typeof value === "object" && value !== null && compatCanvases.has(value);
+}
+
 /**
  * WebIDL unsigned long conversion for canvas dimensions: BigInt and Symbol
  * reject with a TypeError, non-finite numbers become 0, and the rest wrap
@@ -137,5 +148,7 @@ export function createFacade<T extends TargetCanvas>(
       return Reflect.has(targetCanvas, property);
     },
   };
-  return new Proxy(target, handler) as unknown as CompatCanvas<T>;
+  const facade = new Proxy(target, handler) as unknown as CompatCanvas<T>;
+  compatCanvases.add(facade);
+  return facade;
 }

@@ -1,4 +1,9 @@
-import type { NativeCanvas, ImageSource, CompositeMode } from "../api.js";
+import type {
+  NativeCanvas,
+  ImageSource,
+  CompositeMode,
+  TargetCanvas,
+} from "../api.js";
 
 /** All geometry uses device pixels, top-left origin, unless called out explicitly. */
 export type Matrix = readonly [number, number, number, number, number, number];
@@ -255,6 +260,11 @@ export interface LifecycleRegistration {
   register(hooks: LifecycleHooks): () => void;
 }
 export interface FeatureEnvironment {
+  /**
+   * The caller's target canvas behind this context's facade (IMG-03): draw
+   * entry points reject it as their own source; the library never adopts it.
+   */
+  readonly target: TargetCanvas;
   readonly state: StateStore;
   readonly path: PathStore;
   readonly raster: Rasterizer;
