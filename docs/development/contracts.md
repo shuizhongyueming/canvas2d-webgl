@@ -45,6 +45,8 @@
 - `PathCommand` 在构造时捕获变换，`PathSnapshot` 拷贝不可变命令序列。beginPath/reset生成新路径，不修改旧快照。描边使用调用时状态；路径与save/restore栈分开。
 - `ClipSnapshot` 保存路径、rule和parent；null表示画布范围。调用clip时当前路径不清空；restore回到旧clip引用；resize/lost恢复时丢弃旧clip。每个快照另带内部 `mask(bounds)`：由裁剪特性闭包到 `Rasterizer.clip` 的原生覆盖素材，设备在每次绘制时把链上各级依次写入 stencil（第 i 级只在上一级值 i-1 处递增到 i，内容按 EQUAL 深度测试）。掩码按 0.5 alpha 阈值二值化，因此裁剪边缘是硬边，不能宣称与原生软边逐像素一致；该差异是批准 stencil 路线的预期结果，记录见[决策 #52](https://github.com/shuizhongyueming/canvas2d-webgl/issues/52)，曲线/亚像素边界作为渲染对评审，整数对齐的裁剪几何可逐像素相等。场景 renderbuffer 为 STENCIL_INDEX8，0 保留给"裁剪外"，嵌套上限 255 级，普通绘制超出报 `resource-limit`；`source-in` 还需额外一级区分源覆盖，因此在 255 级时报 `resource-limit` 且不改动场景，不钳制引用后静默清空。裁剪特性通过 `FeatureEnvironment.lifecycle` 注册 reset/lost/restored/disposed hooks；会话在 hooks 之前调用 `state.reset()`/`state.discardClips()` 与 `raster.clearCache()`，hook 本身不重复清理。
 - `DrawOperation` 对应一次Canvas调用。`sourceBounds`仅是源覆盖范围，不是合成范围；例如source-in可能影响clip内源以外的像素。`kind: empty` 不能一律当no-op；参数非法/规定无效操作应在入口决定，不发送绘制操作。
+- drawImage 的图源限 CORS-clean（同源或带合法 CORS 头）：`CORS-clean-HTMLImageElement` 与 `CORS-clean-native-canvas`。每次调用经 WebGL 同步上传，tainted 源在 drawImage 内同步抛 SecurityError，并保持场景与资源不变；属有意偏差（原生绘制并污染目标，推迟到读回才失败），见 #48（沿用 #41 的 createPattern 先例）。兼容 facade 与 context 自身 target 按 IMG-03 拒绝为 `unsupported-api`。DOM 品牌判定要求 `Symbol.toStringTag` 位于原型链上，自有标签的普通对象按非法源抛 TypeError；createPattern 仍沿用既有结构性品牌判定（历史取舍）。
+- 兼容画布的品牌是目标画布上的不可枚举 `Symbol.for` 标记（不作为公开 API），使同一 realm 内第二个库实例也能拒绝其 facade；跨 realm 时 `Symbol.for` 仍共享，但依赖对方同样写入该标记。
 - clear操作有自己的覆盖几何，不能由paint/globalAlpha/filter控制；sourceBounds/clip仍有效。不同源种类共用一次合成操作，不按每个子路径重复合成。
 - `GPUDevice.draw()` 同步消费原生源、按调用顺序写入场景FBO；微任务只处理present，不延迟外部canvas取样。native源引用在draw返回后不得再用于延迟上传。
 - `RasterSource` 是原生辅助素材及设备空间位置/尺寸，调用方在draw返回后release；release幂等。pixel尺寸与设备bounds可以不同，消费者必须显式使用二者进行UV/定位。外部源的寿命归调用方，不进入库资源清理栈。
@@ -77,6 +79,8 @@
 ## 支持矩阵与测试发现
 
 `SUPPORT_MATRIX` 逐项声明target/name/kind/owner/policy、受支持的参数数量、取值、图像来源和原生默认值；它不记录实现进度。默认lineJoin=miter、textAlign=start、textBaseline=alphabetic不表示允许写入矩阵外合法值。
+
+drawImage 的已知像素差异按机制分开记录（决策 #49）：1:1 区域应为 0 差异；缩放区域是 Skia 双线性过滤与 GL LINEAR 采样的插值差；斜变换边缘是原生的抗锯齿覆盖与场景 FBO/quad 无 MSAA 的硬边差。这是 GPU 直通路线的预期结果，与 #43（矩形直通 AA）机制不同；归人工+AI 像素评审裁定，不设容差、不自动接受，评审不接受时另行决策（mipmap/CPU 降采样或原生素材路线）。
 
 `REQUIRED_CASES` 按成员合同、重载、取值、来源及绘制结果分配最低case ID。ID由成员和具体值生成，不能重用或更改含义；新增组合可另加case，不能删最低目录以消除失败。`test/cases/manifest/index.ts` 补充跨特性case ID。它们是验收需求目录，**没有可运行用例，不能计为通过**。
 

@@ -39,11 +39,11 @@ export const cases: CaseDefinition[] = [
       a.assert(scene.pixel(3, 4)[3] === 0, "outside destination remains clear");
     },
   })),
-  ...(["HTMLImageElement", "native-canvas"] as const).map((sourceType): CaseDefinition => ({
+  ...(["CORS-clean-HTMLImageElement", "CORS-clean-native-canvas"] as const).map((sourceType): CaseDefinition => ({
     ...base, id: `context.drawImage.source-${sourceType}`, requirements: ["context.drawImage", "IMG-01"],
     async run(a) {
       const canvas = cornerCanvas();
-      const source = sourceType === "HTMLImageElement" ? await canvasToImage(canvas) : canvas;
+      const source = sourceType === "CORS-clean-HTMLImageElement" ? await canvasToImage(canvas) : canvas;
       a.context.fillStyle = "#ffff00";
       a.context.fillRect(0, 0, 32, 32);
       drawImage(a.context, source, 4, 4);

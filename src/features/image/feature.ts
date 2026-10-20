@@ -24,9 +24,17 @@ import { isCompatCanvas } from "../../canvas/facade.js";
 const TYPE_MESSAGE =
   "Failed to execute 'drawImage' on 'CanvasRenderingContext2D': The provided value is not of type '(CSSImageValue or HTMLCanvasElement or HTMLImageElement or HTMLVideoElement or ImageBitmap or OffscreenCanvas or SVGImageElement or VideoFrame)'.";
 
-/** Cross-realm DOM brand check; survives where instanceof against one realm fails. */
+/**
+ * Cross-realm DOM brand check; survives where instanceof against one realm
+ * fails. Genuine DOM wrappers inherit Symbol.toStringTag from their interface
+ * prototype, so an own tag marks a forged plain object, which the native
+ * method rejects as not a CanvasImageSource.
+ */
 function hasDomTag(value: object, tag: string): boolean {
-  return Object.prototype.toString.call(value) === `[object ${tag}]`;
+  return (
+    Object.prototype.toString.call(value) === `[object ${tag}]` &&
+    !Object.prototype.hasOwnProperty.call(value, Symbol.toStringTag)
+  );
 }
 
 function globalInstanceof(value: object, name: string): boolean {
@@ -130,13 +138,13 @@ export const imageFeature: FeatureFactory = (
   function classify(value: unknown): Classified {
     if (typeof value !== "object" || value === null)
       throw new TypeError(TYPE_MESSAGE);
-    if (isCompatCanvas(value))
-      return { outcome: "rejected", message: "drawImage: compat canvas source" };
     if (value === target)
       return {
         outcome: "rejected",
         message: "drawImage: canvas is its own source",
       };
+    if (isCompatCanvas(value))
+      return { outcome: "rejected", message: "drawImage: compat canvas source" };
     if (isImageElement(value)) return { outcome: "image", image: value };
     if (isCanvasElement(value)) return { outcome: "canvas", canvas: value };
     if (isOtherNativeSource(value))

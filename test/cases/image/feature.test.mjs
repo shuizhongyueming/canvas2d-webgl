@@ -4,22 +4,26 @@ import { imageFeature } from '../../../dist/features/image/feature.js';
 import { createFacade } from '../../../dist/canvas/facade.js';
 import { createStateStore } from '../../../dist/context/state.js';
 
-// DOM brands are forged with Symbol.toStringTag, the same cross-realm brand
-// channel the classifier trusts; Node has no HTMLImageElement constructor.
+// DOM brands are forged with an inherited Symbol.toStringTag, the same
+// cross-realm brand channel the classifier trusts (a genuine DOM wrapper keeps
+// the tag on its interface prototype); Node has no HTMLImageElement constructor.
+function branded(tag) {
+  return Object.create({ [Symbol.toStringTag]: tag });
+}
+
 function fakeImage(overrides = {}) {
-  return {
-    [Symbol.toStringTag]: 'HTMLImageElement',
+  return Object.assign(branded('HTMLImageElement'), {
     complete: true,
     naturalWidth: 4,
     naturalHeight: 3,
     currentSrc: 'data:image/png;base64,x',
     src: 'data:image/png;base64,x',
     ...overrides,
-  };
+  });
 }
 
 function fakeCanvas(overrides = {}) {
-  return { [Symbol.toStringTag]: 'HTMLCanvasElement', width: 4, height: 3, ...overrides };
+  return Object.assign(branded('HTMLCanvasElement'), { width: 4, height: 3, ...overrides });
 }
 
 function stubPaint(id) {
@@ -96,6 +100,9 @@ test('values that are not image sources reject with the native TypeError', () =>
   const { drawImage, ops } = setup();
   for (const bad of [42, 'x', null, undefined, {}, { width: 4, height: 3 }, { [Symbol.toStringTag]: 'ImageData' }])
     assert.throws(() => drawImage(bad, 0, 0), TypeError);
+  // An own Symbol.toStringTag is a forged plain object, not a DOM wrapper.
+  for (const tag of ['HTMLImageElement', 'HTMLCanvasElement', 'OffscreenCanvas'])
+    assert.throws(() => drawImage({ [Symbol.toStringTag]: tag }, 0, 0), TypeError);
   assert.equal(ops.length, 0);
 });
 
@@ -106,7 +113,17 @@ test('compat canvases, the own target and other native source kinds report unsup
   const otherTarget = { width: 8, height: 8 };
   assert.throws(() => drawImage(compatFacade(otherTarget), 0, 0), { code: 'unsupported-api' });
   for (const tag of ['ImageBitmap', 'HTMLVideoElement', 'VideoFrame'])
-    assert.throws(() => drawImage({ [Symbol.toStringTag]: tag }, 0, 0), { code: 'unsupported-api' });
+    assert.throws(() => drawImage(branded(tag), 0, 0), { code: 'unsupported-api' });
+  assert.equal(ops.length, 0);
+});
+
+test('the compat brand reaches facades created by another library copy', () => {
+  const { drawImage, ops } = setup();
+  const target = { width: 4, height: 4 };
+  createFacade(target, { disposed: false }, { width: 4, height: 4 }, {});
+  assert.equal(target[Symbol.for('canvas2d-webgl.compat-canvas')], true, 'target carries the shared non-enumerable brand');
+  const foreign = new Proxy(target, { get: (source, key) => Reflect.get(source, key, source) });
+  assert.throws(() => drawImage(foreign, 0, 0), { code: 'unsupported-api' });
   assert.equal(ops.length, 0);
 });
 

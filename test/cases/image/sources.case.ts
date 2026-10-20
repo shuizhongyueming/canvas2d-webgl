@@ -61,8 +61,13 @@ export const cases: CaseDefinition[] = [
       const context = tainted.getContext("2d")!;
       context.drawImage(image, 0, 0);
       a.assert(outcome(() => context.getImageData(0, 0, 1, 1)) === "SecurityError", "fixture canvas is actually tainted");
+      // Decision #48: drawImage sources are CORS-clean only. The compat path
+      // uploads synchronously, so the native SecurityError must surface as-is
+      // (outcome prefers a library code when present); the native reference
+      // keeps its draw-and-taint semantics. Both sides keep the same message
+      // because the harness compares reference and actual checks pairwise.
       for (const source of [image, tainted])
-        a.assert(outcome(() => drawImage(a.context, source, 0, 0)) === (isCompat(a) ? "SecurityError" : "ok"), "unsafe sources fail synchronously at GPU upload");
+        a.assert(outcome(() => drawImage(a.context, source, 0, 0)) === (isCompat(a) ? "SecurityError" : "ok"), "tainted source: compat propagates SecurityError unchanged; native draws and taints");
       if (hooks && (hooks.resourceCounts().textures !== 0 || hooks.resourceCounts().textureLeases !== 0 || hooks.readScene().pixels.some(value => value !== 0)))
         throw new Error("failed upload changed the scene or retained resources");
     },
