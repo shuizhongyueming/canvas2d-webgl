@@ -4,7 +4,7 @@
 
 ## 当前交付
 
-这是工程与协作契约。公开入口 `createCompatCanvas` 已接入真实创建（[#16](https://github.com/shuizhongyueming/canvas2d-webgl/issues/16)）：输入校验、离屏工厂同步探测、GPU 能力检测与资源分配、状态/context 组装、画布三分法转发；失败按错误表同步抛带 `code` 的错误并回滚库资源，不返回半初始化对象。尚不是兼容渲染器：绘制入口按特性票逐步接入，矩形三方法（`fillRect`/`clearRect`/`strokeRect`，[#17](https://github.com/shuizhongyueming/canvas2d-webgl/issues/17)）及批准路径构造方法、无参 `fill`/`stroke`（[#19](https://github.com/shuizhongyueming/canvas2d-webgl/issues/19)）已实现；其余未安装的受支持成员抛 `not-implemented`，读回/导出按支持矩阵抛 `unsupported-api`。不要将契约单测通过当成 Canvas 兼容性通过。
+这是工程与协作契约。公开入口 `createCompatCanvas` 已接入真实创建（[#16](https://github.com/shuizhongyueming/canvas2d-webgl/issues/16)）：输入校验、离屏工厂同步探测、GPU 能力检测与资源分配、状态/context 组装、画布三分法转发；失败按错误表同步抛带 `code` 的错误并回滚库资源，不返回半初始化对象。尚不是兼容渲染器：绘制入口按特性票逐步接入，矩形三方法（`fillRect`/`clearRect`/`strokeRect`，[#17](https://github.com/shuizhongyueming/canvas2d-webgl/issues/17)）及批准路径构造方法、无参 `fill`/`stroke`（[#19](https://github.com/shuizhongyueming/canvas2d-webgl/issues/19)）已实现；合成状态（`globalCompositeOperation` 的 `source-over`/`source-atop`/`source-in`/`lighter` 与 `filter` 的 `brightness(120%)`/`none`，[#22](https://github.com/shuizhongyueming/canvas2d-webgl/issues/22)）已接入 GPU 混合与片元处理，但裁剪尚未落地，`source-in` 目前以整个画布为有效裁剪；其余未安装的受支持成员抛 `not-implemented`，读回/导出按支持矩阵抛 `unsupported-api`。不要将契约单测通过当成 Canvas 兼容性通过。
 
 - 运行时、共享契约与浏览器用例使用 strict TypeScript + ESM；Node 构建与测试工具保留 JavaScript ESM。开发机 Node >=22；Node 版本不代表 vivo 的 JS 运行时要求。
 - `pnpm install --frozen-lockfile --ignore-scripts` 安装锁定的类型检查和测试开发依赖；生产代码无运行时依赖。
