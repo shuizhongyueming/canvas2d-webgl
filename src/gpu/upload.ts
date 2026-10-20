@@ -1,6 +1,7 @@
 import type { ImageSource, NativeCanvas } from "../api.js";
 import type { PatternBitmap, RasterSource } from "../internal/contracts.js";
 import { createCompatError, ERROR_CODES } from "../contracts/errors.js";
+import { isPatternBitmap, patternBitmapPixels } from "../paint/pattern.js";
 
 export type TextureSource = RasterSource | ImageSource | PatternBitmap;
 
@@ -11,15 +12,6 @@ export interface SourcePixels {
   readonly element?: NativeCanvas | HTMLImageElement;
   /** Present for owned typed-array bitmaps (straight sRGB, like RasterSource). */
   readonly data?: Uint8ClampedArray;
-}
-
-/** Captured pattern bitmaps are the only sources carrying their own pixels. */
-export function isPatternBitmap(source: object): source is PatternBitmap {
-  return (
-    typeof source === "object" &&
-    source !== null &&
-    (source as PatternBitmap).data instanceof Uint8ClampedArray
-  );
 }
 
 export function isRasterSource(source: object): source is RasterSource {
@@ -42,7 +34,7 @@ export function sourcePixels(source: TextureSource): SourcePixels {
     return {
       width: source.width,
       height: source.height,
-      data: source.data,
+      data: patternBitmapPixels(source),
     };
   if (
     typeof HTMLImageElement !== "undefined" &&

@@ -60,12 +60,12 @@ export const cases: CaseDefinition[] = [
   },
   {
     ...base,
-    id: "context.createPattern.source-HTMLImageElement",
+    id: "context.createPattern.source-CORS-clean-HTMLImageElement",
     requirements: ["context.createPattern"],
     async run(a) {
       const image = await loadImage(STRIPES_3x5);
       const pattern = asNative(a.context).createPattern(image, "repeat");
-      a.assert(pattern !== null, "HTMLImageElement source accepted");
+      a.assert(pattern !== null, "CORS-clean HTMLImageElement source accepted");
       a.observe("created", pattern !== null);
     },
   },

@@ -12,17 +12,19 @@ export type Bounds = Readonly<{
 export type Color = readonly [number, number, number, number];
 /**
  * Immutable bitmap captured at createPattern time: straight sRGB RGBA8,
- * aligned with RasterSource alpha semantics. The owning paint never mutates
- * the typed array and the wrapper is frozen at creation, so a captured
- * bitmap outlives any later mutation of the source image. Runtime-neutral
- * on purpose: this is not a DOM ImageData.
+ * aligned with RasterSource alpha semantics. The descriptor is all
+ * primitives, so freezing it is genuinely deep; the canonical pixel bytes
+ * are held privately by the paint module (definePatternBitmap /
+ * patternBitmapPixels) and never appear on an externally reachable object,
+ * keeping the captured bitmap safe from later mutation of the source image
+ * or of anything a caller can touch. Runtime-neutral on purpose: this is
+ * not a DOM ImageData.
  */
 export interface PatternBitmap {
   readonly width: number;
   readonly height: number;
   readonly colorSpace: "srgb";
   readonly alpha: "straight";
-  readonly data: Uint8ClampedArray;
 }
 export type Paint =
   | Readonly<{ kind: "solid"; color: Color }>

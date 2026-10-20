@@ -41,7 +41,7 @@
 - `Matrix` 为 `[a,b,c,d,e,f]`，Canvas 列向量变换，设备像素左上原点、y向下。几何和纹理坐标转换只在设备入口处理，不在各特性重复翻转。
 - `Color` 是直通 sRGB `[r,g,b,a]`，每通道 0..1。GPU场景纹理为预乘alpha，上传/着色只预乘一次。`RasterSource.alpha` 描述输入颜色语义，不推断浏览器画布内部的存储格式；原生canvas上传通过WebGL unpack约定转换。
 - `DrawState` 是每次绘制的不可变快照；逻辑状态中的 `PaintRef` 是可变对象引用，save/restore保存引用。绘制时 `snapshot()` 捕获当前 paint version/stops；后续 addColorStop影响下一次绘制，不能追改已经提交的操作。
-- `Paint.id` 与 path/clip id 只要求同一画布实例内唯一。渐变端点为用户空间坐标，绘制时经 `DrawState.transform` 求值，创建时变换不影响渲染；图案同样使用当前绘制坐标空间，不暗中添加 pattern.setTransform。图案在创建时经注入的离屏工厂同步捕获并冻结源位图（`PatternBitmap`：直通 sRGB RGBA8，alpha 语义同 `RasterSource`），此后不可变，不受源图像后续换 src 影响。缓存键包含相关版本/状态，不能仅比较id；对已捕获的图案，`id+version`（version 恒 0）重新成为充分缓存键。
+- `Paint.id` 与 path/clip id 只要求同一画布实例内唯一。渐变端点为用户空间坐标，绘制时经 `DrawState.transform` 求值，创建时变换不影响渲染；图案同样使用当前绘制坐标空间，不暗中添加 pattern.setTransform。图案在创建时经注入的离屏工厂同步捕获并冻结源位图（`PatternBitmap` 描述符：直通 sRGB RGBA8，alpha 语义同 `RasterSource`），此后不可变，不受源图像后续换 src 影响；描述符只含原始值、深冻结成立，canonical 像素由 paint 模块私有持有，GPU/raster 经内部访问器零拷贝消费，外部可达面拿不到像素缓冲。createPattern 图源限 CORS-clean（同源或带合法 CORS 头）；tainted 源在创建时同步抛 SecurityError，属有意偏差（原生推迟到读回），见 #41。缓存键包含相关版本/状态，不能仅比较id；对已捕获的图案，`id+version`（version 恒 0）重新成为充分缓存键。
 - `PathCommand` 在构造时捕获变换，`PathSnapshot` 拷贝不可变命令序列。beginPath/reset生成新路径，不修改旧快照。描边使用调用时状态；路径与save/restore栈分开。
 - `ClipSnapshot` 保存路径、rule和parent；null表示画布范围。调用clip时当前路径不清空；restore回到旧clip引用；resize/lost恢复时丢弃旧clip。
 - `DrawOperation` 对应一次Canvas调用。`sourceBounds`仅是源覆盖范围，不是合成范围；例如source-in可能影响clip内源以外的像素。`kind: empty` 不能一律当no-op；参数非法/规定无效操作应在入口决定，不发送绘制操作。

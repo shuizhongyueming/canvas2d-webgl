@@ -11,9 +11,10 @@ export function isCompatPattern(value: unknown): value is CompatPattern {
 const REPETITIONS = new Set(["repeat", "repeat-x", "repeat-y", "no-repeat"]);
 
 /**
- * Repeat-only pattern holding the frozen bitmap captured at creation
- * (decision #36): native captures the bitmap when createPattern runs, so
- * later img.src swaps are never observed. With the capture owned and frozen,
+ * Repeat-only pattern holding the frozen bitmap descriptor captured at
+ * creation (decision #36): native captures the bitmap when createPattern
+ * runs, so later img.src swaps are never observed. The descriptor is deeply
+ * frozen (all primitives) and the canonical pixels stay module-private, so
  * the pattern is immutable and id+version (version stays 0: the recorded
  * fields never change) is again a sufficient key for derived GPU/raster
  * material.
@@ -51,13 +52,67 @@ export class RepeatPatternPaint implements PaintRef {
 }
 
 /**
+ * Canonical pattern pixels live outside the PatternBitmap descriptor: the
+ * descriptor is all primitives so freezing it is deep, and the only
+ * Uint8ClampedArray is reachable solely through this module-private map.
+ * Callers receive the descriptor (RepeatPatternPaint.image, Paint snapshots)
+ * and can never reach — let alone mutate — the canonical bytes, so
+ * id+version stays a sufficient cache key for derived material.
+ */
+const canonicalPixels = new WeakMap<PatternBitmap, Uint8ClampedArray>();
+
+/**
+ * Define a captured pattern bitmap: the payload is copied (the caller may
+ * reuse or mutate its own buffer afterwards), the descriptor is frozen, and
+ * the canonical bytes are registered for internal consumers. Creation-time
+ * only; never on a per-draw path.
+ */
+export function definePatternBitmap(
+  width: number,
+  height: number,
+  data: Uint8ClampedArray,
+): PatternBitmap {
+  const bitmap = Object.freeze({
+    width,
+    height,
+    colorSpace: "srgb",
+    alpha: "straight",
+  }) as PatternBitmap;
+  canonicalPixels.set(bitmap, new Uint8ClampedArray(data));
+  return bitmap;
+}
+
+/** Zero-copy canonical pixels for GPU upload and raster replay. */
+export function patternBitmapPixels(bitmap: PatternBitmap): Uint8ClampedArray {
+  const pixels = canonicalPixels.get(bitmap);
+  if (!pixels)
+    throw createCompatError(
+      ERROR_CODES.CONTRACT,
+      "pattern bitmap was not created by definePatternBitmap",
+    );
+  return pixels;
+}
+
+/** Registry membership is the brand; no structural field can be forged. */
+export function isPatternBitmap(value: unknown): value is PatternBitmap {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    canonicalPixels.has(value as PatternBitmap)
+  );
+}
+
+/**
  * Synchronously capture the image's current bitmap through the
  * platform-injected offscreen factory: draw at natural size, read the
- * straight sRGB pixels back, and freeze the owned struct. The factory and a
- * 2D context on its product are required capabilities — their absence fails
- * capability-unavailable instead of silently degrading to a live image
- * reference. The scratch canvas is released immediately; getImageData has
- * already copied the pixels.
+ * straight sRGB pixels back, and freeze the owned descriptor. The factory
+ * and a 2D context on its product are required capabilities — their absence
+ * fails capability-unavailable instead of silently degrading to a live image
+ * reference. A tainted source makes getImageData throw SecurityError, which
+ * propagates unchanged (intentional deviation from the native timing, which
+ * defers the failure to readback; decision #41). Whatever happens, the
+ * scratch canvas is released on the way out; getImageData has already copied
+ * the pixels on the success path.
  */
 function capturePatternBitmap(
   image: HTMLImageElement,
@@ -71,22 +126,16 @@ function capturePatternBitmap(
       "createPattern: offscreen canvas factory is unavailable",
     );
   const canvas = createCanvas(width, height);
-  const context = canvas.getContext("2d");
-  if (!context)
-    throw createCompatError(
-      ERROR_CODES.CAPABILITY,
-      "createPattern: offscreen 2D context is unavailable",
-    );
   try {
+    const context = canvas.getContext("2d");
+    if (!context)
+      throw createCompatError(
+        ERROR_CODES.CAPABILITY,
+        "createPattern: offscreen 2D context is unavailable",
+      );
     context.drawImage(image, 0, 0);
     const captured = context.getImageData(0, 0, width, height);
-    return Object.freeze({
-      width,
-      height,
-      colorSpace: "srgb",
-      alpha: "straight",
-      data: captured.data,
-    });
+    return definePatternBitmap(width, height, captured.data);
   } finally {
     canvas.width = 0;
     canvas.height = 0;

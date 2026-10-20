@@ -1,4 +1,5 @@
 import type * as gpu from "../../../src/gpu/index.js";
+import { definePatternBitmap } from "../../../src/paint/pattern.js";
 import type { TestHooks } from "../../types/testing.js";
 import type {
   Bounds,
@@ -163,7 +164,12 @@ export function makeRasterSource(
   };
 }
 
-/** Frozen captured-bitmap fixture, matching the paint feature's PatternBitmap. */
+/**
+ * Captured-bitmap fixture registered through the same entry point the paint
+ * feature uses: definePatternBitmap copies the payload and keeps it private,
+ * so consumers resolve pixels through the internal accessor exactly as in
+ * production.
+ */
 export function makePatternBitmap(
   width: number,
   height: number,
@@ -179,13 +185,7 @@ export function makePatternBitmap(
       data[offset + 2] = b;
       data[offset + 3] = alpha;
     }
-  return Object.freeze({
-    width,
-    height,
-    colorSpace: "srgb",
-    alpha: "straight",
-    data,
-  });
+  return definePatternBitmap(width, height, data);
 }
 
 export type Pixel = [number, number, number, number];

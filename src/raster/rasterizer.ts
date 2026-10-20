@@ -21,6 +21,7 @@ import {
 import { context2d, destroyCanvas } from "./native.js";
 import type { Native2DContext } from "./native.js";
 import { applyPaint } from "./paint.js";
+import { patternBitmapPixels } from "../paint/pattern.js";
 import { replayPath } from "./replay.js";
 
 /** Native default; miterLimit is outside the support matrix. */
@@ -244,7 +245,7 @@ class NativeRasterizer implements Rasterizer {
 
   /**
    * One retained scratch canvas turns a captured pattern bitmap into a native
-   * pattern: putImageData the frozen pixels, then createPattern. Native
+   * pattern: putImageData the canonical pixels, then createPattern. Native
    * createPattern copies the scratch bitmap synchronously, so a single
    * scratch serves every pattern paint and survives no longer than any other
    * internal canvas. The scratch must match the tile size exactly — resizing
@@ -262,10 +263,11 @@ class NativeRasterizer implements Rasterizer {
       canvas.height = bitmap.height;
     }
     context.putImageData(
-      // Captured pixels come from getImageData, so they are always backed by
-      // a regular ArrayBuffer; putImageData copies out immediately.
+      // Canonical pixels come from the paint module's private registry and
+      // originate in getImageData, so they are always backed by a regular
+      // ArrayBuffer; putImageData copies out immediately.
       new ImageData(
-        bitmap.data as Uint8ClampedArray<ArrayBuffer>,
+        patternBitmapPixels(bitmap) as Uint8ClampedArray<ArrayBuffer>,
         bitmap.width,
         bitmap.height,
       ),

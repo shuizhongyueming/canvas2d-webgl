@@ -9,7 +9,7 @@ test('approved overloads and exclusions remain distinct from unknown spellings',
   assert.equal(lookupMember('context', 'getImageData').policy, 'unsupported');
   assert.equal(lookupMember('context', 'fillRekt'), undefined);
   assert.equal(lookupMember('canvas', 'toDataURL').policy, 'unsupported');
-  assert.deepEqual(lookupMember('context', 'createPattern').sources, ['HTMLImageElement']);
+  assert.deepEqual(lookupMember('context', 'createPattern').sources, ['CORS-clean-HTMLImageElement']);
 });
 
 test('every declared contract has unique stable cases, none claiming implementation', () => {
