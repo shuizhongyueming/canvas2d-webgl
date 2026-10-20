@@ -54,7 +54,8 @@ TraceEntry：
 | `member` | string | 矩阵成员 id；矩阵外成员为原始名称 |
 | `kind` | `"method-call" \| "property-set"` | 方法调用与 setter 分别记录 |
 | `signature` | string | 参数签名或观察到的取值（见上节约定） |
-| `count` | number | 本场景内出现次数 |
+| `count` | number \| null | 本场景内出现次数；未逐次计数时填 `null`，并用 `countNote` 说明原因（不得编造数字） |
+| `countNote` | string? | 配合 `count: null` 的说明，例如「启动段共 N 条轨迹，逐成员计数未单独记录」 |
 | `sourceRef` | string? | 取样源标识，仅 `drawImage` 等取样类成员使用：同一外部 canvas 反复取样以同一标识重复出现（动态源分支 A 证据）；每帧新建源记录其类别（如 `new-offscreen-per-frame`，分支 B 证据） |
 
 ## 评审记录（review）
@@ -97,9 +98,9 @@ TraceEntry：
 | `schemaVersion` | `1` | 格式版本 |
 | `runId` | string | 本次验收执行标识（日期 + 环境标识） |
 | `date` / `environmentRef` / `game` / `library` | — | 同 ScenarioRun |
-| `scenarios` | object[] | 七场景各自的 `scenarioId`、`execution`、`review.status`、`verdict` 汇总 |
-| `triggered` | object[] | 矩阵内已触发成员：`{ "member", "scenarios": [场景id...], "totalCount" }` |
-| `untriggered` | object[] | 支持集内全部场景均未触发的成员：`{ "member", "fallback": { "layer": "ACC-02" \| "ACC-03", "evidenceRef": <单元差分证据引用> } }`。未触发不缩减 #4 矩阵；缺兜底证据的成员如实标注，且存在即阻止 `overall = "accepted"` |
+| `scenarios` | object[] | 七场景各自的 `scenarioId`、`execution`、`review.status`（字符串值，取自对应 ScenarioRun 的 `review.status`）、`verdict` 汇总 |
+| `triggered` | object[] | 矩阵内已触发成员：`{ "member", "sessionScope": boolean, "totalCount": number?, "note"?: string }`。`sessionScope: true` 表示计数来自全会话聚合（若采集器有缓冲上限，聚合只覆盖上限内窗口，须在报告中说明）；`sessionScope: false` 表示该成员由某次场景执行当时的快照记录，此时 `totalCount` 可省略并用 `note` 说明来源 |
+| `untriggered` | object[] | 支持集内（`policy: supported`）在本次观察窗口内未触发的成员：`{ "member", "fallback": { "layer": "ACC-02" \| "ACC-03", "evidenceRef": <单元差分证据引用> } }`。未触发不缩减 #4 矩阵；缺兜底证据的成员如实标注，且存在即阻止 `overall = "accepted"` |
 | `outOfMatrix` | object[] | 矩阵外触发：`{ "name", "scenarioId", "decisionIssue": <决策票号> }` |
 | `overall` | `"accepted" \| "not-accepted"` | 仅当三者同时成立时为 `accepted`：七场景全部 `accepted`；无未决矩阵外项（未关联决策票，或关联决策票未解决，均属未决）；`untriggered` 每项均有 ACC-02/03 兜底证据引用。其余一律 `not-accepted` 并附原因清单 |
 
