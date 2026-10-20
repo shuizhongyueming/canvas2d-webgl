@@ -160,6 +160,58 @@ test('offscreen text forwards an empty source for the composite operation', () =
   assert.equal(rasterCalls.text[0].source.releases, 1);
 });
 
+test('a gradient fill paint flows into the text draw snapshot verbatim', () => {
+  const { members, ops, rasterCalls, state } = setup();
+  const gradientPaint = {
+    kind: 'linear-gradient',
+    id: 9,
+    version: 3,
+    from: [0, 0],
+    to: [8, 0],
+    stops: [],
+  };
+  state.set('fill', stubPaint(9, gradientPaint));
+  members.fillText.value('G', 1, 2);
+  assert.equal(rasterCalls.text.length, 1);
+  assert.equal(rasterCalls.text[0].mode, 'fill');
+  assert.equal(rasterCalls.text[0].state.fill.kind, 'linear-gradient');
+  assert.deepEqual(rasterCalls.text[0].state.fill.from, [0, 0]);
+  assert.equal(ops[0].source, rasterCalls.text[0].source);
+  assert.equal(rasterCalls.text[0].source.releases, 1);
+});
+
+test('a pattern stroke paint flows into the text draw snapshot verbatim', () => {
+  const { members, rasterCalls, state } = setup();
+  const patternPaint = { kind: 'repeat-pattern', id: 11, version: 0 };
+  state.set('stroke', stubPaint(11, patternPaint));
+  state.set('lineWidth', 2);
+  members.strokeText.value('P', 3, 4);
+  assert.equal(rasterCalls.text.length, 1);
+  assert.equal(rasterCalls.text[0].mode, 'stroke');
+  assert.equal(rasterCalls.text[0].state.stroke.kind, 'repeat-pattern');
+  assert.equal(rasterCalls.text[0].state.lineWidth, 2);
+});
+
+test('an effective clip passes into text operations and their state snapshot', () => {
+  const { members, ops } = setup();
+  const clip = Object.freeze({
+    id: 3,
+    parent: null,
+    path: Object.freeze({ id: 4, commands: Object.freeze([]) }),
+    rule: 'nonzero',
+  });
+  members.fillText.value('clipped', 0, 0);
+  ops.length = 0;
+  // Simulate the clip feature having installed its snapshot.
+  members.fillText.value('again', 1, 1);
+  assert.equal(ops[0].clip, null, 'no clip is installed yet');
+  const withClip = setup();
+  withClip.state.set('clip', clip);
+  withClip.members.fillText.value('clipped', 0, 0);
+  assert.equal(withClip.ops[0].clip, clip);
+  assert.equal(withClip.rasterCalls.text[0].state.clip, clip);
+});
+
 test('argument errors precede the disposed check; lost draws silently and still measures', () => {
   const disposed = setup({ gpu: { status: 'disposed' } });
   assert.throws(() => disposed.members.fillText.value('x'), TypeError);
