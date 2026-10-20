@@ -206,11 +206,16 @@ type ImageDrawSource = Extract<DrawOperation["source"], { kind: "image" }>;
 /** Half coverage is the binary cut for a 1-bit stencil level. */
 const MASK_ALPHA_THRESHOLD = 0.5;
 
+/**
+ * The scene renderbuffer is STENCIL_INDEX8: eight bits, where 0 marks
+ * "outside every clip", leaving 255 nested levels.
+ */
+const MAX_CLIP_DEPTH = 255;
+
 class SceneDevice implements GPUDevice {
   private readonly gl: WebGLRenderingContext;
   private readonly target: TargetCanvas;
   private readonly maxTextureSize: number;
-  private readonly maxClipDepth: number;
   private readonly registry: LeaseRegistry<WebGLTexture>;
   private readonly presenterQueue: ScheduledPresenter;
   private readonly owner: ResourceOwner;
@@ -230,7 +235,6 @@ class SceneDevice implements GPUDevice {
     target: TargetCanvas,
     gl: WebGLRenderingContext,
     maxTextureSize: number,
-    stencilBits: number,
     owner: ResourceOwner,
   ) {
     this.target = target;
@@ -239,9 +243,6 @@ class SceneDevice implements GPUDevice {
     this.owner = owner;
     this.width = target.width;
     this.height = target.height;
-    // Each nesting level consumes one stencil value; WebGL 1 guarantees at
-    // least 8 bits, and the scene renderbuffer is STENCIL_INDEX8.
-    this.maxClipDepth = Math.max(1, (1 << Math.min(stencilBits, 8)) - 1);
     this.registry = createLeaseRegistry<WebGLTexture>((texture) =>
       gl.deleteTexture(texture),
     );
@@ -400,10 +401,10 @@ class SceneDevice implements GPUDevice {
     for (let level: ClipSnapshot | null = clip; level; level = level.parent)
       chain.push(level);
     chain.reverse();
-    if (chain.length > this.maxClipDepth)
+    if (chain.length > MAX_CLIP_DEPTH)
       throw createCompatError(
         ERROR_CODES.RESOURCE_LIMIT,
-        `clip nesting depth ${chain.length} exceeds ${this.maxClipDepth} stencil values`,
+        `clip nesting depth ${chain.length} exceeds ${MAX_CLIP_DEPTH} stencil values`,
       );
     const masks: RasterSource[] = [];
     try {
@@ -949,7 +950,7 @@ export function createSceneRenderer(
         ERROR_CODES.INITIALIZATION,
         "injected failure after context acquisition",
       );
-    const { maxTextureSize, stencilBits } = validateContext(gl);
+    const { maxTextureSize } = validateContext(gl);
     if (options.failAfter === "attributes")
       throw createCompatError(
         ERROR_CODES.INITIALIZATION,
@@ -957,13 +958,7 @@ export function createSceneRenderer(
       );
     validateSceneSize(target.width, target.height, maxTextureSize);
     const owner = createResourceOwner();
-    const device = new SceneDevice(
-      target,
-      gl,
-      maxTextureSize,
-      stencilBits,
-      owner,
-    );
+    const device = new SceneDevice(target, gl, maxTextureSize, owner);
     device.createGpuObjects();
     cleanups.push(() => device.shutdown());
     if (options.failAfter === "programs")
