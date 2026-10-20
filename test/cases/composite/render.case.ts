@@ -72,6 +72,39 @@ export const cases: CaseDefinition[] = [
       a.assert(scene.count((p) => pixelsEqual(p, TRANSPARENT)) === 48 * 48, `${variant} is an empty source, not a skipped operation`);
     },
   })),
+  ...modes.map((mode): CaseDefinition => ({
+    ...base,
+    id: `composite.empty-source.${mode}`,
+    requirements: ["context.globalCompositeOperation", "ACC-03"],
+    async run(a) {
+      const context = a.context;
+      // source-in still composites an empty source; the other three modes have
+      // no observable effect, so the destination must survive verbatim.
+      const survivors = mode === "source-in" ? 0 : 48 * 48;
+      context.fillStyle = "#ff0000";
+      context.fillRect(0, 0, 48, 48);
+      context.globalCompositeOperation = mode;
+      context.globalAlpha = 0;
+      context.fillStyle = "#00ff00";
+      context.fillRect(8, 8, 16, 16);
+      const zeroAlpha = await dumpScene(a);
+      a.assert(
+        zeroAlpha.count((p) => pixelsEqual(p, [255, 0, 0, 255])) === survivors,
+        `${mode}: globalAlpha=0 source is ${mode === "source-in" ? "an empty source" : "a no-op"}`,
+      );
+      context.globalAlpha = 1;
+      context.globalCompositeOperation = "source-over";
+      context.fillStyle = "#ff0000";
+      context.fillRect(0, 0, 48, 48);
+      context.globalCompositeOperation = mode;
+      context.fillRect(-100, -100, 8, 8);
+      const offCanvas = await dumpScene(a);
+      a.assert(
+        offCanvas.count((p) => pixelsEqual(p, [255, 0, 0, 255])) === survivors,
+        `${mode}: off-canvas source is ${mode === "source-in" ? "an empty source" : "a no-op"}`,
+      );
+    },
+  })),
   {
     ...base,
     id: "composite.source-in.no-op-and-stencil-reset",
