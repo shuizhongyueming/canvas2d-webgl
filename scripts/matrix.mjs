@@ -107,10 +107,12 @@ export function stateOf(entry, result) {
       : result.render === "rejected"
         ? "review-rejected"
         : "pending-review";
-  // Combined cases carry a semantic verdict from their assertions and
-  // observations; only pixels are left to review.
+  // Combined cases carry both: assertions and observations decide the
+  // semantic verdict, and their captured pair still needs human+AI review.
   if (result.semantic !== "pass") return "semantic-missing";
-  return "semantic-pass";
+  if (result.render === "accepted") return "review-accepted";
+  if (result.render === "rejected") return "review-rejected";
+  return result.render === "pending-review" ? "pending-review" : "semantic-pass";
 }
 
 /** Execution state ordering used by every table. */
