@@ -110,8 +110,15 @@ export function paintFeature(environment: FeatureEnvironment): FeatureDefinition
     image?: unknown,
     repetition?: unknown,
   ): CompatPattern | null {
-    return createRepeatPattern(image, repetition, arguments.length, allocId)
-      ?.publicValue ?? null;
+    return (
+      createRepeatPattern(
+        image,
+        repetition,
+        arguments.length,
+        allocId,
+        environment.createOffscreenCanvas,
+      )?.publicValue ?? null
+    );
   }
 
   const members: Readonly<Record<string, PropertyDescriptor>> = {

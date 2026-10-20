@@ -12,8 +12,32 @@ function stateDouble(initial = {}) {
     has: (name) => map.has(name),
   };
 }
-const make = (state) => {
-  const feature = paintFeature({ state });
+// Offscreen canvas double for the pattern bitmap capture (issue #36).
+const canvasDouble = () => ({
+  width: 0,
+  height: 0,
+  getContext: (type) =>
+    type === "2d"
+      ? {
+          drawImage: () => {},
+          getImageData: (x, y, width, height) => ({
+            data: new Uint8ClampedArray(width * height * 4),
+          }),
+        }
+      : null,
+});
+const offscreenFactory = () => (width, height) => {
+  const canvas = canvasDouble();
+  canvas.width = width;
+  canvas.height = height;
+  return canvas;
+};
+const make = (state, environment = {}) => {
+  const feature = paintFeature({
+    state,
+    createOffscreenCanvas: offscreenFactory(),
+    ...environment,
+  });
   const target = Object.create(null);
   Object.defineProperties(target, feature.members);
   return target;
@@ -107,6 +131,24 @@ test("createLinearGradient validates like native and records no transform", () =
   assert.deepEqual(paint.from, [1, 2], "string arguments coerce like WebIDL");
   assert.deepEqual(paint.to, [3, 4]);
   assert.equal("transform" in paint, false);
+});
+
+test("createPattern captures through the environment factory or fails capability-unavailable", () => {
+  const ctx = make(stateDouble());
+  const pattern = ctx.createPattern(image(), "repeat");
+  assert.ok(pattern, "injected factory captures the bitmap");
+  ctx.fillStyle = pattern;
+  assert.equal(ctx.fillStyle, pattern);
+  // Without the injected factory the capture cannot run: the capability
+  // failure replaces the success path but never masks native input errors.
+  const bare = make(stateDouble(), { createOffscreenCanvas: undefined });
+  const missing = capture(() => bare.createPattern(image(), "repeat"));
+  assert.equal(missing.code, "capability-unavailable");
+  assert.throws(() => bare.createPattern({}, "repeat"), TypeError);
+  assert.equal(
+    bare.createPattern({ complete: false, naturalWidth: 0, naturalHeight: 0 }, "repeat"),
+    null,
+  );
 });
 
 test("paint ids are unique within one canvas feature instance", () => {

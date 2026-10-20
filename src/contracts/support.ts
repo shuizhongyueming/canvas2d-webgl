@@ -45,7 +45,12 @@ export const SUPPORT_MATRIX: readonly SupportRow[] = freeze<SupportRow[]>([
   {"id": "context.fillText","target": "context","name": "fillText","kind": "method","owner": "text","policy": "supported","arities": [3]},
   {"id": "context.strokeText","target": "context","name": "strokeText","kind": "method","owner": "text","policy": "supported","arities": [3]},
   {"id": "context.measureText","target": "context","name": "measureText","kind": "method","owner": "text","policy": "supported","arities": [1]},
-  {"id": "context.createPattern","target": "context","name": "createPattern","kind": "method","owner": "paint","policy": "supported","arities": [2],"sources": ["HTMLImageElement"],"values": ["repeat"]},
+  // createPattern sources are limited to CORS-clean images (same-origin or
+  // valid CORS headers): the capture reads pixels back at creation time, so a
+  // tainted source throws SecurityError synchronously inside createPattern —
+  // an intentional deviation from native, which creates the pattern and defers
+  // the failure to readback (decision #41).
+  {"id": "context.createPattern","target": "context","name": "createPattern","kind": "method","owner": "paint","policy": "supported","arities": [2],"sources": ["CORS-clean-HTMLImageElement"],"values": ["repeat"]},
   {"id": "context.createLinearGradient","target": "context","name": "createLinearGradient","kind": "method","owner": "paint","policy": "supported","arities": [4]},
   {"id": "context.fillStyle","target": "context","name": "fillStyle","kind": "property","owner": "paint","policy": "supported","values": ["hex","rgba","CompatGradient","CompatPattern"],"default": "#000000"},
   {"id": "context.strokeStyle","target": "context","name": "strokeStyle","kind": "property","owner": "paint","policy": "supported","values": ["hex","rgba","CompatGradient","CompatPattern"],"default": "#000000"},

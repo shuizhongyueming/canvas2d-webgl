@@ -7,9 +7,14 @@
  *   references across save/restore; StateStore.snapshot() must call
  *   PaintRef.snapshot() so draws capture the current version/stops.
  * - GPU ticket: Paint snapshots plus REPEAT_PATTERN_GLSL cover both NPOT and
- *   POT tiling; texture wrap must stay CLAMP_TO_EDGE (see shader.ts).
+ *   POT tiling; texture wrap must stay CLAMP_TO_EDGE (see shader.ts). Repeat
+ *   patterns carry a frozen creation-time bitmap descriptor (PatternBitmap)
+ *   whose canonical pixels stay private to pattern.ts and upload through the
+ *   typed-array texImage2D path (gpu/upload.ts).
  * - Raster ticket: the same Paint snapshots describe native-assisted draws;
- *   evaluate.ts is the executable reference for gradient interpolation.
+ *   pattern bitmaps reach native createPattern through the rasterizer's
+ *   scratch canvas, and evaluate.ts is the executable reference for gradient
+ *   interpolation.
  */
 export { classifyColorValue, parseSupportedColor } from "./color.js";
 export type { ColorValueClass, ParsedPaintColor } from "./color.js";

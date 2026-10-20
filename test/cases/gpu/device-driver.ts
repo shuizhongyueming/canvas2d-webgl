@@ -1,4 +1,5 @@
 import type * as gpu from "../../../src/gpu/index.js";
+import type * as paint from "../../../src/paint/pattern.js";
 import type { TestHooks } from "../../types/testing.js";
 import type {
   Bounds,
@@ -6,6 +7,7 @@ import type {
   DrawState,
   GPUDevice,
   Matrix,
+  PatternBitmap,
   RasterSource,
 } from "../../../src/internal/contracts.js";
 
@@ -19,6 +21,19 @@ export async function loadGpu(): Promise<GpuModule> {
   return (await import(
     new URL("../../../../dist/gpu/index.js", import.meta.url).href
   )) as GpuModule;
+}
+
+export type PaintModule = typeof paint;
+
+/**
+ * The pattern module must be the very instance the runtime under test uses:
+ * the canonical-pixel registry is module-private (a WeakMap brand), so a
+ * second copy compiled from the sources would not share it.
+ */
+export async function loadPaint(): Promise<PaintModule> {
+  return (await import(
+    new URL("../../../../dist/paint/pattern.js", import.meta.url).href
+  )) as PaintModule;
 }
 
 /** Pin the internal hook shape to the frozen test protocol. */
@@ -160,6 +175,31 @@ export function makeRasterSource(
       /* call-counting belongs to the owning test */
     },
   };
+}
+
+/**
+ * Captured-bitmap fixture registered through the same entry point the paint
+ * feature uses: definePatternBitmap copies the payload and keeps it private,
+ * so consumers resolve pixels through the internal accessor exactly as in
+ * production.
+ */
+export async function makePatternBitmap(
+  width: number,
+  height: number,
+  colorAt: (x: number, y: number) => readonly [number, number, number, number],
+): Promise<PatternBitmap> {
+  const { definePatternBitmap } = await loadPaint();
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y += 1)
+    for (let x = 0; x < width; x += 1) {
+      const [r, g, b, alpha] = colorAt(x, y);
+      const offset = (y * width + x) * 4;
+      data[offset] = r;
+      data[offset + 1] = g;
+      data[offset + 2] = b;
+      data[offset + 3] = alpha;
+    }
+  return definePatternBitmap(width, height, data);
 }
 
 export type Pixel = [number, number, number, number];

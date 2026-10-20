@@ -4,6 +4,7 @@ import type {
   DrawState,
   Paint,
   PathSnapshot,
+  PatternBitmap,
   RasterSource,
   Rasterizer,
 } from "../internal/contracts.js";
@@ -20,6 +21,7 @@ import {
 import { context2d, destroyCanvas } from "./native.js";
 import type { Native2DContext } from "./native.js";
 import { applyPaint } from "./paint.js";
+import { patternBitmapPixels } from "../paint/pattern.js";
 import { replayPath } from "./replay.js";
 
 /** Native default; miterLimit is outside the support matrix. */
@@ -70,6 +72,8 @@ class NativeRasterizer implements Rasterizer {
   #disposed = false;
   #measure: { canvas: NativeCanvas; context: Native2DContext } | null = null;
   #stage: { canvas: NativeCanvas; context: Native2DContext } | null = null;
+  #patternScratch: { canvas: NativeCanvas; context: Native2DContext } | null =
+    null;
 
   constructor(options: RasterizerOptions) {
     this.#options = options;
@@ -183,6 +187,8 @@ class NativeRasterizer implements Rasterizer {
     this.#measure = null;
     if (this.#stage) destroyCanvas(this.#stage.canvas);
     this.#stage = null;
+    if (this.#patternScratch) destroyCanvas(this.#patternScratch.canvas);
+    this.#patternScratch = null;
   }
 
   #assertLive(): void {
@@ -236,6 +242,49 @@ class NativeRasterizer implements Rasterizer {
     const { width, height } = this.#options.sceneExtent();
     return `${width}x${height}`;
   }
+
+  /**
+   * One retained scratch canvas turns a captured pattern bitmap into a native
+   * pattern: putImageData the canonical pixels, then createPattern. Native
+   * createPattern copies the scratch bitmap synchronously, so a single
+   * scratch serves every pattern paint and survives no longer than any other
+   * internal canvas. The scratch must match the tile size exactly — resizing
+   * resets the bitmap, while an exact-size putImageData overwrites every
+   * pixel, so no stale content can leak into the tile either way.
+   */
+  readonly #patternSource = (bitmap: PatternBitmap): CanvasPattern => {
+    if (!this.#patternScratch) {
+      const canvas = this.#options.createCanvas(bitmap.width, bitmap.height);
+      this.#patternScratch = { canvas, context: context2d(canvas) };
+    }
+    const { canvas, context } = this.#patternScratch;
+    if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+    }
+    context.putImageData(
+      // Canonical pixels come from the paint module's private registry and
+      // originate in getImageData, so they are always backed by a regular
+      // ArrayBuffer; putImageData copies out immediately.
+      new ImageData(
+        patternBitmapPixels(bitmap) as Uint8ClampedArray<ArrayBuffer>,
+        bitmap.width,
+        bitmap.height,
+      ),
+      0,
+      0,
+    );
+    const pattern = context.createPattern(
+      canvas as CanvasImageSource,
+      "repeat",
+    );
+    if (!pattern)
+      throw createCompatError(
+        ERROR_CODES.CONTRACT,
+        "repeat-pattern paint produced no native pattern",
+      );
+    return pattern;
+  };
 
   #scene(): Bounds {
     const { width, height } = this.#options.sceneExtent();
@@ -310,7 +359,7 @@ class NativeRasterizer implements Rasterizer {
         stage.ctx.lineWidth = state.lineWidth;
         stage.ctx.lineCap = state.lineCap;
         stage.ctx.lineJoin = state.lineJoin;
-        applyPaint(stage.ctx, state.stroke, "stroke");
+        applyPaint(stage.ctx, state.stroke, "stroke", this.#patternSource);
         stage.ctx.stroke();
       } else {
         // Gradients and patterns are evaluated in the draw-time space at fill
@@ -319,7 +368,7 @@ class NativeRasterizer implements Rasterizer {
         // and the fill-time CTM never re-transforms it.
         if (state.fill.kind === "solid") stage.ctx.setTransform(1, 0, 0, 1, 0, 0);
         else stage.ctx.setTransform(...state.transform);
-        applyPaint(stage.ctx, state.fill, "fill");
+        applyPaint(stage.ctx, state.fill, "fill", this.#patternSource);
         stage.ctx.fill();
       }
       ctx.putImageData(
@@ -412,7 +461,7 @@ class NativeRasterizer implements Rasterizer {
           ctx.lineCap = state.lineCap;
           ctx.lineJoin = state.lineJoin;
         }
-        applyPaint(ctx, paint, mode);
+        applyPaint(ctx, paint, mode, this.#patternSource);
         if (mode === "fill") ctx.fillText(text, x, y);
         else ctx.strokeText(text, x, y);
       } else {
@@ -435,7 +484,7 @@ class NativeRasterizer implements Rasterizer {
           stage.ctx.lineCap = state.lineCap;
           stage.ctx.lineJoin = state.lineJoin;
         }
-        applyPaint(stage.ctx, paint, mode);
+        applyPaint(stage.ctx, paint, mode, this.#patternSource);
         if (mode === "fill") stage.ctx.fillText(text, x, y);
         else stage.ctx.strokeText(text, x, y);
         ctx.putImageData(
