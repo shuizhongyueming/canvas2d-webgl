@@ -1,5 +1,4 @@
 import type { CaseDefinition } from "../../types/testing.js";
-import { isCompat, outcome } from "../shared.js";
 import { TRANSPARENT, dumpScene, pixelsEqual } from "./helpers.js";
 
 const renderBase = {
@@ -110,50 +109,44 @@ export const cases: CaseDefinition[] = [
     },
   },
   {
-    kind: "semantic",
+    kind: "combined",
     width: 16,
     height: 16,
     seed: 1,
     fonts: [] as string[],
     id: "rect.clearRect.path-independence",
     requirements: ["context.clearRect", "context.beginPath", "context.rect", "context.fill"],
-    run(a) {
-      const context = a.context as unknown as Record<
-        string,
-        (...args: unknown[]) => unknown
-      >;
-      // Path survival itself stays pending: compat has no public path until
-      // the path feature lands (#19), so asserting the stub codes would pass
-      // the case without any path evidence. Both sides pin the pending seam;
-      // the compat branch still exercises the stubs and reports through the
-      // as-approved observation, which trips the cross-side comparison if the
-      // stub codes ever change.
-      let pathMembers = "as-approved";
-      if (isCompat(a)) {
-        const codes = [
-          outcome(() => context.beginPath!()),
-          outcome(() => context.rect!(1, 1, 4, 4)),
-          outcome(() => context.fill!()),
-        ];
-        if (!codes.every((code) => code === "not-implemented"))
-          pathMembers = codes.join(",");
-        a.context.fillStyle = "#ff0000";
-        a.context.fillRect(0, 0, 8, 8);
-        a.context.clearRect(2, 2, 4, 4);
-        a.context.strokeRect(4, 4, 8, 8);
-      } else {
-        const native = a.context as CanvasRenderingContext2D;
-        native.beginPath();
-        native.rect(2, 2, 4, 4);
-        native.fillStyle = "#ff0000";
-        native.fillRect(0, 0, 8, 8);
-        native.clearRect(6, 6, 4, 4);
-        native.strokeRect(8, 8, 4, 4);
-        native.fillStyle = "#00ff00";
-        native.fill();
-      }
-      a.observe("pathMembers", pathMembers);
-      a.observe("pathSurvives", "pending-#19");
+    async run(a) {
+      const context = a.context;
+      // Record a current path, then run the three rect entries across it:
+      // none of them may read or disturb it, on either side.
+      context.beginPath();
+      context.rect(2, 2, 8, 8);
+      context.fillStyle = "#ff0000";
+      context.fillRect(0, 0, 8, 8);
+      context.clearRect(6, 6, 4, 4);
+      context.strokeStyle = "#0000ff";
+      context.strokeRect(8, 8, 4, 4);
+      context.fillStyle = "#00ff00";
+      context.fill(); // fills the recorded rect if it survived untouched
+      const scene = await dumpScene(a);
+      a.assert(
+        pixelsEqual(scene.pixel(1, 1), [255, 0, 0, 255]),
+        "outside the recorded rect the fillRect survives",
+      );
+      a.assert(
+        pixelsEqual(scene.pixel(5, 5), [0, 255, 0, 255]),
+        "fill() repaints the recorded rect after fillRect and strokeRect",
+      );
+      a.assert(
+        pixelsEqual(scene.pixel(7, 7), [0, 255, 0, 255]),
+        "the area clearRect erased is refilled by the surviving path",
+      );
+      a.assert(
+        pixelsEqual(scene.pixel(14, 14), TRANSPARENT),
+        "nothing leaks beyond the recorded geometry",
+      );
+      a.observe("pathSurvives", true);
     },
   },
 ];
