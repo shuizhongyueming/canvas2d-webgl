@@ -1,6 +1,5 @@
 import type { CaseDefinition } from "../../types/testing.js";
 import { loadImage, STRIPES_3x5 } from "../paint/fixtures.js";
-import { isCompat, outcome } from "../shared.js";
 import { TRANSPARENT, dumpScene, pixelsEqual } from "./helpers.js";
 
 const assignStroke = (context: unknown, value: unknown): void => {
@@ -18,10 +17,10 @@ const renderBase = {
 /**
  * Rect/paint seams recorded as follow-ups from the #17 review: strokeRect
  * with gradient and pattern strokes (both go through the native stroke asset
- * service), and the whole-surface source-in semantics of a non-solid
- * fillRect. The composite implementation belongs to #22; until it lands, the
- * source-in case pins native truth on the reference side and the
- * not-implemented seam on the compat side.
+ * service), and the whole-surface source-in semantics of a non-solid fillRect.
+ * #22 landed the composite implementation, so both sides now assert the same
+ * native truth: source-in erases the destination across the whole effective
+ * clip, not just the source bounds.
  */
 export const cases: CaseDefinition[] = [
   {
@@ -87,61 +86,33 @@ export const cases: CaseDefinition[] = [
     fonts: [] as string[],
     async run(a) {
       const context = a.context;
-      let composite = "as-approved";
-      if (isCompat(a)) {
-        // The composite ticket (#22) owns globalCompositeOperation; until it
-        // lands the setter reports not-implemented and this draw stays
-        // source-over. Pin the seam instead of asserting fake evidence.
-        const code = outcome(() => {
-          (
-            context as unknown as { globalCompositeOperation: unknown }
-          ).globalCompositeOperation = "source-in";
-        });
-        if (code !== "not-implemented") composite = code;
-        context.fillStyle = "#00ff00";
-        context.fillRect(0, 0, 32, 32);
-        const gradient = context.createLinearGradient(0, 0, 32, 0);
-        gradient.addColorStop(0, "#ff0000");
-        gradient.addColorStop(1, "#0000ff");
-        context.fillStyle = gradient;
-        context.fillRect(8, 8, 16, 16);
-        const scene = await dumpScene(a);
-        a.assert(
-          code === "not-implemented" &&
-            pixelsEqual(scene.pixel(4, 4), [0, 255, 0, 255]),
-          "destination outside the source matches the recorded composite status",
-        );
-        const inside = scene.pixel(16, 16);
-        a.assert(
-          inside[0] > 100 && inside[2] > 60 && inside[3] === 255,
-          "the gradient covers the source interior",
-        );
-      } else {
-        const native = context;
-        native.fillStyle = "#00ff00";
-        native.fillRect(0, 0, 32, 32);
-        native.globalCompositeOperation = "source-in";
-        const gradient = native.createLinearGradient(0, 0, 32, 0);
-        gradient.addColorStop(0, "#ff0000");
-        gradient.addColorStop(1, "#0000ff");
-        native.fillStyle = gradient;
-        native.fillRect(8, 8, 16, 16);
-        // Native truth: source-in erases the destination everywhere the
-        // source does not cover — across the whole effective clip, not just
-        // the source bounds (ACC-03).
-        const scene = await dumpScene(a);
-        a.assert(
-          pixelsEqual(scene.pixel(4, 4), TRANSPARENT),
-          "destination outside the source matches the recorded composite status",
-        );
-        const inside = scene.pixel(16, 16);
-        a.assert(
-          inside[0] > 100 && inside[2] > 60 && inside[3] === 255,
-          "the gradient covers the source interior",
-        );
-      }
-      a.observe("composite", composite);
-      a.observe("sourceInOutsideSource", "pending-#22");
+      context.fillStyle = "#00ff00";
+      context.fillRect(0, 0, 32, 32);
+      context.globalCompositeOperation = "source-in";
+      const gradient = context.createLinearGradient(0, 0, 32, 0);
+      gradient.addColorStop(0, "#ff0000");
+      gradient.addColorStop(1, "#0000ff");
+      context.fillStyle = gradient;
+      context.fillRect(8, 8, 16, 16);
+      // source-in erases the destination everywhere the source does not
+      // cover — across the whole effective clip, not just the source bounds
+      // (ACC-03). Both compat and native assert the same truth now that #22
+      // owns the composite implementation.
+      const scene = await dumpScene(a);
+      a.assert(
+        pixelsEqual(scene.pixel(4, 4), TRANSPARENT),
+        "destination outside the source is erased",
+      );
+      a.assert(
+        pixelsEqual(scene.pixel(28, 28), TRANSPARENT),
+        "destination outside the source is erased on the far side too",
+      );
+      const inside = scene.pixel(16, 16);
+      a.assert(
+        inside[0] > 100 && inside[2] > 60 && inside[3] === 255,
+        "the gradient covers the source interior",
+      );
+      a.observe("composite", "as-approved");
     },
   },
 ];
