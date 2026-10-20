@@ -248,7 +248,7 @@ export const cases: CaseDefinition[] = [
       // path (issue #37): NPOT 3x5 stays legal because wrap is CLAMP_TO_EDGE,
       // and the straight-alpha pixels premultiply under the same unpack
       // convention as DOM sources.
-      const bitmap = makePatternBitmap(3, 5, (x) => [
+      const bitmap = await makePatternBitmap(3, 5, (x) => [
         x === 0 ? 255 : 0,
         x === 1 ? 255 : 0,
         x === 2 ? 255 : 0,
@@ -267,7 +267,7 @@ export const cases: CaseDefinition[] = [
       retained.release();
       a.observe("afterFinalRelease", counts());
       const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
-      const oversized = makePatternBitmap(maxTextureSize + 1, 1, () => [
+      const oversized = await makePatternBitmap(maxTextureSize + 1, 1, () => [
         0, 0, 0, 255,
       ]);
       a.observe(
