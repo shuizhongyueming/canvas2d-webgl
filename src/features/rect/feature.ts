@@ -114,6 +114,8 @@ export const rectFeature: FeatureFactory = (
     recorder.rect(x, y, width, height, snapshot.transform);
     const source = raster.path(recorder.snapshot(), snapshot, mode);
     try {
+      // Empty coverage still becomes an operation: source-in erases the
+      // effective clip, the other modes are no-ops in the device.
       gpu.draw({
         generation: gpu.generation,
         kind: "draw",
