@@ -1,6 +1,7 @@
 import type { CompositeMode, ImageSource, TargetCanvas } from "../api.js";
 import type {
   Bounds,
+  ClipSnapshot,
   DrawOperation,
   GPUDevice,
   Matrix,
@@ -93,8 +94,12 @@ varying vec2 v_uv;
 uniform sampler2D u_texture;
 uniform float u_alpha;
 uniform float u_brightness;
+uniform float u_alpha_threshold;
 void main() {
   vec4 color = texture2D(u_texture, v_uv);
+  // Coverage threshold for stencil masks. Discarding skips stencil writes,
+  // which is exactly how a mask level rejects a pixel at the stencil step.
+  if (color.a < u_alpha_threshold) discard;
   // The filter applies to the source before the global alpha multiply; in
   // premultiplied space the brightness transfer is a scale clamped at alpha.
   vec3 filtered = min(color.rgb * u_brightness, vec3(color.a));
@@ -119,6 +124,7 @@ interface TexturedProgram {
   readonly uTexture: WebGLUniformLocation;
   readonly uAlpha: WebGLUniformLocation;
   readonly uBrightness: WebGLUniformLocation;
+  readonly uAlphaThreshold: WebGLUniformLocation;
 }
 
 function makeSolidProgram(gl: WebGLRenderingContext): SolidProgram {
@@ -149,19 +155,30 @@ function makeTexturedProgram(gl: WebGLRenderingContext): TexturedProgram {
     const uTexture = gl.getUniformLocation(program, "u_texture");
     const uAlpha = gl.getUniformLocation(program, "u_alpha");
     const uBrightness = gl.getUniformLocation(program, "u_brightness");
+    const uAlphaThreshold = gl.getUniformLocation(program, "u_alpha_threshold");
     if (
       aPosition < 0 ||
       aUv < 0 ||
       !uResolution ||
       !uTexture ||
       !uAlpha ||
-      !uBrightness
+      !uBrightness ||
+      !uAlphaThreshold
     )
       throw createCompatError(
         ERROR_CODES.INITIALIZATION,
         "textured program interface is incomplete",
       );
-    return { program, aPosition, aUv, uResolution, uTexture, uAlpha, uBrightness };
+    return {
+      program,
+      aPosition,
+      aUv,
+      uResolution,
+      uTexture,
+      uAlpha,
+      uBrightness,
+      uAlphaThreshold,
+    };
   } catch (failure) {
     gl.deleteProgram(program);
     throw failure;
@@ -186,10 +203,14 @@ function rectCorners(bounds: Bounds, transform: Matrix): number[] {
 
 type ImageDrawSource = Extract<DrawOperation["source"], { kind: "image" }>;
 
+/** Half coverage is the binary cut for a 1-bit stencil level. */
+const MASK_ALPHA_THRESHOLD = 0.5;
+
 class SceneDevice implements GPUDevice {
   private readonly gl: WebGLRenderingContext;
   private readonly target: TargetCanvas;
   private readonly maxTextureSize: number;
+  private readonly maxClipDepth: number;
   private readonly registry: LeaseRegistry<WebGLTexture>;
   private readonly presenterQueue: ScheduledPresenter;
   private readonly owner: ResourceOwner;
@@ -209,6 +230,7 @@ class SceneDevice implements GPUDevice {
     target: TargetCanvas,
     gl: WebGLRenderingContext,
     maxTextureSize: number,
+    stencilBits: number,
     owner: ResourceOwner,
   ) {
     this.target = target;
@@ -217,6 +239,9 @@ class SceneDevice implements GPUDevice {
     this.owner = owner;
     this.width = target.width;
     this.height = target.height;
+    // Each nesting level consumes one stencil value; WebGL 1 guarantees at
+    // least 8 bits, and the scene renderbuffer is STENCIL_INDEX8.
+    this.maxClipDepth = Math.max(1, (1 << Math.min(stencilBits, 8)) - 1);
     this.registry = createLeaseRegistry<WebGLTexture>((texture) =>
       gl.deleteTexture(texture),
     );
@@ -336,42 +361,157 @@ class SceneDevice implements GPUDevice {
     );
   }
 
+  /** Device extent, the bounds a clip provider is asked to rasterize. */
+  private sceneBounds(): Bounds {
+    return { x: 0, y: 0, width: this.width, height: this.height };
+  }
+
+  /**
+   * Restore the canonical stencil state after any clipped or source-in draw:
+   * test off, function/op default, write mask open, color writes on, and every
+   * texel back to zero so no later draw can observe this mask.
+   */
+  private resetStencil(): void {
+    const gl = this.gl;
+    this.bindSceneState();
+    gl.stencilFunc(gl.ALWAYS, 0, 0xff);
+    gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);
+    gl.stencilMask(0xff);
+    gl.colorMask(true, true, true, true);
+    gl.clearStencil(0);
+    gl.clear(gl.STENCIL_BUFFER_BIT);
+  }
+
+  /**
+   * Build the effective clip into the scene stencil and return its depth.
+   *
+   * Each ClipSnapshot level is a native rasterized coverage mask. Level i is
+   * drawn only where the stencil still holds i-1 (EQUAL) and increments to i
+   * on fragments that survive the mask's alpha threshold; discarded fragments
+   * leave the previous value untouched, so a later level can only shrink the
+   * region. Content then tests EQUAL depth. A level with empty coverage never
+   * advances the counter, which makes an empty path an empty clip region
+   * without special-casing. Masks are resolved before the stencil is touched,
+   * and every resolved source is released before returning.
+   */
+  private beginClip(clip: ClipSnapshot | null): number {
+    if (!clip) return 0;
+    const chain: ClipSnapshot[] = [];
+    for (let level: ClipSnapshot | null = clip; level; level = level.parent)
+      chain.push(level);
+    chain.reverse();
+    if (chain.length > this.maxClipDepth)
+      throw createCompatError(
+        ERROR_CODES.RESOURCE_LIMIT,
+        `clip nesting depth ${chain.length} exceeds ${this.maxClipDepth} stencil values`,
+      );
+    const masks: RasterSource[] = [];
+    try {
+      for (const level of chain) {
+        if (typeof level.mask !== "function")
+          throw createCompatError(
+            ERROR_CODES.CONTRACT,
+            `clip ${level.id} has no mask provider`,
+          );
+        masks.push(level.mask(this.sceneBounds()));
+      }
+    } catch (failure) {
+      for (const mask of masks) mask.release();
+      throw failure;
+    }
+    const gl = this.gl;
+    try {
+      this.bindSceneState();
+      gl.enable(gl.STENCIL_TEST);
+      gl.stencilMask(0xff);
+      gl.stencilOp(gl.KEEP, gl.KEEP, gl.INCR);
+      gl.colorMask(false, false, false, false);
+      gl.clearStencil(0);
+      gl.clear(gl.STENCIL_BUFFER_BIT);
+      for (let index = 0; index < masks.length; index += 1) {
+        const mask = masks[index]!;
+        if (mask.bounds.width <= 0 || mask.bounds.height <= 0) continue;
+        const lease = this.acquireTexture(mask);
+        try {
+          const texture = this.registry.payload(lease.handle);
+          if (!texture)
+            throw createCompatError(
+              ERROR_CODES.CONTRACT,
+              "clip mask texture is missing",
+            );
+          const { corners, uvs } = this.texturedGeometry(mask);
+          gl.stencilFunc(gl.EQUAL, index, 0xff);
+          this.drawTexturedQuad(
+            texture,
+            corners,
+            uvs,
+            1,
+            "replace",
+            "scene",
+            1,
+            true,
+            MASK_ALPHA_THRESHOLD,
+          );
+        } finally {
+          lease.release();
+        }
+      }
+      gl.colorMask(true, true, true, true);
+      gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);
+      gl.stencilFunc(gl.EQUAL, chain.length, 0xff);
+      return chain.length;
+    } catch (failure) {
+      this.resetStencil();
+      throw failure;
+    } finally {
+      for (const mask of masks) mask.release();
+    }
+  }
+
   /**
    * source-in spans the whole effective clip, not just the source geometry:
    * destination pixels inside the clip but outside the source coverage become
-   * transparent. Coverage is marked in the scene stencil, the outside is
-   * cleared through the inverted stencil test, then the source composites with
-   * (DST_ALPHA, ZERO) through the equal test. When the clip feature lands it
-   * must confine all three passes by its own mask; today the effective clip is
-   * the canvas extent. Canonical state is restored before returning: stencil
-   * test off, stencil back to all-zero, color writes on.
+   * transparent. The source coverage is marked at stencil depth + 1, the
+   * depth-equal pixels outside it are cleared, then the source composites with
+   * (DST_ALPHA, ZERO) through the depth + 1 test. When a clip is active its
+   * levels occupy 0..depth, so all three passes stay inside the clip: pass 1
+   * tests EQUAL depth, pass 2 tests EQUAL depth, and pass 3 tests EQUAL
+   * depth + 1. Canonical stencil state is restored before returning.
    */
   private compositeSourceIn(
     corners: number[],
     drawSource: (stencil: boolean) => void,
+    clipDepth: number,
   ): void {
     const gl = this.gl;
-    // Pass 1: mark source coverage in the stencil without touching color.
+    if (clipDepth === 0) {
+      // No clip: start from a known-zero stencil like before.
+      this.bindSceneState();
+      gl.clearStencil(0);
+      gl.stencilMask(0xff);
+      gl.clear(gl.STENCIL_BUFFER_BIT);
+      gl.enable(gl.STENCIL_TEST);
+    }
+    // Pass 1: mark source coverage at depth + 1 without touching color.
     gl.stencilMask(0xff);
-    gl.stencilFunc(gl.ALWAYS, 1, 0xff);
-    gl.stencilOp(gl.KEEP, gl.KEEP, gl.REPLACE);
+    gl.stencilFunc(
+      clipDepth === 0 ? gl.ALWAYS : gl.EQUAL,
+      clipDepth,
+      0xff,
+    );
+    gl.stencilOp(gl.KEEP, gl.KEEP, gl.INCR);
     gl.colorMask(false, false, false, false);
     this.drawSolidQuad(corners, TRANSPARENT, "replace", 1, true);
-    // Pass 2: clear the destination outside the coverage.
-    gl.stencilFunc(gl.EQUAL, 0, 0xff);
+    // Pass 2: clear the destination outside the coverage, inside the clip.
+    gl.stencilFunc(gl.EQUAL, clipDepth, 0xff);
     gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);
     gl.stencilMask(0x00);
     gl.colorMask(true, true, true, true);
     this.drawSolidQuad(this.fullscreen(), TRANSPARENT, "replace", 1, true);
     // Pass 3: composite the source inside the coverage.
-    gl.stencilFunc(gl.EQUAL, 1, 0xff);
+    gl.stencilFunc(gl.EQUAL, clipDepth + 1, 0xff);
     drawSource(true);
-    gl.disable(gl.STENCIL_TEST);
-    gl.stencilFunc(gl.ALWAYS, 0, 0xff);
-    gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);
-    gl.stencilMask(0xff);
-    gl.clearStencil(0);
-    gl.clear(gl.STENCIL_BUFFER_BIT);
+    this.resetStencil();
   }
 
   private fullscreen(): number[] {
@@ -411,6 +551,7 @@ class SceneDevice implements GPUDevice {
     target: "scene" | "display",
     brightness: number,
     stencil = false,
+    alphaThreshold = 0,
   ): void {
     const { scene, textured, positionBuffer, uvBuffer } = this.requireObjects();
     const gl = this.gl;
@@ -428,6 +569,7 @@ class SceneDevice implements GPUDevice {
     gl.uniform2f(textured.uResolution, this.width, this.height);
     gl.uniform1f(textured.uAlpha, alpha);
     gl.uniform1f(textured.uBrightness, brightness);
+    gl.uniform1f(textured.uAlphaThreshold, alphaThreshold);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(
       gl.TEXTURE_2D,
@@ -479,96 +621,119 @@ class SceneDevice implements GPUDevice {
         ERROR_CODES.CONTRACT,
         `stale draw operation: generation ${operation.generation}, current ${this.generation}`,
       );
-    if (operation.clip !== null)
-      throw createCompatError(
-        ERROR_CODES.NOT_IMPLEMENTED,
-        "stencil clip resolution arrives with the clip feature",
-      );
     const source = operation.source;
     // The filter transfers the source before compositing; brightness(120%) is
     // a per-channel scale in the fragment shaders, 1 is the exact identity.
     const brightness = operation.state.filter === "brightness(120%)" ? 1.2 : 1;
-    if (operation.kind === "clear") {
-      // Clears are independent of paint, alpha, composite and filter.
-      if (source.kind === "rect")
-        this.drawSolidQuad(
-          rectCorners(source.bounds, source.transform),
-          TRANSPARENT,
-          "replace",
-          1,
-        );
-    } else if (source.kind === "empty") {
-      // An empty source still composites: source-in erases the effective clip,
-      // the other modes are observable no-ops.
-      if (operation.state.composite === "source-in")
-        this.drawSolidQuad(this.fullscreen(), TRANSPARENT, "replace", 1);
-    } else if (source.kind === "rect") {
-      if (source.paint.kind !== "solid")
-        throw createCompatError(
-          ERROR_CODES.NOT_IMPLEMENTED,
-          `paint kind "${source.paint.kind}" arrives with the paint feature`,
-        );
-      const [r, g, b, a] = source.paint.color;
-      const alpha = a * operation.state.alpha;
-      const corners = rectCorners(source.bounds, source.transform);
-      const color: readonly [number, number, number, number] = [
-        r * alpha,
-        g * alpha,
-        b * alpha,
-        alpha,
-      ];
-      // Stencil coverage on this solid path is binary. AA-sensitive source-in
-      // sources (transforms, fractional edges) are rasterized by the feature
-      // layer into a native asset before reaching the device; this path is for
-      // device-level seams whose caller accepts hard coverage.
-      if (operation.state.composite === "source-in")
-        this.compositeSourceIn(corners, (stencil) =>
-          this.drawSolidQuad(corners, color, "source-in", brightness, stencil),
-        );
-      else
-        this.drawSolidQuad(
-          corners,
-          color,
-          operation.state.composite,
-          brightness,
-        );
-    } else {
-      const upload = source.kind === "raster" ? source : source.image;
-      const lease = this.acquireTexture(upload);
-      try {
-        const texture = this.registry.payload(lease.handle);
-        if (!texture)
-          throw createCompatError(
-            ERROR_CODES.CONTRACT,
-            "uploaded texture is missing",
+    let clipDepth = 0;
+    try {
+      clipDepth = this.beginClip(operation.clip);
+      if (operation.kind === "clear") {
+        // Clears are independent of paint, alpha, composite and filter, but
+        // still confined to the effective clip.
+        if (source.kind === "rect")
+          this.drawSolidQuad(
+            rectCorners(source.bounds, source.transform),
+            TRANSPARENT,
+            "replace",
+            1,
+            clipDepth > 0,
           );
-        const { corners, uvs } = this.texturedGeometry(source);
+      } else if (source.kind === "empty") {
+        // An empty source still composites: source-in erases the effective
+        // clip, the other modes are observable no-ops.
         if (operation.state.composite === "source-in")
-          this.compositeSourceIn(corners, (stencil) =>
+          this.drawSolidQuad(
+            this.fullscreen(),
+            TRANSPARENT,
+            "replace",
+            1,
+            clipDepth > 0,
+          );
+      } else if (source.kind === "rect") {
+        if (source.paint.kind !== "solid")
+          throw createCompatError(
+            ERROR_CODES.NOT_IMPLEMENTED,
+            `paint kind "${source.paint.kind}" arrives with the paint feature`,
+          );
+        const [r, g, b, a] = source.paint.color;
+        const alpha = a * operation.state.alpha;
+        const corners = rectCorners(source.bounds, source.transform);
+        const color: readonly [number, number, number, number] = [
+          r * alpha,
+          g * alpha,
+          b * alpha,
+          alpha,
+        ];
+        // Stencil coverage on this solid path is binary. AA-sensitive source-in
+        // sources (transforms, fractional edges) are rasterized by the feature
+        // layer into a native asset before reaching the device; this path is
+        // for device-level seams whose caller accepts hard coverage.
+        if (operation.state.composite === "source-in")
+          this.compositeSourceIn(
+            corners,
+            (stencil) =>
+              this.drawSolidQuad(
+                corners,
+                color,
+                "source-in",
+                brightness,
+                stencil,
+              ),
+            clipDepth,
+          );
+        else
+          this.drawSolidQuad(
+            corners,
+            color,
+            operation.state.composite,
+            brightness,
+            clipDepth > 0,
+          );
+      } else {
+        const upload = source.kind === "raster" ? source : source.image;
+        const lease = this.acquireTexture(upload);
+        try {
+          const texture = this.registry.payload(lease.handle);
+          if (!texture)
+            throw createCompatError(
+              ERROR_CODES.CONTRACT,
+              "uploaded texture is missing",
+            );
+          const { corners, uvs } = this.texturedGeometry(source);
+          if (operation.state.composite === "source-in")
+            this.compositeSourceIn(
+              corners,
+              (stencil) =>
+                this.drawTexturedQuad(
+                  texture,
+                  corners,
+                  uvs,
+                  operation.state.alpha,
+                  "source-in",
+                  "scene",
+                  brightness,
+                  stencil,
+                ),
+              clipDepth,
+            );
+          else
             this.drawTexturedQuad(
               texture,
               corners,
               uvs,
               operation.state.alpha,
-              "source-in",
+              operation.state.composite,
               "scene",
               brightness,
-              stencil,
-            ),
-          );
-        else
-          this.drawTexturedQuad(
-            texture,
-            corners,
-            uvs,
-            operation.state.alpha,
-            operation.state.composite,
-            "scene",
-            brightness,
-          );
-      } finally {
-        lease.release();
+              clipDepth > 0,
+            );
+        } finally {
+          lease.release();
+        }
       }
+    } finally {
+      if (clipDepth > 0) this.resetStencil();
     }
     this.presenterQueue.request(this.generation);
   }
@@ -784,7 +949,7 @@ export function createSceneRenderer(
         ERROR_CODES.INITIALIZATION,
         "injected failure after context acquisition",
       );
-    const { maxTextureSize } = validateContext(gl);
+    const { maxTextureSize, stencilBits } = validateContext(gl);
     if (options.failAfter === "attributes")
       throw createCompatError(
         ERROR_CODES.INITIALIZATION,
@@ -792,7 +957,13 @@ export function createSceneRenderer(
       );
     validateSceneSize(target.width, target.height, maxTextureSize);
     const owner = createResourceOwner();
-    const device = new SceneDevice(target, gl, maxTextureSize, owner);
+    const device = new SceneDevice(
+      target,
+      gl,
+      maxTextureSize,
+      stencilBits,
+      owner,
+    );
     device.createGpuObjects();
     cleanups.push(() => device.shutdown());
     if (options.failAfter === "programs")

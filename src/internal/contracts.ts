@@ -109,6 +109,13 @@ export interface ClipSnapshot {
   readonly parent: ClipSnapshot | null;
   readonly path: PathSnapshot;
   readonly rule: "nonzero" | "evenodd";
+  /**
+   * Internal native coverage provider for this level. The clip feature closes
+   * over the rasterizer; the device resolves the mask at draw time and
+   * consumes it as one stencil level. Logical snapshots without a provider
+   * (state-unit stubs) are invalid to draw with, not silently unclipped.
+   */
+  readonly mask?: (bounds: Bounds) => RasterSource;
 }
 /** No GL object escapes a lease. A handle belongs to one device generation. */
 export interface ResourceHandle {
