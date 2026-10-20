@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createSession } from "../../../dist/canvas/session.js";
+import { createSession } from "../../../dist/lifecycle/session.js";
+import { createLifecycleRegistry } from "../../../dist/lifecycle/registry.js";
 
 function fakeDevice() {
   const calls = [];
@@ -41,10 +42,12 @@ function fakeDevice() {
 function fakeParts() {
   const order = [];
   const device = fakeDevice();
+  const lifecycle = createLifecycleRegistry();
   const record = (name) => () => order.push(name);
   return {
     order,
     device,
+    lifecycle,
     state: {
       save() {},
       restore() {},
@@ -52,6 +55,7 @@ function fakeParts() {
       snapshot() {},
       set() {},
       get() {},
+      discardClips() {},
     },
     path: {
       begin() {},
@@ -118,6 +122,7 @@ test("session lost/restore entries drive the device and notify callbacks", () =>
   const events = [];
   const session = createSession({
     ...parts,
+    target: undefined,
     onContextLost: () => events.push("lost"),
     onContextRestored: () => events.push("restored"),
   });
