@@ -91,7 +91,7 @@ test('missing arguments throw the native TypeError before any state is read', ()
   assert.equal(rasterCalls.measure.length, 0);
 });
 
-test('a present maxWidth argument reports unsupported-api on all three entries', () => {
+test('a present maxWidth argument reports unsupported-api on text draws while measureText ignores it', () => {
   const { members, rasterCalls } = setup();
   assert.throws(() => members.fillText.value('x', 0, 0, 100), { code: 'unsupported-api' });
   assert.throws(() => members.strokeText.value('x', 0, 0, 20), { code: 'unsupported-api' });
