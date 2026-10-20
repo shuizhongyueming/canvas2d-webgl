@@ -229,10 +229,11 @@
   "date": "2026-10-20",
   "operator": "kimi-code-agent",
   "execution": "executed",
-  "savePreset": { "key": "stickmanfuryv4", "value": "0,0,0,3,0,2,0,1,0,0,0,...（默认存档原值，完整串见仓外证据）", "appliedVia": "devtools" },
+  "savePreset": null,
   "cheatKeysUsed": ["2：杀光敌人以进入结算"],
   "stepsExecuted": [
     "作弊键 2 杀光当前关卡敌人",
+    "存档为默认值（savePreset: null）；步骤中未写入预设",
     "推进 checkLevelComplete() 状态机（rAF 被节流，直接调用）",
     "观察 gameState 变为 levelComplete、进度条目标 25%"
   ],
@@ -278,9 +279,10 @@
   "date": "2026-10-20",
   "operator": "kimi-code-agent",
   "execution": "executed",
-  "savePreset": { "key": "stickmanfuryv4", "value": "进度经 setWeaponUnlockProgress(100) 构造，非自然累积", "appliedVia": "devtools" },
+  "savePreset": null,
   "cheatKeysUsed": ["2：杀光敌人以进入结算"],
   "stepsExecuted": [
+    "存档为默认值（savePreset: null）",
     "setWeaponUnlockProgress(100) 构造解锁分支前置（非自然进度累积）",
     "initLevelComplete() 进入结算",
     "推进 stageCompleteTimer 至动画完成",
@@ -493,11 +495,16 @@
 1. 七场景 `review.status` 均为 `pending-review`（缺人工+AI 双方记录）；
 2. `review.human` / `review.ai` 均为 `null`；
 3. `library.dirty = true`（未跟踪的 `.pnpm-store/`；本 PR 已把它加入 `.gitignore`，后续运行可达到 `dirty === false`），正式 acceptance 要求 `dirty === false`；
-4. `untriggered` 中「其余 SUPPORT_MATRIX 成员」一项尚未逐成员绑定具体用例 ID（`test:matrix` 输出可作为权威清单，但当前未在本文档展开）；
-5. **触发统计的口径（两个来源）**：
+4. **触发统计的口径（两个来源）**：
    - `sessionScope: true` 的 26 项来自**全会话聚合**，其计数之和恰为 **200000**，说明该聚合就是采集缓冲区本身（上限 200000 条，写满后不再记录）。因此它覆盖的是**会话前段**，不含写满之后发生的调用。
    - `sessionScope: false` 的 3 项（`context.filter`、`context.clearRect`、`context.globalCompositeOperation`）来自**各场景执行当时的快照**，它们发生在缓冲区写满之后，故不在全会话聚合中，但确定已触发。
    - 两者合并得到 29 个「已观察触发」的 supported 成员；**不能**把任一来源单独当作完整调用面。
+
+## 报告范围说明
+
+- `triggered` / `untriggered` 只覆盖 `SUPPORT_MATRIX` 中 `policy: supported` 的 43 个成员。
+- `readonly`、`forward`、`unsupported` 共 58 个成员不进入本报告：`unsupported` 由 51 个 `context.<member>.contract` 用例负责；`readonly`/`forward` 由各自契约用例负责（见 `test:matrix` 输出）。
+- 加入 `.pnpm-store/` 到 `.gitignore` 之后，后续运行会产生不同的 `sourceHash`；本记录的 hash 只绑定本次执行，旧评审不可跨提交复用。
 
 ## 结论边界（必须与上文一致）
 
