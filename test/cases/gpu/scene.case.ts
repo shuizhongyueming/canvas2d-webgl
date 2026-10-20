@@ -17,6 +17,14 @@ import {
   rectDraw,
 } from "./device-driver.js";
 
+/** Exact byte-pixel comparison for expected-value assertions. */
+function pixelIs(
+  actual: readonly number[],
+  expected: readonly number[],
+): boolean {
+  return actual.every((channel, index) => channel === expected[index]);
+}
+
 export const cases: CaseDefinition[] = [
   {
     id: "gpu.scene.clear-and-alpha",
@@ -66,17 +74,37 @@ export const cases: CaseDefinition[] = [
         rectDraw(device.generation, { x: 0, y: 2, width: 4, height: 2 }, BLUE),
       );
       const scene = hooks.readScene();
-      a.observe("sceneTop", pixelAt(scene, 0, 0));
-      a.observe("sceneBottom", pixelAt(scene, 0, 3));
-      a.observe("displayBeforePresent", readDisplayPixel(gl, 0, 0));
+      a.assert(
+        pixelIs(pixelAt(scene, 0, 0), [255, 0, 0, 255]),
+        "scene top row is the red half",
+      );
+      a.assert(
+        pixelIs(pixelAt(scene, 0, 3), [0, 0, 255, 255]),
+        "scene bottom row is the blue half",
+      );
+      a.assert(
+        pixelIs(readDisplayPixel(gl, 0, 0), [0, 0, 0, 0]),
+        "display stays transparent before the first present",
+      );
       await hooks.whenPresented(device.generation);
       // GL readback is bottom row first: (0,0) is the display bottom row.
-      a.observe("displayBottomAfter", readDisplayPixel(gl, 0, 0));
-      a.observe("displayTopAfter", readDisplayPixel(gl, 0, 3));
+      // Expected values, not self-observation: a vertically flipped present
+      // blit swaps these two rows and fails both assertions.
+      a.assert(
+        pixelIs(readDisplayPixel(gl, 0, 0), [0, 0, 255, 255]),
+        "display bottom row shows the blue scene half, unflipped",
+      );
+      a.assert(
+        pixelIs(readDisplayPixel(gl, 0, 3), [255, 0, 0, 255]),
+        "display top row shows the red scene half, unflipped",
+      );
       device.draw(
         rectDraw(device.generation, { x: 0, y: 0, width: 1, height: 1 }, GREEN),
       );
-      a.observe("sceneAfterExternalRead", pixelAt(hooks.readScene(), 0, 0));
+      a.assert(
+        pixelIs(pixelAt(hooks.readScene(), 0, 0), [0, 255, 0, 255]),
+        "scene writes still land after the external display read",
+      );
       device.dispose();
     },
   },

@@ -14,9 +14,6 @@ export const cases: CaseDefinition[] = [
     ...base,
     id: "canvas.context-stubs.not-implemented",
     requirements: [
-      "context.fillRect",
-      "context.clearRect",
-      "context.strokeRect",
       "context.drawImage",
       "context.beginPath",
       "context.fill",
@@ -33,9 +30,6 @@ export const cases: CaseDefinition[] = [
       >;
       const source = makeTarget(1, 1);
       const calls: Array<[string, () => unknown]> = [
-        ["fillRect", () => context.fillRect!(0, 0, 1, 1)],
-        ["clearRect", () => context.clearRect!(0, 0, 1, 1)],
-        ["strokeRect", () => context.strokeRect!(0, 0, 1, 1)],
         ["drawImage", () => context.drawImage!(source, 0, 0)],
         ["beginPath", () => context.beginPath!()],
         ["fill", () => context.fill!()],
@@ -47,6 +41,7 @@ export const cases: CaseDefinition[] = [
       ];
       // Approved drawing entries that no feature owns yet must report
       // not-implemented; silently succeeding would be a contract violation.
+      // The rect ticket owns fillRect/clearRect/strokeRect for real now.
       const expected = isCompat(a) ? "not-implemented" : "ok";
       const results = calls.map(
         ([name, invoke]) => [name, outcome(invoke)] as const,
