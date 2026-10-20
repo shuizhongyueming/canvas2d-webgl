@@ -58,6 +58,14 @@ pnpm run test:matrix --run test-results/24-acceptance/<runId>/run.json --out tes
 
 `test:matrix` 在缺定义或存在语义失败时退出 1；待评审属于预期未完成状态，不改变退出码，也不会被写成通过。脚本只读运行产物，不重新采集、不重新判定评审。
 
+## 渲染对评审索引
+
+```sh
+pnpm run test:review-index --run <run.json> --out <run目录>/review-index.md
+```
+
+索引逐用例列出差异像素数、最大通道差、边缘翻转、低 alpha 差与包围框，并在一个真实产物上做局部错误检测反例：改动几个像素各一个通道单位，要求定位器报出同样的坐标数。统计列只帮助阅读，不构成容差；索引不写评审结论，也不改变任何用例状态。评审记录仍按 `reviews.template.json` 填写后交给 `test:acceptance`。
+
 ## 排除项
 
 矩阵中每个 `policy: unsupported` 成员都有 `context.<member>.contract`，compat 侧断言错误 code 为 `unsupported-api` 且 message 含 API 名，native 侧断言同一调用在原生语义下合法。`scrollPathIntoView` 在当前 Chromium 未暴露，用例把这一平台事实记为 `absent`，不会被当成排除语义通过。

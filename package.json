@@ -24,6 +24,8 @@
     "test:report": "node scripts/testing.mjs report",
     "test:acceptance": "node scripts/testing.mjs acceptance",
     "test:matrix": "node scripts/acceptance-matrix.mjs",
+    "test:review-index": "node scripts/acceptance-review.mjs",
+    "pretest:review-index": "pnpm run build",
     "pretest:matrix": "pnpm run build",
     "verify": "pnpm run check && pnpm run test:unit",
     "pretest:unit": "pnpm run build",
