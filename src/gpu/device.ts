@@ -599,6 +599,15 @@ class SceneDevice implements GPUDevice {
     validateSceneSize(width, height, this.maxTextureSize);
     const previousWidth = this.target.width;
     const previousHeight = this.target.height;
+    const restoreTarget = () => {
+      try {
+        this.target.width = previousWidth;
+        this.target.height = previousHeight;
+      } catch {
+        // The platform refused even the restore; the compat object keeps
+        // reporting the last accepted device size either way.
+      }
+    };
     let scene: SceneFramebuffer;
     try {
       this.target.width = width;
@@ -610,9 +619,15 @@ class SceneDevice implements GPUDevice {
         );
       scene = createSceneFramebuffer(this.gl, width, height, this.maxTextureSize);
     } catch (failure) {
-      this.target.width = previousWidth;
-      this.target.height = previousHeight;
-      throw failure;
+      restoreTarget();
+      const code = (failure as { code?: unknown } | null)?.code;
+      if (typeof code === "string") throw failure;
+      // A platform that rejects the assignment reports a capability limit,
+      // never a silently changed compat-only number (CAN-04).
+      throw createCompatError(
+        ERROR_CODES.SIZE_UNSUPPORTED,
+        `platform refused canvas size ${width}x${height}`,
+      );
     }
     const generation = this.generation;
     this.presenterQueue.invalidate(generation);

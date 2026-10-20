@@ -219,6 +219,23 @@ export interface PathStore {
   snapshot(): PathSnapshot;
   reset(): void;
 }
+/**
+ * One transition vocabulary for every feature (see src/lifecycle/registry.ts).
+ * reset fires for every size assignment, including the same size; lost pauses
+ * without queueing work; restored follows cache discard and GL reconstruction;
+ * disposed runs in reverse registration order. Features must not install their
+ * own DOM listeners or generation bookkeeping.
+ */
+export interface LifecycleHooks {
+  readonly reset?: () => void;
+  readonly lost?: () => void;
+  readonly restored?: () => void;
+  readonly disposed?: () => void;
+}
+export interface LifecycleRegistration {
+  /** Register once; the returned function transfers cleanup back to the caller. */
+  register(hooks: LifecycleHooks): () => void;
+}
 export interface FeatureEnvironment {
   readonly state: StateStore;
   readonly path: PathStore;
@@ -226,6 +243,7 @@ export interface FeatureEnvironment {
   readonly gpu: GPUDevice;
   readonly presenter: Presenter;
   readonly resources: ResourceOwner;
+  readonly lifecycle: LifecycleRegistration;
   /**
    * Platform-injected factory for library-internal offscreen canvases
    * (CompatOptions.createOffscreenCanvas). Consumers that need it fail

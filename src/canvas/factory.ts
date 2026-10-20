@@ -32,7 +32,8 @@ import {
   resolveOffscreenFactory,
   validateOffscreenFactory,
 } from "./offscreen.js";
-import { createSession } from "./session.js";
+import { createLifecycleRegistry } from "../lifecycle/registry.js";
+import { createSession } from "../lifecycle/session.js";
 import { createFacade } from "./facade.js";
 
 interface NormalizedOptions {
@@ -110,14 +111,20 @@ export function createCompatCanvas<T extends TargetCanvas>(
       sceneExtent: () => ({ width: device.width, height: device.height }),
     });
     cleanups.push(() => raster.dispose());
+    const lifecycle = createLifecycleRegistry();
     const session = createSession({
       device,
       raster,
       state,
       path,
+      lifecycle,
+      target: targetCanvas,
       onContextLost: normalized.onContextLost,
       onContextRestored: normalized.onContextRestored,
     });
+    // Detach DOM listeners and release whatever the session owns when a later
+    // initialization step fails, without touching the caller's target.
+    cleanups.push(() => session.dispose());
     const environment: FeatureEnvironment = {
       state,
       path,
@@ -125,6 +132,7 @@ export function createCompatCanvas<T extends TargetCanvas>(
       gpu: device,
       presenter,
       resources,
+      lifecycle,
       // Already resolved and proven by validateOffscreenFactory; the paint
       // feature captures pattern bitmaps through it (decision #36).
       createOffscreenCanvas: offscreenFactory,

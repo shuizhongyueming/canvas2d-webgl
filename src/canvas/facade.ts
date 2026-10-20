@@ -5,7 +5,7 @@ import {
   ERROR_CODES,
   type ErrorCode,
 } from "../contracts/errors.js";
-import type { CanvasSession } from "./session.js";
+import type { CanvasSession } from "../lifecycle/session.js";
 
 /** Export/readback entries are excluded at runtime exactly as the type Omits them. */
 const EXCLUDED: ReadonlySet<string> = new Set([
