@@ -13,6 +13,8 @@ pnpm run test:browser --self-test --output test-results/local
 # 命令输出完整 run.json 路径，用它替换下方 <run.json>。
 pnpm run test:report --run <run.json>
 pnpm run test:acceptance --run <run.json> --reviews <reviews.json>
+# 支持矩阵覆盖对账（按前置票分组，只读运行产物）；口径见 docs/acceptance/matrix-reconciliation.md
+pnpm run test:matrix --run <run.json> --out <run目录>/matrix.md
 # 真实浏览器故障回归；本机默认不指定 GPU 后端。
 pnpm run test:smoke
 # CI 明确选择 SwiftShader WebGL；环境字段记录实际 renderer，绝不重试降级。
