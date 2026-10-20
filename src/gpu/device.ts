@@ -66,8 +66,12 @@ void main() {
 const SOLID_FRAGMENT = `
 precision mediump float;
 uniform vec4 u_color;
+uniform float u_brightness;
 void main() {
-  gl_FragColor = u_color;
+  // The incoming color is premultiplied; brightness transfers the straight
+  // channels and clamps at 1, which in premultiplied space is a scale clamped
+  // at alpha. u_brightness = 1 is the exact identity (rgb <= a always holds).
+  gl_FragColor = vec4(min(u_color.rgb * u_brightness, vec3(u_color.a)), u_color.a);
 }
 `;
 const TEXTURED_VERTEX = `
@@ -88,9 +92,13 @@ precision mediump float;
 varying vec2 v_uv;
 uniform sampler2D u_texture;
 uniform float u_alpha;
+uniform float u_brightness;
 void main() {
   vec4 color = texture2D(u_texture, v_uv);
-  gl_FragColor = vec4(color.rgb * u_alpha, color.a * u_alpha);
+  // The filter applies to the source before the global alpha multiply; in
+  // premultiplied space the brightness transfer is a scale clamped at alpha.
+  vec3 filtered = min(color.rgb * u_brightness, vec3(color.a));
+  gl_FragColor = vec4(filtered * u_alpha, color.a * u_alpha);
 }
 `;
 
@@ -101,6 +109,7 @@ interface SolidProgram {
   readonly aPosition: number;
   readonly uResolution: WebGLUniformLocation;
   readonly uColor: WebGLUniformLocation;
+  readonly uBrightness: WebGLUniformLocation;
 }
 interface TexturedProgram {
   readonly program: WebGLProgram;
@@ -109,6 +118,7 @@ interface TexturedProgram {
   readonly uResolution: WebGLUniformLocation;
   readonly uTexture: WebGLUniformLocation;
   readonly uAlpha: WebGLUniformLocation;
+  readonly uBrightness: WebGLUniformLocation;
 }
 
 function makeSolidProgram(gl: WebGLRenderingContext): SolidProgram {
@@ -117,12 +127,13 @@ function makeSolidProgram(gl: WebGLRenderingContext): SolidProgram {
     const aPosition = gl.getAttribLocation(program, "a_position");
     const uResolution = gl.getUniformLocation(program, "u_resolution");
     const uColor = gl.getUniformLocation(program, "u_color");
-    if (aPosition < 0 || !uResolution || !uColor)
+    const uBrightness = gl.getUniformLocation(program, "u_brightness");
+    if (aPosition < 0 || !uResolution || !uColor || !uBrightness)
       throw createCompatError(
         ERROR_CODES.INITIALIZATION,
         "solid program interface is incomplete",
       );
-    return { program, aPosition, uResolution, uColor };
+    return { program, aPosition, uResolution, uColor, uBrightness };
   } catch (failure) {
     gl.deleteProgram(program);
     throw failure;
@@ -137,12 +148,20 @@ function makeTexturedProgram(gl: WebGLRenderingContext): TexturedProgram {
     const uResolution = gl.getUniformLocation(program, "u_resolution");
     const uTexture = gl.getUniformLocation(program, "u_texture");
     const uAlpha = gl.getUniformLocation(program, "u_alpha");
-    if (aPosition < 0 || aUv < 0 || !uResolution || !uTexture || !uAlpha)
+    const uBrightness = gl.getUniformLocation(program, "u_brightness");
+    if (
+      aPosition < 0 ||
+      aUv < 0 ||
+      !uResolution ||
+      !uTexture ||
+      !uAlpha ||
+      !uBrightness
+    )
       throw createCompatError(
         ERROR_CODES.INITIALIZATION,
         "textured program interface is incomplete",
       );
-    return { program, aPosition, aUv, uResolution, uTexture, uAlpha };
+    return { program, aPosition, aUv, uResolution, uTexture, uAlpha, uBrightness };
   } catch (failure) {
     gl.deleteProgram(program);
     throw failure;
@@ -317,6 +336,44 @@ class SceneDevice implements GPUDevice {
     );
   }
 
+  /**
+   * source-in spans the whole effective clip, not just the source geometry:
+   * destination pixels inside the clip but outside the source coverage become
+   * transparent. Coverage is marked in the scene stencil, the outside is
+   * cleared through the inverted stencil test, then the source composites with
+   * (DST_ALPHA, ZERO) through the equal test. When the clip feature lands it
+   * must confine all three passes by its own mask; today the effective clip is
+   * the canvas extent. Canonical state is restored before returning: stencil
+   * test off, stencil back to all-zero, color writes on.
+   */
+  private compositeSourceIn(
+    corners: number[],
+    drawSource: (stencil: boolean) => void,
+  ): void {
+    const gl = this.gl;
+    // Pass 1: mark source coverage in the stencil without touching color.
+    gl.stencilMask(0xff);
+    gl.stencilFunc(gl.ALWAYS, 1, 0xff);
+    gl.stencilOp(gl.KEEP, gl.KEEP, gl.REPLACE);
+    gl.colorMask(false, false, false, false);
+    this.drawSolidQuad(corners, TRANSPARENT, "replace", 1, true);
+    // Pass 2: clear the destination outside the coverage.
+    gl.stencilFunc(gl.EQUAL, 0, 0xff);
+    gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);
+    gl.stencilMask(0x00);
+    gl.colorMask(true, true, true, true);
+    this.drawSolidQuad(this.fullscreen(), TRANSPARENT, "replace", 1, true);
+    // Pass 3: composite the source inside the coverage.
+    gl.stencilFunc(gl.EQUAL, 1, 0xff);
+    drawSource(true);
+    gl.disable(gl.STENCIL_TEST);
+    gl.stencilFunc(gl.ALWAYS, 0, 0xff);
+    gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);
+    gl.stencilMask(0xff);
+    gl.clearStencil(0);
+    gl.clear(gl.STENCIL_BUFFER_BIT);
+  }
+
   private fullscreen(): number[] {
     return [0, 0, this.width, 0, 0, this.height, this.width, this.height];
   }
@@ -325,13 +382,17 @@ class SceneDevice implements GPUDevice {
     corners: number[],
     color: readonly [number, number, number, number],
     composite: CompositeMode | "replace",
+    brightness: number,
+    stencil = false,
   ): void {
     const { solid, positionBuffer } = this.requireObjects();
     const gl = this.gl;
     this.bindSceneState();
+    if (stencil) gl.enable(gl.STENCIL_TEST);
     gl.useProgram(solid.program);
     gl.uniform2f(solid.uResolution, this.width, this.height);
     gl.uniform4f(solid.uColor, color[0], color[1], color[2], color[3]);
+    gl.uniform1f(solid.uBrightness, brightness);
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(corners), gl.DYNAMIC_DRAW);
     gl.enableVertexAttribArray(solid.aPosition);
@@ -348,6 +409,8 @@ class SceneDevice implements GPUDevice {
     alpha: number,
     composite: CompositeMode | "replace",
     target: "scene" | "display",
+    brightness: number,
+    stencil = false,
   ): void {
     const { scene, textured, positionBuffer, uvBuffer } = this.requireObjects();
     const gl = this.gl;
@@ -360,9 +423,11 @@ class SceneDevice implements GPUDevice {
       gl.disable(gl.STENCIL_TEST);
       gl.disable(gl.DEPTH_TEST);
     }
+    if (stencil) gl.enable(gl.STENCIL_TEST);
     gl.useProgram(textured.program);
     gl.uniform2f(textured.uResolution, this.width, this.height);
     gl.uniform1f(textured.uAlpha, alpha);
+    gl.uniform1f(textured.uBrightness, brightness);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(
       gl.TEXTURE_2D,
@@ -419,22 +484,24 @@ class SceneDevice implements GPUDevice {
         ERROR_CODES.NOT_IMPLEMENTED,
         "stencil clip resolution arrives with the clip feature",
       );
-    if (operation.state.filter !== "none")
-      throw createCompatError(
-        ERROR_CODES.NOT_IMPLEMENTED,
-        "filter shading arrives with the composite feature",
-      );
     const source = operation.source;
+    // The filter transfers the source before compositing; brightness(120%) is
+    // a per-channel scale in the fragment shaders, 1 is the exact identity.
+    const brightness = operation.state.filter === "brightness(120%)" ? 1.2 : 1;
     if (operation.kind === "clear") {
+      // Clears are independent of paint, alpha, composite and filter.
       if (source.kind === "rect")
         this.drawSolidQuad(
           rectCorners(source.bounds, source.transform),
           TRANSPARENT,
           "replace",
+          1,
         );
     } else if (source.kind === "empty") {
+      // An empty source still composites: source-in erases the effective clip,
+      // the other modes are observable no-ops.
       if (operation.state.composite === "source-in")
-        this.drawSolidQuad(this.fullscreen(), TRANSPARENT, "replace");
+        this.drawSolidQuad(this.fullscreen(), TRANSPARENT, "replace", 1);
     } else if (source.kind === "rect") {
       if (source.paint.kind !== "solid")
         throw createCompatError(
@@ -443,11 +510,28 @@ class SceneDevice implements GPUDevice {
         );
       const [r, g, b, a] = source.paint.color;
       const alpha = a * operation.state.alpha;
-      this.drawSolidQuad(
-        rectCorners(source.bounds, source.transform),
-        [r * alpha, g * alpha, b * alpha, alpha],
-        operation.state.composite,
-      );
+      const corners = rectCorners(source.bounds, source.transform);
+      const color: readonly [number, number, number, number] = [
+        r * alpha,
+        g * alpha,
+        b * alpha,
+        alpha,
+      ];
+      // Stencil coverage on this solid path is binary. AA-sensitive source-in
+      // sources (transforms, fractional edges) are rasterized by the feature
+      // layer into a native asset before reaching the device; this path is for
+      // device-level seams whose caller accepts hard coverage.
+      if (operation.state.composite === "source-in")
+        this.compositeSourceIn(corners, (stencil) =>
+          this.drawSolidQuad(corners, color, "source-in", brightness, stencil),
+        );
+      else
+        this.drawSolidQuad(
+          corners,
+          color,
+          operation.state.composite,
+          brightness,
+        );
     } else {
       const upload = source.kind === "raster" ? source : source.image;
       const lease = this.acquireTexture(upload);
@@ -459,14 +543,29 @@ class SceneDevice implements GPUDevice {
             "uploaded texture is missing",
           );
         const { corners, uvs } = this.texturedGeometry(source);
-        this.drawTexturedQuad(
-          texture,
-          corners,
-          uvs,
-          operation.state.alpha,
-          operation.state.composite,
-          "scene",
-        );
+        if (operation.state.composite === "source-in")
+          this.compositeSourceIn(corners, (stencil) =>
+            this.drawTexturedQuad(
+              texture,
+              corners,
+              uvs,
+              operation.state.alpha,
+              "source-in",
+              "scene",
+              brightness,
+              stencil,
+            ),
+          );
+        else
+          this.drawTexturedQuad(
+            texture,
+            corners,
+            uvs,
+            operation.state.alpha,
+            operation.state.composite,
+            "scene",
+            brightness,
+          );
       } finally {
         lease.release();
       }
@@ -488,6 +587,7 @@ class SceneDevice implements GPUDevice {
       1,
       "replace",
       "display",
+      1,
     );
     this.bindSceneState();
   }

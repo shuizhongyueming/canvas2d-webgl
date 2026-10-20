@@ -13,8 +13,8 @@ import { PathRecorder } from "../../path/recorder.js";
 /**
  * Rectangle drawing: fillRect/clearRect/strokeRect.
  *
- * Solid fills and clears reach the GPU as plain transformed quads; gradient
- * and pattern fills and every strokeRect go through the approved native asset
+ * Solid fills and clears reach the GPU as plain transformed quads; source-in
+ * fills, gradient/pattern fills and every strokeRect use the native asset
  * service (a recorded rect path rasterized by the rasterizer), so those share
  * the native rasterizer's coverage and paint evaluation. None of these members
  * touch the current path: the recorder below is feature-private and never
@@ -114,6 +114,8 @@ export const rectFeature: FeatureFactory = (
     recorder.rect(x, y, width, height, snapshot.transform);
     const source = raster.path(recorder.snapshot(), snapshot, mode);
     try {
+      // Empty coverage still becomes an operation: source-in erases the
+      // effective clip, the other modes are no-ops in the device.
       gpu.draw({
         generation: gpu.generation,
         kind: "draw",
@@ -134,10 +136,21 @@ export const rectFeature: FeatureFactory = (
     const rect = rectArguments("fillRect", args);
     if (!rect || !assertUsable()) return;
     const [x, y, width, height] = rect;
-    // A zero-area rect covers no pixels; native paints nothing.
-    if (width === 0 || height === 0) return;
+    if (width === 0 && height === 0) return;
     const snapshot = state.snapshot();
-    if (snapshot.fill.kind !== "solid") {
+    if (width === 0 || height === 0) {
+      if (snapshot.composite === "source-in")
+        gpu.draw({
+          generation: gpu.generation,
+          kind: "draw",
+          state: snapshot,
+          source: { kind: "empty" },
+          sourceBounds: { x, y, width: 0, height: 0 },
+          clip: snapshot.clip,
+        });
+      return;
+    }
+    if (snapshot.fill.kind !== "solid" || snapshot.composite === "source-in") {
       drawRasterRect(x, y, width, height, snapshot, "fill");
       return;
     }
