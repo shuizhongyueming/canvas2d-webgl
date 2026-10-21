@@ -17,38 +17,21 @@ export interface ContextCapabilities {
 /**
  * Bind the target canvas to WebGL 1 with the approved attributes. A target
  * already bound to WebGL keeps its existing context, so the actual attributes
- * are validated separately; a target bound to another context type reports
- * invalid-target, while a platform without WebGL 1 reports webgl-unavailable.
+ * are validated separately; a target that cannot provide a WebGL 1 context
+ * reports webgl-unavailable.
  */
 export function acquireWebGLContext(
   target: TargetCanvas,
-  createProbeCanvas?: () => TargetCanvas,
 ): WebGLRenderingContext {
   const gl = target.getContext("webgl", {
     ...APPROVED_CONTEXT_ATTRIBUTES,
   }) as WebGLRenderingContext | null;
-  if (gl) return gl;
-  const probe =
-    createProbeCanvas?.() ??
-    (typeof document !== "undefined"
-      ? document.createElement("canvas")
-      : undefined);
-  const probeGl = probe?.getContext("webgl", {
-    ...APPROVED_CONTEXT_ATTRIBUTES,
-  }) as WebGLRenderingContext | null | undefined;
-  try {
-    if (probeGl)
-      throw createCompatError(
-        ERROR_CODES.INVALID_TARGET,
-        "target canvas is bound to an incompatible context",
-      );
+  if (!gl)
     throw createCompatError(
       ERROR_CODES.WEBGL_UNAVAILABLE,
       "WebGL 1 context could not be created",
     );
-  } finally {
-    probeGl?.getExtension("WEBGL_lose_context")?.loseContext();
-  }
+  return gl;
 }
 
 /** Validate the real attributes and required capabilities of a live context. */

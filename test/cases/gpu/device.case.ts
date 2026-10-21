@@ -55,7 +55,7 @@ export const cases: CaseDefinition[] = [
       const bound2d = document.createElement("canvas");
       bound2d.getContext("2d");
       a.observe(
-        "incompatibleCode",
+        "bound2dCode",
         captureError(() => gpu.createSceneRenderer(bound2d))?.code ??
           "no-error",
       );

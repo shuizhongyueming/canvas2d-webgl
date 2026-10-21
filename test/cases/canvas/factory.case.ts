@@ -180,8 +180,8 @@ export const cases: CaseDefinition[] = [
         outcome(() => createCompatCanvas(target)),
       );
       a.assert(
-        outcome(() => createCompatCanvas(target)) === "invalid-target",
-        "a 2D-bound target reports invalid-target",
+        outcome(() => createCompatCanvas(target)) === "webgl-unavailable",
+        "a 2D-bound target reports webgl-unavailable",
       );
       a.observe(
         "callerBindingUntouched",

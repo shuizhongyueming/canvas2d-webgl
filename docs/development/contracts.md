@@ -61,7 +61,7 @@
 | --- | --- |
 | `disposed` | 已处置对象的拦截入口 |
 | `unsupported-api` | 规范内明确排除的API、重载或合法但超支持范围的值 |
-| `invalid-target` | 目标不是可用画布或绑定了不兼容上下文 |
+| `invalid-target` | 目标不是可用画布 |
 | `invalid-factory` | 缺少所需注入工厂，或工厂返回非法/非独立画布 |
 | `webgl-unavailable` | 无可用WebGL 1上下文 |
 | `context-attributes-mismatch` | 实际GL属性不符合批准配置 |

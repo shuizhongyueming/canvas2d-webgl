@@ -41,8 +41,6 @@ import { isRasterSource, sourcePixels, uploadSourceTexture } from "./upload.js";
 import { createTestHooks, type SceneTestHooks } from "./hooks.js";
 
 export interface SceneRendererOptions {
-  /** Distinguishes an incompatible target binding from missing WebGL 1. */
-  createProbeCanvas?: () => TargetCanvas;
   /** Test-only fault injection: fail right after the named creation step. */
   failAfter?: "context" | "attributes" | "programs" | "scene";
 }
@@ -961,7 +959,7 @@ export function createSceneRenderer(
     );
   const cleanups: Array<() => void> = [];
   try {
-    const gl = acquireWebGLContext(target, options.createProbeCanvas);
+    const gl = acquireWebGLContext(target);
     if (options.failAfter === "context")
       throw createCompatError(
         ERROR_CODES.INITIALIZATION,
