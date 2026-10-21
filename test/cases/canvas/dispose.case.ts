@@ -23,19 +23,22 @@ export const cases: CaseDefinition[] = [
       canvas.dispose();
       canvas.dispose(); // dispose is idempotent (LIFE-01)
       a.observe("doubleDispose", "tolerated");
-      a.observe("getContextAfter", outcome(() => canvas.getContext("2d")));
-      a.observe("widthReadAfter", outcome(() => String(canvas.width)));
-      a.observe("widthWriteAfter", outcome(() => (canvas.width = 4)));
+      a.observe(
+        "getContextAfter",
+        outcome(() => canvas.getContext("2d")),
+      );
+      a.observe(
+        "widthReadAfter",
+        outcome(() => String(canvas.width)),
+      );
+      a.observe(
+        "widthWriteAfter",
+        outcome(() => (canvas.width = 4)),
+      );
       // Passthrough members keep working after dispose (LIFE-01).
       canvas.style.setProperty("--c2w-disposed", "1");
-      a.observe(
-        "styleAfter",
-        canvas.style.getPropertyValue("--c2w-disposed"),
-      );
-      a.observe(
-        "rectAfter",
-        canvas.getBoundingClientRect().width >= 0,
-      );
+      a.observe("styleAfter", canvas.style.getPropertyValue("--c2w-disposed"));
+      a.observe("rectAfter", canvas.getBoundingClientRect().width >= 0);
       // The target is never destroyed and its context is never lost by us.
       const gl = target.getContext("webgl") as WebGLRenderingContext | null;
       a.assert(!!gl && !gl.isContextLost(), "target GL context stays alive");

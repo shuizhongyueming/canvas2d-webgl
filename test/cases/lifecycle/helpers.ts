@@ -1,5 +1,9 @@
 import type { CaseAdapter, TestHooks } from "../../types/testing.js";
-import type { CompatCanvas, CompatContext, CompatOptions } from "../../../src/api.js";
+import type {
+  CompatCanvas,
+  CompatContext,
+  CompatOptions,
+} from "../../../src/api.js";
 import { loadFactory, makeTarget } from "../shared.js";
 
 /**
@@ -74,7 +78,11 @@ export function pixelsEqual(actual: Pixel, expected: Pixel): boolean {
 }
 
 export function countPixels(
-  scene: { readonly width: number; readonly height: number; readonly pixels: Uint8Array },
+  scene: {
+    readonly width: number;
+    readonly height: number;
+    readonly pixels: Uint8Array;
+  },
   predicate: (pixel: Pixel) => boolean,
 ): number {
   let total = 0;
@@ -151,7 +159,12 @@ export function capture(fn: () => unknown): string {
  */
 export function drawHarnessMarker(a: CaseAdapter): void {
   a.context.fillStyle = "#ff0000";
-  a.context.fillRect(0, 0, Math.min(4, a.canvas.width), Math.min(4, a.canvas.height));
+  a.context.fillRect(
+    0,
+    0,
+    Math.min(4, a.canvas.width),
+    Math.min(4, a.canvas.height),
+  );
 }
 
 /** Wait for the scheduled present of the given generation without forcing one. */

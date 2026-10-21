@@ -48,7 +48,9 @@ function currentTransform(state: StateStore): Matrix {
  * the state-owned properties. Value domains follow the support matrix exactly;
  * legal-but-unlisted values are reported, illegal values keep native semantics.
  */
-export const stateFeature: FeatureFactory = (environment): FeatureDefinition => {
+export const stateFeature: FeatureFactory = (
+  environment,
+): FeatureDefinition => {
   const state = environment?.state;
   if (!state)
     throw createCompatError(
@@ -75,10 +77,7 @@ export const stateFeature: FeatureFactory = (environment): FeatureDefinition => 
           const current = currentTransform(state);
           // Chromium skips translate when the current transform is not invertible.
           if (current[0] * current[3] - current[1] * current[2] === 0) return;
-          transform(
-            state,
-            translateBy(current, values[0]!, values[1]!),
-          );
+          transform(state, translateBy(current, values[0]!, values[1]!));
         },
       },
       rotate: {

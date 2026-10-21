@@ -46,7 +46,10 @@ export const cases: CaseDefinition[] = [
     requirements: ["context.createLinearGradient"],
     run(a) {
       const context = asNative(a.context);
-      a.observe("four", errorInfo(() => context.createLinearGradient(0, 0, 1, 1)));
+      a.observe(
+        "four",
+        errorInfo(() => context.createLinearGradient(0, 0, 1, 1)),
+      );
       a.observe(
         "three",
         errorInfo(() => callRaw(context, "createLinearGradient", 0, 0, 1)),
@@ -55,7 +58,10 @@ export const cases: CaseDefinition[] = [
         "none",
         errorInfo(() => callRaw(context, "createLinearGradient")),
       );
-      a.observe("nan", errorInfo(() => context.createLinearGradient(NaN, 0, 1, 1)));
+      a.observe(
+        "nan",
+        errorInfo(() => context.createLinearGradient(NaN, 0, 1, 1)),
+      );
       a.observe(
         "infinity",
         errorInfo(() => context.createLinearGradient(0, 0, Infinity, 1)),
@@ -68,11 +74,26 @@ export const cases: CaseDefinition[] = [
     requirements: ["gradient.addColorStop"],
     run(a) {
       const gradient = asNative(a.context).createLinearGradient(0, 0, 16, 0);
-      a.observe("ok", errorInfo(() => gradient.addColorStop(0.5, "#ff0000")));
-      a.observe("low", errorInfo(() => gradient.addColorStop(-0.1, "#fff")));
-      a.observe("high", errorInfo(() => gradient.addColorStop(1.1, "#fff")));
-      a.observe("nan", errorInfo(() => gradient.addColorStop(NaN, "#fff")));
-      a.observe("badColor", errorInfo(() => gradient.addColorStop(0.5, "junk")));
+      a.observe(
+        "ok",
+        errorInfo(() => gradient.addColorStop(0.5, "#ff0000")),
+      );
+      a.observe(
+        "low",
+        errorInfo(() => gradient.addColorStop(-0.1, "#fff")),
+      );
+      a.observe(
+        "high",
+        errorInfo(() => gradient.addColorStop(1.1, "#fff")),
+      );
+      a.observe(
+        "nan",
+        errorInfo(() => gradient.addColorStop(NaN, "#fff")),
+      );
+      a.observe(
+        "badColor",
+        errorInfo(() => gradient.addColorStop(0.5, "junk")),
+      );
       a.observe(
         "nullColor",
         errorInfo(() => callRaw(gradient, "addColorStop", 0.5, null)),
@@ -81,10 +102,13 @@ export const cases: CaseDefinition[] = [
         "stringOffset",
         errorInfo(() => callRaw(gradient, "addColorStop", "0.5", "#fff")),
       );
-      a.observe("edges", errorInfo(() => {
-        gradient.addColorStop(0, "#000");
-        gradient.addColorStop(1, "#fff");
-      }));
+      a.observe(
+        "edges",
+        errorInfo(() => {
+          gradient.addColorStop(0, "#000");
+          gradient.addColorStop(1, "#fff");
+        }),
+      );
     },
   },
   {
@@ -93,12 +117,18 @@ export const cases: CaseDefinition[] = [
     requirements: ["gradient.addColorStop"],
     run(a) {
       const gradient = asNative(a.context).createLinearGradient(0, 0, 16, 0);
-      a.observe("two", errorInfo(() => gradient.addColorStop(0.25, "#123456")));
+      a.observe(
+        "two",
+        errorInfo(() => gradient.addColorStop(0.25, "#123456")),
+      );
       a.observe(
         "one",
         errorInfo(() => callRaw(gradient, "addColorStop", 0.25)),
       );
-      a.observe("zero", errorInfo(() => callRaw(gradient, "addColorStop")));
+      a.observe(
+        "zero",
+        errorInfo(() => callRaw(gradient, "addColorStop")),
+      );
       a.observe(
         "extra",
         errorInfo(() =>

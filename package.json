@@ -18,6 +18,8 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "check": "tsc -p tsconfig.json",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
     "test": "pnpm run test:unit",
     "test:unit": "node scripts/unit.mjs",
     "test:browser": "node scripts/testing.mjs browser",
@@ -27,7 +29,7 @@
     "test:review-index": "node scripts/acceptance-review.mjs",
     "pretest:review-index": "pnpm run build",
     "pretest:matrix": "pnpm run build",
-    "verify": "pnpm run check && pnpm run test:unit",
+    "verify": "pnpm run check && pnpm run format:check && pnpm run test:unit",
     "pretest:unit": "pnpm run build",
     "pretest:browser": "pnpm run build",
     "pretest:report": "pnpm run build",
@@ -40,6 +42,7 @@
   },
   "packageManager": "pnpm@12.6.0",
   "devDependencies": {
+    "@biomejs/biome": "2.5.15",
     "playwright": "1.64.1",
     "pngjs": "7.0.0",
     "typescript": "7.0.2"

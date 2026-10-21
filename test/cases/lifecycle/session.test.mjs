@@ -150,7 +150,11 @@ test("a successful resize resets state, stack, path and caches even at the same 
 
   session.resize(8, 6);
 
-  assert.deepEqual(device.resizeCalls, [[8, 6]], "same size still reaches the device");
+  assert.deepEqual(
+    device.resizeCalls,
+    [[8, 6]],
+    "same size still reaches the device",
+  );
   assert.equal(state.get("alpha"), 1);
   assert.equal(state.get("clip"), null);
   assert.equal(path.snapshot().commands.length, 0);
@@ -267,7 +271,11 @@ test("dispose removes library listeners and drains exactly once", () => {
 test("DOM loss/restore events are cancelled for restoration and reach the callbacks", () => {
   const { device, target, events } = setup();
   const prevented = target.dispatch("webglcontextlost");
-  assert.equal(prevented, true, "the library handles the loss so it can restore");
+  assert.equal(
+    prevented,
+    true,
+    "the library handles the loss so it can restore",
+  );
   assert.equal(device.loseCalls, 1);
   assert.deepEqual(events, ["lost"]);
 
@@ -307,10 +315,9 @@ test("lifecycle registration is validated and disposed in reverse order", () => 
   registry.register(second);
 
   assert.throws(() => registry.register(first), { code: "contract-violation" });
-  assert.throws(
-    () => registry.register({ unknown: () => undefined }),
-    { code: "contract-violation" },
-  );
+  assert.throws(() => registry.register({ unknown: () => undefined }), {
+    code: "contract-violation",
+  });
   registry.disposed();
   assert.deepEqual(order, ["second", "first"]);
   registry.disposed();

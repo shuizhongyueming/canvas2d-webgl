@@ -127,10 +127,9 @@ export function createFacade<T extends TargetCanvas>(
       // and methods reject any other receiver, and identity stays stable.
       const cached = boundMethods.get(property);
       if (cached && cached.raw === value) return cached.bound;
-      const bound = Function.prototype.bind.call(
-        value,
-        targetCanvas,
-      ) as (...args: unknown[]) => unknown;
+      const bound = Function.prototype.bind.call(value, targetCanvas) as (
+        ...args: unknown[]
+      ) => unknown;
       boundMethods.set(property, {
         raw: value as (...args: never[]) => unknown,
         bound,

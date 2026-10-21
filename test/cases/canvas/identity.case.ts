@@ -29,7 +29,10 @@ export const cases: CaseDefinition[] = [
       a.assert(first === second, "repeated getContext('2d') keeps identity");
       a.assert(first === a.context, "adapter context matches a fresh request");
       const canvasOf = (first as { canvas?: unknown }).canvas;
-      a.assert(canvasOf === a.canvas, "context.canvas points back to the canvas");
+      a.assert(
+        canvasOf === a.canvas,
+        "context.canvas points back to the canvas",
+      );
       a.observe("stable", first === second && first === a.context);
       a.observe("canvasBackReference", canvasOf === a.canvas);
     },
@@ -56,9 +59,15 @@ export const cases: CaseDefinition[] = [
     requirements: ["canvas.getContext"],
     run(a) {
       const getContext = getContextOf(a.canvas);
-      a.assert(typeof a.canvas.getContext === "function", "getContext is a function");
+      a.assert(
+        typeof a.canvas.getContext === "function",
+        "getContext is a function",
+      );
       const first = getContext("2d");
-      a.assert(!!first && typeof first === "object", "2d returns the context object");
+      a.assert(
+        !!first && typeof first === "object",
+        "2d returns the context object",
+      );
       a.assert(getContext("2d") === first, "identity is stable across calls");
       a.observe("identity", getContext("2d") === first);
       a.observe("returnsContext", !!first);
@@ -72,7 +81,10 @@ export const cases: CaseDefinition[] = [
       const getContext = getContextOf(a.canvas);
       const single = getContext("2d");
       a.assert(!!single, "exactly one argument returns the context");
-      a.assert(single === a.context, "the single-argument form is the adapter context");
+      a.assert(
+        single === a.context,
+        "the single-argument form is the adapter context",
+      );
       a.observe("arity1", !!single);
     },
   },
@@ -83,7 +95,10 @@ export const cases: CaseDefinition[] = [
     run(a) {
       const getContext = getContextOf(a.canvas);
       const context = getContext("2d");
-      a.assert(!!context && context === a.context, "'2d' is the supported type");
+      a.assert(
+        !!context && context === a.context,
+        "'2d' is the supported type",
+      );
       a.observe("value", "2d");
     },
   },
@@ -115,7 +130,10 @@ export const cases: CaseDefinition[] = [
       const canvas = a.canvas as unknown as {
         getContext(...args: unknown[]): unknown;
       };
-      a.observe("zeroArguments", outcome(() => canvas.getContext()));
+      a.observe(
+        "zeroArguments",
+        outcome(() => canvas.getContext()),
+      );
       const twoArguments = outcome(() => canvas.getContext("2d", {}));
       const expected = isCompat(a) ? "unsupported-api" : "ok";
       a.assert(

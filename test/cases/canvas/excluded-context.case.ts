@@ -60,7 +60,9 @@ function callMember(
  * fact, and it can never stand in for the compat exclusion.
  */
 function accepts(a: CaseAdapter, result: Attempt): boolean {
-  return !isCompat(a) && (result.outcome === "ok" || result.outcome === "absent");
+  return (
+    !isCompat(a) && (result.outcome === "ok" || result.outcome === "absent")
+  );
 }
 
 /** The compat side must report the approved exclusion and name the member. */
@@ -163,7 +165,8 @@ export const cases: CaseDefinition[] = [
         const write = attempt(() => {
           target[member.name] = member.value;
         });
-        const ok = approved(a, member.name, read) && approved(a, member.name, write);
+        const ok =
+          approved(a, member.name, read) && approved(a, member.name, write);
         a.assert(ok, "member follows the approved exclusion");
         a.observe(
           "access",

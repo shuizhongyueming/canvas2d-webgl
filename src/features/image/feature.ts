@@ -144,7 +144,10 @@ export const imageFeature: FeatureFactory = (
         message: "drawImage: canvas is its own source",
       };
     if (isCompatCanvas(value))
-      return { outcome: "rejected", message: "drawImage: compat canvas source" };
+      return {
+        outcome: "rejected",
+        message: "drawImage: compat canvas source",
+      };
     if (isImageElement(value)) return { outcome: "image", image: value };
     if (isCanvasElement(value)) return { outcome: "canvas", canvas: value };
     if (isOtherNativeSource(value))

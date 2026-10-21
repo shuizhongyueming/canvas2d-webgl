@@ -144,7 +144,9 @@ function capturePatternBitmap(
 
 function globalInstanceof(value: object, name: string): boolean {
   const ctor = (globalThis as Record<string, unknown>)[name];
-  return typeof ctor === "function" && value instanceof (ctor as new () => object);
+  return (
+    typeof ctor === "function" && value instanceof (ctor as new () => object)
+  );
 }
 
 /**

@@ -48,7 +48,9 @@ interface NormalizedOptions {
 }
 
 /** undefined/null mean "no options", like a WebIDL dictionary argument. */
-function normalizeOptions(options: CompatOptions | undefined): NormalizedOptions {
+function normalizeOptions(
+  options: CompatOptions | undefined,
+): NormalizedOptions {
   if (options === undefined || options === null)
     return {
       createOffscreenCanvas: undefined,
@@ -60,7 +62,10 @@ function normalizeOptions(options: CompatOptions | undefined): NormalizedOptions
   const { createOffscreenCanvas, onContextLost, onContextRestored } = options;
   if (onContextLost !== undefined && typeof onContextLost !== "function")
     throw new TypeError("createCompatCanvas: onContextLost must be a function");
-  if (onContextRestored !== undefined && typeof onContextRestored !== "function")
+  if (
+    onContextRestored !== undefined &&
+    typeof onContextRestored !== "function"
+  )
     throw new TypeError(
       "createCompatCanvas: onContextRestored must be a function",
     );

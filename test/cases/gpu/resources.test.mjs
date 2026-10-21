@@ -26,7 +26,10 @@ test("resource owner drains everything and rethrows the first failure", () => {
     order.push("c");
     throw first;
   });
-  assert.throws(() => owner.releaseAll(), (error) => error === first);
+  assert.throws(
+    () => owner.releaseAll(),
+    (error) => error === first,
+  );
   assert.deepEqual(order, ["c", "b", "a"]);
 });
 

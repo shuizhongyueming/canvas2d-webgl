@@ -49,7 +49,10 @@ export const cases: CaseDefinition[] = [
       c.save();
       c.globalAlpha = 0.1;
       c.restore();
-      a.assert(c.globalAlpha === 0.5, "globalAlpha participates in the state stack");
+      a.assert(
+        c.globalAlpha === 0.5,
+        "globalAlpha participates in the state stack",
+      );
       a.observe("afterRestore", c.globalAlpha);
     },
   },
@@ -64,7 +67,10 @@ export const cases: CaseDefinition[] = [
         c.globalAlpha = value;
         seen.push(c.globalAlpha);
       }
-      a.assert(seen.join() === "0,0.25,0.5,0.75,1", "in-range finite numbers are accepted");
+      a.assert(
+        seen.join() === "0,0.25,0.5,0.75,1",
+        "in-range finite numbers are accepted",
+      );
       a.observe("accepted", seen);
     },
   },
@@ -77,7 +83,17 @@ export const cases: CaseDefinition[] = [
       const loose = c as unknown as { globalAlpha: unknown };
       c.globalAlpha = 0.5;
       const held: number[] = [];
-      for (const value of [-0.1, 1.1, NaN, Infinity, -Infinity, "abc", undefined, {}, true]) {
+      for (const value of [
+        -0.1,
+        1.1,
+        NaN,
+        Infinity,
+        -Infinity,
+        "abc",
+        undefined,
+        {},
+        true,
+      ]) {
         loose.globalAlpha = value;
         held.push(c.globalAlpha);
       }
@@ -121,7 +137,10 @@ export const cases: CaseDefinition[] = [
         c.lineWidth = value;
         seen.push(c.lineWidth);
       }
-      a.assert(seen.every((v, i) => v === [0.5, 2, 100, Number.EPSILON][i]), "positive finite numbers are accepted");
+      a.assert(
+        seen.every((v, i) => v === [0.5, 2, 100, Number.EPSILON][i]),
+        "positive finite numbers are accepted",
+      );
       a.observe("accepted", seen);
     },
   },
@@ -134,13 +153,26 @@ export const cases: CaseDefinition[] = [
       const loose = c as unknown as { lineWidth: unknown };
       c.lineWidth = 3;
       const held: number[] = [];
-      for (const value of [0, -2, NaN, Infinity, -Infinity, "abc", undefined, {}, null]) {
+      for (const value of [
+        0,
+        -2,
+        NaN,
+        Infinity,
+        -Infinity,
+        "abc",
+        undefined,
+        {},
+        null,
+      ]) {
         loose.lineWidth = value;
         held.push(c.lineWidth);
       }
       loose.lineWidth = "2";
       const coerced = c.lineWidth;
-      a.assert(held.every((v) => v === 3), "non-positive, non-finite and non-numeric values are ignored");
+      a.assert(
+        held.every((v) => v === 3),
+        "non-positive, non-finite and non-numeric values are ignored",
+      );
       a.observe("held", held);
       a.observe("coerced", coerced);
     },
@@ -196,7 +228,10 @@ export const cases: CaseDefinition[] = [
       a.assert(c.lineJoin === "round", "lineJoin assignment round-trips");
       c.save();
       c.restore();
-      a.assert(c.lineJoin === "round", "lineJoin participates in the state stack");
+      a.assert(
+        c.lineJoin === "round",
+        "lineJoin participates in the state stack",
+      );
       a.observe("afterRestore", c.lineJoin);
     },
   },
@@ -242,10 +277,18 @@ export const cases: CaseDefinition[] = [
       const expectedApplied = isCompat(a) ? "miter" : "bevel";
       a.assert(miter === expected, "lineJoin=miter follows approved semantics");
       a.assert(bevel === expected, "lineJoin=bevel follows approved semantics");
-      a.assert(a.context.lineJoin === expectedApplied, "final lineJoin matches approved semantics");
+      a.assert(
+        a.context.lineJoin === expectedApplied,
+        "final lineJoin matches approved semantics",
+      );
       a.observe("miter", miter === expected ? "as-approved" : miter);
       a.observe("bevel", bevel === expected ? "as-approved" : bevel);
-      a.observe("applied", a.context.lineJoin === expectedApplied ? "as-approved" : a.context.lineJoin);
+      a.observe(
+        "applied",
+        a.context.lineJoin === expectedApplied
+          ? "as-approved"
+          : a.context.lineJoin,
+      );
     },
   },
   {
@@ -261,7 +304,10 @@ export const cases: CaseDefinition[] = [
         loose.lineCap = junk;
         loose.lineJoin = junk;
       }
-      a.assert(c.lineCap === "round" && c.lineJoin === "round", "illegal values are ignored");
+      a.assert(
+        c.lineCap === "round" && c.lineJoin === "round",
+        "illegal values are ignored",
+      );
       a.observe("afterJunk", [c.lineCap, c.lineJoin]);
       a.observe(
         "symbolCap",

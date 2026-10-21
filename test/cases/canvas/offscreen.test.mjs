@@ -53,7 +53,11 @@ const rejects = (name, factory, code) =>
 
 rejects("a null return", () => null, "invalid-factory");
 rejects("a plain object", () => ({}), "invalid-factory");
-rejects("a canvas without getContext", () => ({ width: 4, height: 3 }), "invalid-factory");
+rejects(
+  "a canvas without getContext",
+  () => ({ width: 4, height: 3 }),
+  "invalid-factory",
+);
 
 test("validateOffscreenFactory rejects the target canvas itself", () => {
   const target = fakeTarget();
@@ -93,23 +97,17 @@ test("validateOffscreenFactory rejects immutable dimensions", () => {
 test("validateOffscreenFactory rejects a throwing factory", () => {
   assert.throws(
     () =>
-      validateOffscreenFactory(
-        () => {
-          throw new Error("boom");
-        },
-        fakeTarget(),
-      ),
-    (error) => error.code === "invalid-factory" && error.message.includes("boom"),
+      validateOffscreenFactory(() => {
+        throw new Error("boom");
+      }, fakeTarget()),
+    (error) =>
+      error.code === "invalid-factory" && error.message.includes("boom"),
   );
 });
 
 test("validateOffscreenFactory reports a missing 2D capability", () => {
   assert.throws(
-    () =>
-      validateOffscreenFactory(
-        () => fakeCanvas(4, 3, null),
-        fakeTarget(),
-      ),
+    () => validateOffscreenFactory(() => fakeCanvas(4, 3, null), fakeTarget()),
     (error) => error.code === "capability-unavailable",
   );
 });

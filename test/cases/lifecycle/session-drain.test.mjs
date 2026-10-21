@@ -76,15 +76,27 @@ function fakeParts() {
 
 test("session resize routes to the device, then resets state, path and cache", () => {
   const parts = fakeParts();
-  const session = createSession({ ...parts, onContextLost: undefined, onContextRestored: undefined });
+  const session = createSession({
+    ...parts,
+    onContextLost: undefined,
+    onContextRestored: undefined,
+  });
   session.resize(10, 4);
   assert.deepEqual(parts.device.calls, [["resize", 10, 4]]);
-  assert.deepEqual(parts.order, ["state.reset", "path.reset", "raster.clearCache"]);
+  assert.deepEqual(parts.order, [
+    "state.reset",
+    "path.reset",
+    "raster.clearCache",
+  ]);
 });
 
 test("session resize is silently ineffective while the device is lost", () => {
   const parts = fakeParts();
-  const session = createSession({ ...parts, onContextLost: undefined, onContextRestored: undefined });
+  const session = createSession({
+    ...parts,
+    onContextLost: undefined,
+    onContextRestored: undefined,
+  });
   parts.device.lose();
   parts.device.calls.length = 0;
   session.resize(10, 4);
@@ -94,24 +106,40 @@ test("session resize is silently ineffective while the device is lost", () => {
 
 test("session resize propagates device failure without resetting state", () => {
   const parts = fakeParts();
-  const failure = Object.assign(new Error("size refused"), { code: "size-unsupported" });
+  const failure = Object.assign(new Error("size refused"), {
+    code: "size-unsupported",
+  });
   parts.device.resize = () => {
     throw failure;
   };
-  const session = createSession({ ...parts, onContextLost: undefined, onContextRestored: undefined });
-  assert.throws(() => session.resize(0, 0), (error) => error === failure);
+  const session = createSession({
+    ...parts,
+    onContextLost: undefined,
+    onContextRestored: undefined,
+  });
+  assert.throws(
+    () => session.resize(0, 0),
+    (error) => error === failure,
+  );
   assert.deepEqual(parts.order, []);
 });
 
 test("session dispose is idempotent and releases device and rasterizer", () => {
   const parts = fakeParts();
-  const session = createSession({ ...parts, onContextLost: undefined, onContextRestored: undefined });
+  const session = createSession({
+    ...parts,
+    onContextLost: undefined,
+    onContextRestored: undefined,
+  });
   session.dispose();
   session.dispose();
   assert.equal(session.disposed, true);
   assert.deepEqual(parts.device.calls, [["dispose"]]);
   assert.deepEqual(parts.order, ["raster.dispose"]);
-  assert.throws(() => session.resize(2, 2), (error) => error.code === "disposed");
+  assert.throws(
+    () => session.resize(2, 2),
+    (error) => error.code === "disposed",
+  );
   session.notifyLost();
   session.notifyRestored();
   assert.deepEqual(parts.device.calls, [["dispose"]]);

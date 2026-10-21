@@ -34,8 +34,7 @@ function textArguments(
       `Failed to execute '${name}' on 'CanvasRenderingContext2D': 3 arguments required, but only ${args.length} present.`,
     );
   // An explicitly passed undefined is a missing optional argument in WebIDL.
-  if (args.length > 3 && args[3] !== undefined)
-    unsupported(`${name} maxWidth`);
+  if (args.length > 3 && args[3] !== undefined) unsupported(`${name} maxWidth`);
   const value = text(args[0]);
   const x = coordinate(args[1]);
   const y = coordinate(args[2]);
@@ -81,9 +80,7 @@ function createMetrics(width: number): CompatTextMetrics {
   return Object.create(null, descriptors) as CompatTextMetrics;
 }
 
-export const textFeature: FeatureFactory = (
-  environment,
-): FeatureDefinition => {
+export const textFeature: FeatureFactory = (environment): FeatureDefinition => {
   const state = environment?.state;
   const gpu = environment?.gpu;
   const raster = environment?.raster;
@@ -114,9 +111,10 @@ export const textFeature: FeatureFactory = (
         generation: gpu.generation,
         kind: "draw",
         state: snapshot,
-        source: source.bounds.width <= 0 || source.bounds.height <= 0
-          ? { kind: "empty" }
-          : source,
+        source:
+          source.bounds.width <= 0 || source.bounds.height <= 0
+            ? { kind: "empty" }
+            : source,
         sourceBounds: source.bounds,
         clip: snapshot.clip,
       });

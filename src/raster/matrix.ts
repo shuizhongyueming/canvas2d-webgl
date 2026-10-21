@@ -26,8 +26,14 @@ export function alignOutset(
 ): Bounds | null {
   const x0 = Math.max(Math.floor(bounds.x - margin), scene.x);
   const y0 = Math.max(Math.floor(bounds.y - margin), scene.y);
-  const x1 = Math.min(Math.ceil(bounds.x + bounds.width + margin), scene.x + scene.width);
-  const y1 = Math.min(Math.ceil(bounds.y + bounds.height + margin), scene.y + scene.height);
+  const x1 = Math.min(
+    Math.ceil(bounds.x + bounds.width + margin),
+    scene.x + scene.width,
+  );
+  const y1 = Math.min(
+    Math.ceil(bounds.y + bounds.height + margin),
+    scene.y + scene.height,
+  );
   if (!(x1 > x0 && y1 > y0)) return null;
   return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
 }

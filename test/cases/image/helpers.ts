@@ -4,8 +4,10 @@ import { loadImage } from "../paint/fixtures.js";
 export function drawImage(
   context: CaseAdapter["context"],
   source: HTMLImageElement | HTMLCanvasElement | OffscreenCanvas,
-  ...coordinates: [number, number] | [number, number, number, number] |
-    [number, number, number, number, number, number, number, number]
+  ...coordinates:
+    | [number, number]
+    | [number, number, number, number]
+    | [number, number, number, number, number, number, number, number]
 ): void {
   return Reflect.apply(context.drawImage, context, [source, ...coordinates]);
 }
@@ -31,7 +33,9 @@ export function makeSourceCanvas(
 }
 
 /** Snapshot a canvas source into an HTMLImageElement through a PNG data URL. */
-export function canvasToImage(canvas: HTMLCanvasElement): Promise<HTMLImageElement> {
+export function canvasToImage(
+  canvas: HTMLCanvasElement,
+): Promise<HTMLImageElement> {
   return loadImage(canvas.toDataURL("image/png"));
 }
 

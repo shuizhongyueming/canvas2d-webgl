@@ -88,7 +88,10 @@ async function run(a: CaseAdapter): Promise<void> {
 
   const source = lab.rasterizer.path(recorder.snapshot(), makeState(), "fill");
   compareAsset(a, reference, source, "mixed-fill");
-  a.assert(source.pixelWidth === source.bounds.width, "fill asset is 1:1 with device bounds");
+  a.assert(
+    source.pixelWidth === source.bounds.width,
+    "fill asset is 1:1 with device bounds",
+  );
   source.release();
 
   // Degenerate inputs: an empty path and a point-only path rasterize to
@@ -99,7 +102,10 @@ async function run(a: CaseAdapter): Promise<void> {
   emptyReference.fill();
   recorder.begin();
   const empty = lab.rasterizer.path(recorder.snapshot(), makeState(), "fill");
-  a.assert(empty.bounds.width === 0 && empty.bounds.height === 0, "empty path gives a degenerate asset");
+  a.assert(
+    empty.bounds.width === 0 && empty.bounds.height === 0,
+    "empty path gives a degenerate asset",
+  );
   compareAsset(a, emptyReference, empty, "empty-fill");
   empty.release();
 
@@ -143,8 +149,22 @@ async function run(a: CaseAdapter): Promise<void> {
   ellipseReference.ellipse(100, 100, 40, 10, Math.PI / 4, 0, Math.PI * 2);
   ellipseReference.fill();
   recorder.begin();
-  recorder.ellipse(100, 100, 40, 10, Math.PI / 4, 0, Math.PI * 2, false, IDENTITY);
-  const ellipseSource = lab.rasterizer.path(recorder.snapshot(), makeState(), "fill");
+  recorder.ellipse(
+    100,
+    100,
+    40,
+    10,
+    Math.PI / 4,
+    0,
+    Math.PI * 2,
+    false,
+    IDENTITY,
+  );
+  const ellipseSource = lab.rasterizer.path(
+    recorder.snapshot(),
+    makeState(),
+    "fill",
+  );
   compareAsset(a, ellipseReference, ellipseSource, "rotated-ellipse-fill");
   ellipseSource.release();
 
@@ -164,7 +184,11 @@ async function run(a: CaseAdapter): Promise<void> {
   recorder.rect(10, 10, 30, 15, rotated);
   recorder.moveTo(45, 40, rotated);
   recorder.arc(35, 40, 10, 0, Math.PI * 1.5, false, rotated);
-  const rotatedSource = lab.rasterizer.path(recorder.snapshot(), makeState(), "fill");
+  const rotatedSource = lab.rasterizer.path(
+    recorder.snapshot(),
+    makeState(),
+    "fill",
+  );
   compareAsset(a, rotatedReference, rotatedSource, "rotated-construction-fill");
   rotatedSource.release();
 

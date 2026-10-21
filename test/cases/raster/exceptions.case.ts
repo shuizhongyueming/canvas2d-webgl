@@ -18,7 +18,10 @@ function capture(fn: () => void): CapturedError | null {
   } catch (error) {
     if (error instanceof DOMException)
       return { name: error.name, code: error.code };
-    return { name: error instanceof Error ? error.name : "unknown", code: undefined };
+    return {
+      name: error instanceof Error ? error.name : "unknown",
+      code: undefined,
+    };
   }
 }
 
@@ -31,8 +34,16 @@ function run(a: CaseAdapter): void {
   const recorder = new PathRecorder();
 
   const attempts: readonly [string, () => void, () => void][] = [
-    ["arc", () => ctx.arc(5, 5, -1, 0, 6.3), () => recorder.arc(5, 5, -1, 0, 6.3, false, IDENTITY)],
-    ["arcTo", () => ctx.arcTo(1, 1, 2, 2, -3), () => recorder.arcTo(1, 1, 2, 2, -3, IDENTITY)],
+    [
+      "arc",
+      () => ctx.arc(5, 5, -1, 0, 6.3),
+      () => recorder.arc(5, 5, -1, 0, 6.3, false, IDENTITY),
+    ],
+    [
+      "arcTo",
+      () => ctx.arcTo(1, 1, 2, 2, -3),
+      () => recorder.arcTo(1, 1, 2, 2, -3, IDENTITY),
+    ],
     [
       "ellipse-major",
       () => ctx.ellipse(5, 5, -1, 2, 0, 0, 6.3),
@@ -47,7 +58,10 @@ function run(a: CaseAdapter): void {
   for (const [label, nativeCall, recorderCall] of attempts) {
     const expected = capture(nativeCall);
     const actual = capture(recorderCall);
-    a.observe(`${label}:native`, expected ? `${expected.name}:${expected.code}` : "none");
+    a.observe(
+      `${label}:native`,
+      expected ? `${expected.name}:${expected.code}` : "none",
+    );
     a.assert(expected !== null, `${label}: native rejects a negative radius`);
     a.assert(actual !== null, `${label}: recorder rejects a negative radius`);
     a.assert(
@@ -55,22 +69,59 @@ function run(a: CaseAdapter): void {
       `${label}: recorder exception matches native name and code`,
     );
   }
-  a.assert(recorder.snapshot().commands.length === 0, "rejected calls record nothing");
+  a.assert(
+    recorder.snapshot().commands.length === 0,
+    "rejected calls record nothing",
+  );
 
   const ignores: readonly [string, () => void, () => void][] = [
-    ["arc-non-finite", () => ctx.arc(NaN, 5, -1, 0, 6.3), () => recorder.arc(NaN, 5, -1, 0, 6.3, false, IDENTITY)],
-    ["arcTo-non-finite", () => ctx.arcTo(1, Infinity, 2, 2, -3), () => recorder.arcTo(1, Infinity, 2, 2, -3, IDENTITY)],
-    ["ellipse-non-finite", () => ctx.ellipse(5, 5, Infinity, -2, 0, 0, 6.3), () => recorder.ellipse(5, 5, Infinity, -2, 0, 0, 6.3, false, IDENTITY)],
-    ["moveTo-non-finite", () => ctx.moveTo(Infinity, 0), () => recorder.moveTo(Infinity, 0, IDENTITY)],
-    ["lineTo-non-finite", () => ctx.lineTo(0, NaN), () => recorder.lineTo(0, NaN, IDENTITY)],
-    ["rect-non-finite", () => ctx.rect(0, 0, NaN, 1), () => recorder.rect(0, 0, NaN, 1, IDENTITY)],
-    ["quadratic-non-finite", () => ctx.quadraticCurveTo(1, 2, 3, Infinity), () => recorder.quadraticCurveTo(1, 2, 3, Infinity, IDENTITY)],
+    [
+      "arc-non-finite",
+      () => ctx.arc(NaN, 5, -1, 0, 6.3),
+      () => recorder.arc(NaN, 5, -1, 0, 6.3, false, IDENTITY),
+    ],
+    [
+      "arcTo-non-finite",
+      () => ctx.arcTo(1, Infinity, 2, 2, -3),
+      () => recorder.arcTo(1, Infinity, 2, 2, -3, IDENTITY),
+    ],
+    [
+      "ellipse-non-finite",
+      () => ctx.ellipse(5, 5, Infinity, -2, 0, 0, 6.3),
+      () => recorder.ellipse(5, 5, Infinity, -2, 0, 0, 6.3, false, IDENTITY),
+    ],
+    [
+      "moveTo-non-finite",
+      () => ctx.moveTo(Infinity, 0),
+      () => recorder.moveTo(Infinity, 0, IDENTITY),
+    ],
+    [
+      "lineTo-non-finite",
+      () => ctx.lineTo(0, NaN),
+      () => recorder.lineTo(0, NaN, IDENTITY),
+    ],
+    [
+      "rect-non-finite",
+      () => ctx.rect(0, 0, NaN, 1),
+      () => recorder.rect(0, 0, NaN, 1, IDENTITY),
+    ],
+    [
+      "quadratic-non-finite",
+      () => ctx.quadraticCurveTo(1, 2, 3, Infinity),
+      () => recorder.quadraticCurveTo(1, 2, 3, Infinity, IDENTITY),
+    ],
   ];
   for (const [label, nativeCall, recorderCall] of ignores) {
     const expected = capture(nativeCall);
     const actual = capture(recorderCall);
-    a.assert(expected === null, `${label}: native silently ignores non-finite input`);
-    a.assert(actual === null, `${label}: recorder silently ignores non-finite input`);
+    a.assert(
+      expected === null,
+      `${label}: native silently ignores non-finite input`,
+    );
+    a.assert(
+      actual === null,
+      `${label}: recorder silently ignores non-finite input`,
+    );
   }
   a.assert(
     recorder.snapshot().commands.length === 0,
@@ -89,7 +140,10 @@ function run(a: CaseAdapter): void {
   a.assert(alpha > 0, "native path survives save/restore");
   const before = recorder.snapshot();
   recorder.moveTo(4, 4, IDENTITY);
-  a.assert(before.commands.length === 0, "recorder snapshots are independent of later calls");
+  a.assert(
+    before.commands.length === 0,
+    "recorder snapshots are independent of later calls",
+  );
 }
 
 export const cases: CaseDefinition[] = [

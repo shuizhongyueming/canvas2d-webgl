@@ -34,7 +34,10 @@ export const cases: CaseDefinition[] = [
         after.count(([, , , alpha]) => alpha !== 0) > 0,
         "real text lands after the empty draws",
       );
-      a.observe("emptyInkCount", scene.count(([, , , alpha]) => alpha !== 0));
+      a.observe(
+        "emptyInkCount",
+        scene.count(([, , , alpha]) => alpha !== 0),
+      );
     },
   },
   {

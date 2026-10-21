@@ -11,7 +11,10 @@ export function nativeException(
   if (typeof ctor === "function") {
     try {
       return new (
-        ctor as new (message: string, name: string) => Error & { code: number }
+        ctor as new (
+          message: string,
+          name: string,
+        ) => Error & { code: number }
       )(message, name);
     } catch {
       /* fall through to the synthetic error */

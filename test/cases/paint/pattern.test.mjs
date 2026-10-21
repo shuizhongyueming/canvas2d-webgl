@@ -77,7 +77,10 @@ test("repeat pattern creation captures and freezes the creation-time bitmap", ()
   const pixels = patternBitmapPixels(bitmap);
   assert.ok(pixels instanceof Uint8ClampedArray);
   assert.equal(pixels.length, 3 * 5 * 4);
-  assert.ok(pixels.every((value) => value === 9), "captured payload");
+  assert.ok(
+    pixels.every((value) => value === 9),
+    "captured payload",
+  );
   assert.ok(Object.isFrozen(bitmap));
   assert.equal(pattern.version, 0, "patterns never mutate after creation");
 
@@ -114,10 +117,7 @@ test("a missing factory fails capability-unavailable only at the capture point",
   // Native validation still runs first: bad input and unusable images never
   // reach the capture, so they keep their native outcomes without a factory.
   assert.throws(() => create({}, "repeat"), TypeError);
-  assert.equal(
-    capture(() => create(image(), "bogus")).name,
-    "SyntaxError",
-  );
+  assert.equal(capture(() => create(image(), "bogus")).name, "SyntaxError");
   assert.equal(
     capture(() => create(image(), "repeat-x")).code,
     "unsupported-api",
@@ -217,7 +217,10 @@ test("ImageData is not a legal pattern source", () => {
 });
 
 test("unusable images return null, broken images throw InvalidStateError", () => {
-  assert.equal(create(image({ complete: false, naturalWidth: 0 }), "repeat"), null);
+  assert.equal(
+    create(image({ complete: false, naturalWidth: 0 }), "repeat"),
+    null,
+  );
   assert.equal(
     create(image({ naturalWidth: 0, naturalHeight: 0 }), "repeat"),
     null,

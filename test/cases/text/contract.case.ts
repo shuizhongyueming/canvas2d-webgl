@@ -43,7 +43,10 @@ export const cases: CaseDefinition[] = [
     requirements: ["context.fillText"],
     run(a) {
       const context = a.context;
-      a.observe("zero", textMessage(() => callText(context, "fillText")));
+      a.observe(
+        "zero",
+        textMessage(() => callText(context, "fillText")),
+      );
       a.observe(
         "two",
         textMessage(() => callText(context, "fillText", "x", 1)),
@@ -115,7 +118,10 @@ export const cases: CaseDefinition[] = [
     requirements: ["context.strokeText"],
     run(a) {
       const context = a.context;
-      a.observe("zero", textMessage(() => callText(context, "strokeText")));
+      a.observe(
+        "zero",
+        textMessage(() => callText(context, "strokeText")),
+      );
       a.observe(
         "two",
         textMessage(() => callText(context, "strokeText", "x", 1)),
@@ -180,7 +186,10 @@ export const cases: CaseDefinition[] = [
     requirements: ["context.measureText"],
     run(a) {
       const context = a.context;
-      a.observe("zero", textMessage(() => callText(context, "measureText")));
+      a.observe(
+        "zero",
+        textMessage(() => callText(context, "measureText")),
+      );
       a.observe(
         "one",
         textOutcome(() => callText(context, "measureText", "x")),

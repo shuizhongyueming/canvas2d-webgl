@@ -51,7 +51,10 @@ export const cases: CaseDefinition[] = [
       // Compat stores the native normalized serialization, so both sides
       // round-trip byte-identically, including dropped "normal" qualifiers.
       a.observe("accepted", seen);
-      a.assert(seen.every((font) => font.length > 0), "valid fonts accepted");
+      a.assert(
+        seen.every((font) => font.length > 0),
+        "valid fonts accepted",
+      );
     },
   },
   {
@@ -94,7 +97,10 @@ export const cases: CaseDefinition[] = [
       c.textAlign = "right";
       c.restore();
       const restored: string = (() => c.textAlign)();
-      a.assert(restored === "center", "textAlign participates in the state stack");
+      a.assert(
+        restored === "center",
+        "textAlign participates in the state stack",
+      );
       a.observe("afterRestore", restored);
     },
   },
@@ -124,7 +130,10 @@ export const cases: CaseDefinition[] = [
           loose.textAlign = value;
         });
         const expected = isCompat(a) ? "unsupported-api" : "ok";
-        a.assert(result === expected, `textAlign=${value} follows approved semantics`);
+        a.assert(
+          result === expected,
+          `textAlign=${value} follows approved semantics`,
+        );
         results.push(result === expected ? "as-approved" : result);
       }
       a.observe("codes", results);
@@ -149,9 +158,15 @@ export const cases: CaseDefinition[] = [
     requirements: ["context.textBaseline"],
     run(a) {
       const c = a.context;
-      a.assert(c.textBaseline === "alphabetic", "default textBaseline is alphabetic");
+      a.assert(
+        c.textBaseline === "alphabetic",
+        "default textBaseline is alphabetic",
+      );
       c.textBaseline = "middle";
-      a.assert(c.textBaseline === "middle", "textBaseline assignment round-trips");
+      a.assert(
+        c.textBaseline === "middle",
+        "textBaseline assignment round-trips",
+      );
       c.save();
       c.textBaseline = "bottom";
       c.restore();
@@ -198,7 +213,8 @@ export const cases: CaseDefinition[] = [
       a.observe("codes", results);
       c.textBaseline = "bottom";
       const held: string[] = [];
-      for (const junk of ["JUNK", 42, null, {}, ["x"]]) loose.textBaseline = junk;
+      for (const junk of ["JUNK", 42, null, {}, ["x"]])
+        loose.textBaseline = junk;
       held.push(c.textBaseline);
       a.observe("held", held);
       a.observe(

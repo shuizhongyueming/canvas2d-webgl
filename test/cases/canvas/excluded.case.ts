@@ -19,7 +19,10 @@ export const cases: CaseDefinition[] = [
       a.assert(typeof canvas.toDataURL === "function", "member is present");
       const result = outcome(() => canvas.toDataURL());
       const expected = isCompat(a) ? "unsupported-api" : "ok";
-      a.assert(result === expected, "toDataURL follows approved exclusion semantics");
+      a.assert(
+        result === expected,
+        "toDataURL follows approved exclusion semantics",
+      );
       a.observe("call", result === expected ? "as-approved" : result);
     },
   },
@@ -34,7 +37,10 @@ export const cases: CaseDefinition[] = [
       a.assert(typeof canvas.toBlob === "function", "member is present");
       const result = outcome(() => canvas.toBlob(() => undefined));
       const expected = isCompat(a) ? "unsupported-api" : "ok";
-      a.assert(result === expected, "toBlob follows approved exclusion semantics");
+      a.assert(
+        result === expected,
+        "toBlob follows approved exclusion semantics",
+      );
       a.observe("call", result === expected ? "as-approved" : result);
     },
   },

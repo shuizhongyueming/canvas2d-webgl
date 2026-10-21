@@ -76,10 +76,31 @@ export const cases: CaseDefinition[] = [
       const scene = await dumpScene(a);
       expectPixel(a, scene, 4, 4, RED, "outside clip keeps the background");
       expectPixel(a, scene, 8, 8, BLUE, "clip covers its top-left edge pixel");
-      expectPixel(a, scene, 16, 16, WHITE, "drawing inside the clip composites");
-      expectPixel(a, scene, 23, 23, BLUE, "clip covers its bottom-right edge pixel");
+      expectPixel(
+        a,
+        scene,
+        16,
+        16,
+        WHITE,
+        "drawing inside the clip composites",
+      );
+      expectPixel(
+        a,
+        scene,
+        23,
+        23,
+        BLUE,
+        "clip covers its bottom-right edge pixel",
+      );
       expectPixel(a, scene, 28, 28, RED, "outside clip stays unclipped");
-      expectPixel(a, scene, 31, 31, RED, "canvas corner stays outside the clip");
+      expectPixel(
+        a,
+        scene,
+        31,
+        31,
+        RED,
+        "canvas corner stays outside the clip",
+      );
     },
   },
   {
@@ -109,7 +130,14 @@ export const cases: CaseDefinition[] = [
       expectPixel(a, scene, 10, 10, WHITE, "evenodd hole survives both clips");
       expectPixel(a, scene, 23, 3, WHITE, "nested clip bounds the right edge");
       expectPixel(a, scene, 3, 23, WHITE, "nested clip bounds the bottom edge");
-      expectPixel(a, scene, 0, 0, WHITE, "outside the nested clip is untouched");
+      expectPixel(
+        a,
+        scene,
+        0,
+        0,
+        WHITE,
+        "outside the nested clip is untouched",
+      );
     },
   },
   {
@@ -155,10 +183,24 @@ export const cases: CaseDefinition[] = [
       context.clearRect(0, 0, 32, 32);
       context.restore();
       const scene = await dumpScene(a);
-      expectPixel(a, scene, 12, 12, TRANSPARENT, "clearRect is confined to the clip");
+      expectPixel(
+        a,
+        scene,
+        12,
+        12,
+        TRANSPARENT,
+        "clearRect is confined to the clip",
+      );
       expectPixel(a, scene, 8, 8, TRANSPARENT, "clip edge pixel is cleared");
       expectPixel(a, scene, 4, 4, RED, "clearRect does not escape the clip");
-      expectPixel(a, scene, 28, 28, RED, "clearRect does not clear unclipped areas");
+      expectPixel(
+        a,
+        scene,
+        28,
+        28,
+        RED,
+        "clearRect does not clear unclipped areas",
+      );
     },
   },
   {
@@ -180,7 +222,14 @@ export const cases: CaseDefinition[] = [
       context.fillStyle = "#0000ff";
       context.fillRect(0, 0, 32, 32);
       const nested = await dumpScene(a);
-      expectPixel(a, nested, 12, 12, BLUE, "inner clip composites its intersection");
+      expectPixel(
+        a,
+        nested,
+        12,
+        12,
+        BLUE,
+        "inner clip composites its intersection",
+      );
       expectPixel(a, nested, 4, 4, RED, "inner restore keeps the outer clip");
       context.restore();
       context.fillStyle = "#00ff00";
@@ -188,7 +237,14 @@ export const cases: CaseDefinition[] = [
       const outer = await dumpScene(a);
       expectPixel(a, outer, 4, 4, GREEN, "restore returns to the outer clip");
       expectPixel(a, outer, 12, 12, GREEN, "outer clip still bounds drawing");
-      expectPixel(a, outer, 20, 20, TRANSPARENT, "outer clip excludes later drawing");
+      expectPixel(
+        a,
+        outer,
+        20,
+        20,
+        TRANSPARENT,
+        "outer clip excludes later drawing",
+      );
       context.restore();
       context.fillStyle = "#000000";
       context.fillRect(0, 0, 32, 32);
@@ -219,10 +275,31 @@ export const cases: CaseDefinition[] = [
       context.fill();
       context.restore();
       const scene = await dumpScene(a);
-      expectPixel(a, scene, 4, 4, BLUE, "clip does not consume the current path");
+      expectPixel(
+        a,
+        scene,
+        4,
+        4,
+        BLUE,
+        "clip does not consume the current path",
+      );
       expectPixel(a, scene, 16, 16, GREEN, "clip survives path replacement");
-      expectPixel(a, scene, 27, 27, GREEN, "replacement fill is cut at the clip edge");
-      expectPixel(a, scene, 2, 2, TRANSPARENT, "paint outside the clip stays clipped");
+      expectPixel(
+        a,
+        scene,
+        27,
+        27,
+        GREEN,
+        "replacement fill is cut at the clip edge",
+      );
+      expectPixel(
+        a,
+        scene,
+        2,
+        2,
+        TRANSPARENT,
+        "paint outside the clip stays clipped",
+      );
     },
   },
   {
@@ -273,10 +350,38 @@ export const cases: CaseDefinition[] = [
       context.fillRect(0, 0, 32, 32);
       context.restore();
       const scene = await dumpScene(a);
-      expectPixel(a, scene, 8, 8, BLUE, "transformed clip starts at its device position");
-      expectPixel(a, scene, 23, 23, BLUE, "transformed clip covers its scaled extent");
-      expectPixel(a, scene, 7, 7, TRANSPARENT, "paint outside the transformed clip is cut");
-      expectPixel(a, scene, 24, 24, TRANSPARENT, "clip does not grow with later transforms");
+      expectPixel(
+        a,
+        scene,
+        8,
+        8,
+        BLUE,
+        "transformed clip starts at its device position",
+      );
+      expectPixel(
+        a,
+        scene,
+        23,
+        23,
+        BLUE,
+        "transformed clip covers its scaled extent",
+      );
+      expectPixel(
+        a,
+        scene,
+        7,
+        7,
+        TRANSPARENT,
+        "paint outside the transformed clip is cut",
+      );
+      expectPixel(
+        a,
+        scene,
+        24,
+        24,
+        TRANSPARENT,
+        "clip does not grow with later transforms",
+      );
     },
   },
   {
@@ -296,9 +401,30 @@ export const cases: CaseDefinition[] = [
       for (let level = 0; level < 12; level += 1) context.restore();
       const scene = await dumpScene(a);
       expectPixel(a, scene, 11, 11, GREEN, "twelfth nested clip still paints");
-      expectPixel(a, scene, 20, 20, GREEN, "nested intersection interior is painted");
-      expectPixel(a, scene, 10, 10, TRANSPARENT, "nested clip excludes previous bands");
-      expectPixel(a, scene, 21, 21, TRANSPARENT, "nested clip excludes outer bands");
+      expectPixel(
+        a,
+        scene,
+        20,
+        20,
+        GREEN,
+        "nested intersection interior is painted",
+      );
+      expectPixel(
+        a,
+        scene,
+        10,
+        10,
+        TRANSPARENT,
+        "nested clip excludes previous bands",
+      );
+      expectPixel(
+        a,
+        scene,
+        21,
+        21,
+        TRANSPARENT,
+        "nested clip excludes outer bands",
+      );
     },
   },
   {
@@ -321,15 +447,40 @@ export const cases: CaseDefinition[] = [
       context.restore();
       const scene = await dumpScene(a);
       expectPixel(a, scene, 16, 16, RED, "path fill is clipped");
-      expectPixel(a, scene, 6, 6, BLUE, "strokeRect is clipped to the same clip");
-      expectPixel(a, scene, 2, 16, TRANSPARENT, "stroke outside the clip is cut");
-      expectPixel(a, scene, 30, 16, TRANSPARENT, "stroke right of the clip is cut");
+      expectPixel(
+        a,
+        scene,
+        6,
+        6,
+        BLUE,
+        "strokeRect is clipped to the same clip",
+      );
+      expectPixel(
+        a,
+        scene,
+        2,
+        16,
+        TRANSPARENT,
+        "stroke outside the clip is cut",
+      );
+      expectPixel(
+        a,
+        scene,
+        30,
+        16,
+        TRANSPARENT,
+        "stroke right of the clip is cut",
+      );
     },
   },
   {
     ...base,
     id: "clip.source-in",
-    requirements: ["context.clip", "context.globalCompositeOperation", "ACC-03"],
+    requirements: [
+      "context.clip",
+      "context.globalCompositeOperation",
+      "ACC-03",
+    ],
     async run(a) {
       const context = a.context;
       // Resolve the hook before drawing: after the last draw there must be no
@@ -347,10 +498,38 @@ export const cases: CaseDefinition[] = [
       context.fillRect(12, 12, 8, 8);
       context.restore();
       const scene = await dumpScene(a);
-      expectPixel(a, scene, 16, 16, GREEN, "source-in composites inside the clip and source");
-      expectPixel(a, scene, 6, 6, TRANSPARENT, "source-in clears inside the clip only");
-      expectPixel(a, scene, 2, 2, RED, "source-in leaves pixels outside the clip untouched");
-      expectPixel(a, scene, 28, 28, RED, "source-in clip boundary holds on all sides");
+      expectPixel(
+        a,
+        scene,
+        16,
+        16,
+        GREEN,
+        "source-in composites inside the clip and source",
+      );
+      expectPixel(
+        a,
+        scene,
+        6,
+        6,
+        TRANSPARENT,
+        "source-in clears inside the clip only",
+      );
+      expectPixel(
+        a,
+        scene,
+        2,
+        2,
+        RED,
+        "source-in leaves pixels outside the clip untouched",
+      );
+      expectPixel(
+        a,
+        scene,
+        28,
+        28,
+        RED,
+        "source-in clip boundary holds on all sides",
+      );
     },
   },
   {
@@ -402,7 +581,14 @@ export const cases: CaseDefinition[] = [
       context.fillRect(0, 0, 32, 32);
       context.restore();
       const scene = await dumpScene(a);
-      expectPixel(a, scene, 4, 4, WHITE, "alpha and composite stay inside the clip");
+      expectPixel(
+        a,
+        scene,
+        4,
+        4,
+        WHITE,
+        "alpha and composite stay inside the clip",
+      );
       // Blended 8-bit rounding is not asserted exactly; the render pair
       // carries the composite result for review.
       a.assert(
@@ -426,7 +612,14 @@ export const cases: CaseDefinition[] = [
       context.fillRect(0, 0, 32, 32);
       context.restore();
       const clipped = await dumpScene(a);
-      expectPixel(a, clipped, 2, 2, TRANSPARENT, "clip excludes the canvas edge");
+      expectPixel(
+        a,
+        clipped,
+        2,
+        2,
+        TRANSPARENT,
+        "clip excludes the canvas edge",
+      );
       // Assigning the same width resets the drawing state and the clip.
       (a.canvas as { width: number }).width = 32;
       context.fillStyle = "#0000ff";

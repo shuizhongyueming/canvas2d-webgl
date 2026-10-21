@@ -32,7 +32,13 @@ export const cases: CaseDefinition[] = [
   {
     ...renderBase,
     id: "rect.clearRect.transform",
-    requirements: ["context.clearRect", "context.fillRect", "context.rotate", "context.translate", "context.setTransform"],
+    requirements: [
+      "context.clearRect",
+      "context.fillRect",
+      "context.rotate",
+      "context.translate",
+      "context.setTransform",
+    ],
     run(a) {
       const context = a.context;
       context.fillStyle = "#ff0000";
@@ -48,7 +54,12 @@ export const cases: CaseDefinition[] = [
   {
     ...renderBase,
     id: "rect.clearRect.state-independent",
-    requirements: ["context.clearRect", "context.fillRect", "context.globalAlpha", "context.fillStyle"],
+    requirements: [
+      "context.clearRect",
+      "context.fillRect",
+      "context.globalAlpha",
+      "context.fillStyle",
+    ],
     kind: "combined",
     async run(a) {
       const context = a.context;
@@ -115,7 +126,12 @@ export const cases: CaseDefinition[] = [
     seed: 1,
     fonts: [] as string[],
     id: "rect.clearRect.path-independence",
-    requirements: ["context.clearRect", "context.beginPath", "context.rect", "context.fill"],
+    requirements: [
+      "context.clearRect",
+      "context.beginPath",
+      "context.rect",
+      "context.fill",
+    ],
     async run(a) {
       const context = a.context;
       // Record a current path, then run the three rect entries across it:

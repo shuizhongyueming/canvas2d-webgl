@@ -64,7 +64,16 @@ export const TICKETS = Object.freeze([
     id: "earlier",
     label: "更早的工程/状态/画布/paint 票",
     rows: ["canvas", "state", "paint", "gpu", "context"],
-    prefixes: ["REN-01", "REN-02", "API-01", "API-02", "CAN-01", "CAN-02", "CAN-03", "ACC-01"],
+    prefixes: [
+      "REN-01",
+      "REN-02",
+      "API-01",
+      "API-02",
+      "CAN-01",
+      "CAN-02",
+      "CAN-03",
+      "ACC-01",
+    ],
   },
 ]);
 
@@ -120,7 +129,9 @@ export function stateOf(entry, result) {
   if (result.semantic !== "pass") return "semantic-missing";
   if (result.render === "accepted") return "review-accepted";
   if (result.render === "rejected") return "review-rejected";
-  return result.render === "pending-review" ? "pending-review" : "semantic-pass";
+  return result.render === "pending-review"
+    ? "pending-review"
+    : "semantic-pass";
 }
 
 /** Execution state ordering used by every table. */

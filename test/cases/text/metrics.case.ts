@@ -91,10 +91,7 @@ export const cases: CaseDefinition[] = [
       // observation pins the width pair instead.
       const again = a.context.measureText("shape");
       a.assert(metrics !== (again as unknown), "fresh metrics object per call");
-      a.observe("widths", [
-        (metrics as { width: number }).width,
-        again.width,
-      ]);
+      a.observe("widths", [(metrics as { width: number }).width, again.width]);
     },
   },
   {

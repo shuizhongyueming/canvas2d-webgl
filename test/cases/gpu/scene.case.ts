@@ -47,11 +47,12 @@ export const cases: CaseDefinition[] = [
       a.observe("drawn", pixelAt(drawn, 0, 0));
       a.observe("outside", pixelAt(drawn, 7, 5));
       device.draw(
-        rectDraw(
-          device.generation,
-          { x: 4, y: 0, width: 4, height: 3 },
-          [1, 0, 0, 128 / 255],
-        ),
+        rectDraw(device.generation, { x: 4, y: 0, width: 4, height: 3 }, [
+          1,
+          0,
+          0,
+          128 / 255,
+        ]),
       );
       a.observe("premulRoundTrip", pixelAt(hooks.readScene(), 4, 0));
       device.dispose();

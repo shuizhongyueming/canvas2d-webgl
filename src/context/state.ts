@@ -218,8 +218,7 @@ export function createStateStore(defaults: StateStoreDefaults): StateStore {
         current.transform = Object.freeze([
           ...(value as unknown as readonly number[]),
         ]) as Matrix;
-      else
-        (current as unknown as Record<StateField, unknown>)[key] = value;
+      else (current as unknown as Record<StateField, unknown>)[key] = value;
     },
     get(name: string): unknown {
       return current[field(name)];

@@ -34,7 +34,9 @@ type StyleMember = "fillStyle" | "strokeStyle";
  * Paint objects are per-canvas: ids are unique within one canvas instance,
  * as the Paint contract requires.
  */
-export function paintFeature(environment: FeatureEnvironment): FeatureDefinition {
+export function paintFeature(
+  environment: FeatureEnvironment,
+): FeatureDefinition {
   const state = environment.state;
   // Ids at or below DEFAULT_STYLE_IDS.stroke are reserved for the default
   // fill/stroke styles installed by the state ticket.

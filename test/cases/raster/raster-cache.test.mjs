@@ -44,7 +44,9 @@ test("LRU eviction drops the oldest unpinned entry and destroys it exactly once"
   const cache = new RasterCache({ maxEntries: 2 });
   const made = [entry(), entry(), entry(), entry()];
   const park = (i) =>
-    cache.store(String(i), made[i].value, made[i].pixels, made[i].destroy)?.release();
+    cache
+      .store(String(i), made[i].value, made[i].pixels, made[i].destroy)
+      ?.release();
   park(0);
   park(1);
   park(2);
@@ -69,7 +71,10 @@ test("an entry that does not fit alongside pinned entries stays uncached", () =>
   const held = cache.store("a", first.value, first.pixels, first.destroy);
   assert.ok(held);
   const second = entry();
-  assert.equal(cache.store("b", second.value, second.pixels, second.destroy), null);
+  assert.equal(
+    cache.store("b", second.value, second.pixels, second.destroy),
+    null,
+  );
   // Ownership stayed with the caller; the cache never destroys it.
   assert.equal(first.record.destroyed, 0);
   assert.equal(second.record.destroyed, 0);
@@ -100,7 +105,12 @@ test("clear() destroys unpinned entries once and retires pinned ones on release"
   const cache = new RasterCache();
   const pinned = entry();
   const idle = entry();
-  const lease = cache.store("held", pinned.value, pinned.pixels, pinned.destroy);
+  const lease = cache.store(
+    "held",
+    pinned.value,
+    pinned.pixels,
+    pinned.destroy,
+  );
   assert.ok(lease);
   cache.store("idle", idle.value, idle.pixels, idle.destroy)?.release();
   cache.clear();

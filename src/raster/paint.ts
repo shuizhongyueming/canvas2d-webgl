@@ -5,7 +5,9 @@ function channel(value: number): number {
   return Math.round(Math.min(1, Math.max(0, value)) * 255);
 }
 
-export function cssColor(color: readonly [number, number, number, number]): string {
+export function cssColor(
+  color: readonly [number, number, number, number],
+): string {
   const alpha = Math.min(1, Math.max(0, color[3]));
   return `rgba(${channel(color[0])},${channel(color[1])},${channel(color[2])},${alpha})`;
 }

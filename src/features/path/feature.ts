@@ -43,9 +43,7 @@ function unsupportedOverload(name: string): never {
   );
 }
 
-export const pathFeature: FeatureFactory = (
-  environment,
-): FeatureDefinition => {
+export const pathFeature: FeatureFactory = (environment): FeatureDefinition => {
   const state = environment?.state;
   const path = environment?.path;
   const gpu = environment?.gpu;
@@ -86,9 +84,10 @@ export const pathFeature: FeatureFactory = (
         generation: gpu.generation,
         kind: "draw",
         state: snapshot,
-        source: source.bounds.width <= 0 || source.bounds.height <= 0
-          ? { kind: "empty" }
-          : source,
+        source:
+          source.bounds.width <= 0 || source.bounds.height <= 0
+            ? { kind: "empty" }
+            : source,
         sourceBounds: source.bounds,
         clip: snapshot.clip,
       });
@@ -131,7 +130,13 @@ export const pathFeature: FeatureFactory = (
         value(...args: readonly unknown[]) {
           const values = coordinates("rect", args, 4);
           if (!assertUsable()) return;
-          path.rect(values[0]!, values[1]!, values[2]!, values[3]!, currentTransform());
+          path.rect(
+            values[0]!,
+            values[1]!,
+            values[2]!,
+            values[3]!,
+            currentTransform(),
+          );
         },
       },
       quadraticCurveTo: {

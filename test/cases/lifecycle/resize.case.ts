@@ -55,16 +55,13 @@ export const cases: CaseDefinition[] = [
       a.assert(context.globalAlpha === 1, "state reset");
       a.observe("generationBefore", before.generation);
       a.observe("generationAfter", after.generation);
-      a.observe("sceneCleared", after.pixels.every((byte) => byte === 0));
+      a.observe(
+        "sceneCleared",
+        after.pixels.every((byte) => byte === 0),
+      );
       // The new empty scene is on display after the scheduled present.
       await present(hooks);
-      const display = displayPixel(
-        handle.gl,
-        after.width,
-        after.height,
-        0,
-        0,
-      );
+      const display = displayPixel(handle.gl, after.width, after.height, 0, 0);
       a.assert(display[3] === 0, "the display shows the cleared scene");
       a.observe("displayCleared", display);
       a.observe("contextStable", canvas.getContext("2d") === context);
@@ -86,7 +83,10 @@ export const cases: CaseDefinition[] = [
       const zero = outcome(() => {
         canvas.width = 0;
       });
-      a.assert(zero === "size-unsupported", "zero width reports the size limit");
+      a.assert(
+        zero === "size-unsupported",
+        "zero width reports the size limit",
+      );
       a.assert(canvas.width === 8, "rejected width leaves the compat size");
       a.assert(context.globalAlpha === 0.75, "rejected width leaves state");
       const afterZero = hooks.readScene();
@@ -127,7 +127,10 @@ export const cases: CaseDefinition[] = [
       a.observe("zero", zero);
       a.observe("oversize", oversize);
       a.observe("finalSize", [canvas.width, canvas.height]);
-      a.observe("finalCleared", resized.pixels.every((byte) => byte === 0));
+      a.observe(
+        "finalCleared",
+        resized.pixels.every((byte) => byte === 0),
+      );
       canvas.dispose();
     },
   },
@@ -166,8 +169,14 @@ export const cases: CaseDefinition[] = [
       const refused = outcome(() => {
         canvas.width = 10;
       });
-      a.assert(refused === "size-unsupported", "refusal reports size-unsupported");
-      a.assert(canvas.width === 8, "the compat width stays at the accepted size");
+      a.assert(
+        refused === "size-unsupported",
+        "refusal reports size-unsupported",
+      );
+      a.assert(
+        canvas.width === 8,
+        "the compat width stays at the accepted size",
+      );
       a.assert(real.width === 8, "the target was never silently resized");
       a.assert(context.globalAlpha === 0.5, "refused resize leaves state");
       const after = hooks.readScene();
@@ -219,8 +228,14 @@ export const cases: CaseDefinition[] = [
         "the stale red frame was not presented over the cleared display",
       );
       a.observe("waiter", outcomeOfWaiter);
-      a.observe("sceneCleared", scene.pixels.every((byte) => byte === 0));
-      a.observe("displayAlpha", displayPixel(gl, scene.width, scene.height, 0, 0)[3]);
+      a.observe(
+        "sceneCleared",
+        scene.pixels.every((byte) => byte === 0),
+      );
+      a.observe(
+        "displayAlpha",
+        displayPixel(gl, scene.width, scene.height, 0, 0)[3],
+      );
       canvas.dispose();
     },
   },

@@ -68,11 +68,21 @@ export class RasterCache<T> {
     if (this.#entries.has(key))
       throw new Error(`contract-violation: duplicate raster cache key ${key}`);
     if (pixels > this.#maxPixels) return null;
-    const entry: Entry<T> = { value, pixels, destroy, pins: 0, stale: false, destroyed: false };
+    const entry: Entry<T> = {
+      value,
+      pixels,
+      destroy,
+      pins: 0,
+      stale: false,
+      destroyed: false,
+    };
     this.#entries.set(key, entry);
     this.#pixels += pixels;
     this.#evictExcept(entry);
-    if (this.#entries.size > this.#maxEntries || this.#pixels > this.#maxPixels) {
+    if (
+      this.#entries.size > this.#maxEntries ||
+      this.#pixels > this.#maxPixels
+    ) {
       this.#entries.delete(key);
       this.#pixels -= pixels;
       return null;
@@ -107,7 +117,10 @@ export class RasterCache<T> {
   /** Oldest-first eviction of unpinned entries, excluding the entry being stored. */
   #evictExcept(keep: Entry<T>): void {
     for (const [key, entry] of this.#entries) {
-      if (this.#entries.size <= this.#maxEntries && this.#pixels <= this.#maxPixels)
+      if (
+        this.#entries.size <= this.#maxEntries &&
+        this.#pixels <= this.#maxPixels
+      )
         return;
       if (entry === keep || entry.pins) continue;
       this.#entries.delete(key);

@@ -41,7 +41,10 @@ export const cases: CaseDefinition[] = [
     requirements: ["context.save"],
     run(a) {
       const save: (...args: unknown[]) => void = a.context.save.bind(a.context);
-      a.assert(save(1, "extra") === undefined, "save tolerates extra arguments and returns undefined");
+      a.assert(
+        save(1, "extra") === undefined,
+        "save tolerates extra arguments and returns undefined",
+      );
       a.observe("extraArgs", "tolerated");
     },
   },
@@ -61,7 +64,10 @@ export const cases: CaseDefinition[] = [
       const afterFirst = c.globalAlpha;
       c.restore();
       const afterSecond = c.globalAlpha;
-      a.assert(afterFirst === 0.2 && afterSecond === 0.1, "restore pops in LIFO order");
+      a.assert(
+        afterFirst === 0.2 && afterSecond === 0.1,
+        "restore pops in LIFO order",
+      );
       a.observe("order", [afterFirst, afterSecond]);
     },
   },
@@ -72,7 +78,10 @@ export const cases: CaseDefinition[] = [
     run(a) {
       const c = a.context;
       const restore: (...args: unknown[]) => void = c.restore.bind(c);
-      a.assert(restore(9) === undefined, "restore tolerates extra arguments and returns undefined");
+      a.assert(
+        restore(9) === undefined,
+        "restore tolerates extra arguments and returns undefined",
+      );
       restore();
       restore();
       a.assert(c.globalAlpha === 1, "restore on an empty stack is a no-op");
@@ -111,7 +120,8 @@ export const cases: CaseDefinition[] = [
       c.restore();
       trail.push(...read());
       a.assert(
-        trail.join(",") === "0.3,4,butt,round,0.6,4,round,round,0.9,2,round,round",
+        trail.join(",") ===
+          "0.3,4,butt,round,0.6,4,round,round,0.9,2,round,round",
         "nested state restores in order",
       );
       a.observe("trail", trail);
@@ -129,7 +139,10 @@ export const cases: CaseDefinition[] = [
       c.restore();
       c.restore();
       c.restore();
-      a.assert(c.globalAlpha === 0.7, "restores beyond the stack depth are no-ops");
+      a.assert(
+        c.globalAlpha === 0.7,
+        "restores beyond the stack depth are no-ops",
+      );
       a.observe("alpha", c.globalAlpha);
     },
   },

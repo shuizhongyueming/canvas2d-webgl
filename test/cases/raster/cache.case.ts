@@ -58,9 +58,14 @@ function run(a: CaseAdapter): void {
   second.release();
 
   // A paint change (same shape, other color) must miss and re-render.
-  const blue = makeState({ fill: { kind: "solid", color: [0.1, 0.25, 0.75, 1] } });
+  const blue = makeState({
+    fill: { kind: "solid", color: [0.1, 0.25, 0.75, 1] },
+  });
   const blueSource = lab.rasterizer.path(snapshot, blue, "fill");
-  a.assert(blueSource.canvas !== first.canvas, "paint change invalidates the asset");
+  a.assert(
+    blueSource.canvas !== first.canvas,
+    "paint change invalidates the asset",
+  );
   const blueReference = referenceContext();
   blueReference.fillStyle = "rgba(26,64,191,1)";
   blueReference.beginPath();
@@ -84,7 +89,10 @@ function run(a: CaseAdapter): void {
     makeState({ fill: gradient(2, "green") }),
     "fill",
   );
-  a.assert(gradientV2.canvas !== gradientV1.canvas, "paint version bump invalidates");
+  a.assert(
+    gradientV2.canvas !== gradientV1.canvas,
+    "paint version bump invalidates",
+  );
 
   // A fresh rasterizer renders the identical asset, byte for byte.
   const bypass = makeLab();
@@ -99,7 +107,10 @@ function run(a: CaseAdapter): void {
   let cacheDiff = 0;
   for (let i = 0; i < cachedPixels.length; i += 1)
     if (cachedPixels[i] !== freshPixels[i]) cacheDiff += 1;
-  a.assert(cacheDiff === 0, "cached asset equals a fresh rasterization exactly");
+  a.assert(
+    cacheDiff === 0,
+    "cached asset equals a fresh rasterization exactly",
+  );
   fresh.release();
 
   // The v1 asset is still cached and differs: the bump really changed content.
@@ -148,7 +159,10 @@ function run(a: CaseAdapter): void {
   gradientReference.closePath();
   gradientReference.fill();
   const nativeDiff = diffAsset(gradientReference, gradientV2);
-  a.observe("cache-paint-version:native-ramp-byte-diffs", nativeDiff.mismatched);
+  a.observe(
+    "cache-paint-version:native-ramp-byte-diffs",
+    nativeDiff.mismatched,
+  );
   a.assert(nativeDiff.escaped === 0, "gradient asset bounds never truncate");
   gradientV2.release();
 
@@ -166,8 +180,14 @@ function run(a: CaseAdapter): void {
     evictLab.created.length === 4,
     "three distinct assets share one staging canvas",
   );
-  a.assert(oldest !== undefined && oldest.width === 0, "evicted asset bitmap is released");
-  a.assert(stage !== undefined && stage.width > 0, "staging canvas stays resident");
+  a.assert(
+    oldest !== undefined && oldest.width === 0,
+    "evicted asset bitmap is released",
+  );
+  a.assert(
+    stage !== undefined && stage.width > 0,
+    "staging canvas stays resident",
+  );
   a.assert(
     rest.every((canvas) => canvas.width > 0),
     "freshly used assets survive eviction",
@@ -193,7 +213,11 @@ function run(a: CaseAdapter): void {
   const tinyLab = makeLab({ maxPixels: 16 });
   const tinyRecorder = new PathRecorder();
   triangle(tinyRecorder, 0);
-  const oversized = tinyLab.rasterizer.path(tinyRecorder.snapshot(), red, "fill");
+  const oversized = tinyLab.rasterizer.path(
+    tinyRecorder.snapshot(),
+    red,
+    "fill",
+  );
   oversized.release();
   a.assert(
     tinyLab.created[0] !== undefined && tinyLab.created[0].width === 0,
@@ -212,7 +236,10 @@ function run(a: CaseAdapter): void {
     limitError = (error as { code?: string }).code;
   }
   a.observe("resource-limit:code", limitError ?? "none");
-  a.assert(limitError === "resource-limit", "oversized assets report resource-limit");
+  a.assert(
+    limitError === "resource-limit",
+    "oversized assets report resource-limit",
+  );
   limitLab.rasterizer.dispose();
 
   // dispose releases cached bitmaps and the shared measure canvas, then
@@ -220,7 +247,10 @@ function run(a: CaseAdapter): void {
   const disposeLab = makeLab();
   const disposeRecorder = new PathRecorder();
   triangle(disposeRecorder, 0);
-  disposeLab.rasterizer.measureWidth("warm", makeState({ font: "16px sans-serif" }));
+  disposeLab.rasterizer.measureWidth(
+    "warm",
+    makeState({ font: "16px sans-serif" }),
+  );
   disposeLab.rasterizer.path(disposeRecorder.snapshot(), red, "fill").release();
   disposeLab.rasterizer.dispose();
   a.assert(
@@ -234,7 +264,10 @@ function run(a: CaseAdapter): void {
     disposedError = (error as { code?: string }).code;
   }
   a.observe("disposed:code", disposedError ?? "none");
-  a.assert(disposedError === "disposed", "disposed rasterizer rejects new work");
+  a.assert(
+    disposedError === "disposed",
+    "disposed rasterizer rejects new work",
+  );
   lab.rasterizer.dispose();
 }
 

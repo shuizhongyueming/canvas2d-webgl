@@ -47,7 +47,13 @@ export const cases: CaseDefinition[] = [
   {
     ...renderBase,
     id: "rect.fillRect.transform",
-    requirements: ["context.fillRect", "context.translate", "context.rotate", "context.scale", "context.setTransform"],
+    requirements: [
+      "context.fillRect",
+      "context.translate",
+      "context.rotate",
+      "context.scale",
+      "context.setTransform",
+    ],
     run(a) {
       const context = a.context;
       context.fillStyle = "#ff0000";

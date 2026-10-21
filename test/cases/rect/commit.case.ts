@@ -147,7 +147,14 @@ export const cases: CaseDefinition[] = [
   {
     ...base,
     id: "CAN-04.same-size-reset",
-    requirements: ["CAN-04", "canvas.width", "context.fillRect", "context.beginPath", "context.rect", "context.fill"],
+    requirements: [
+      "CAN-04",
+      "canvas.width",
+      "context.fillRect",
+      "context.beginPath",
+      "context.rect",
+      "context.fill",
+    ],
     width: 16,
     height: 16,
     async run(a) {

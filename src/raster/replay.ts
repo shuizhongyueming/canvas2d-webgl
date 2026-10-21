@@ -17,7 +17,10 @@ export function replayPath(
   let previous: readonly number[] | null = null;
   for (const command of path.commands) {
     const matrix = offsetMatrix(command.transform, offsetX, offsetY);
-    if (!previous || !matrix.every((value, index) => value === previous![index]))
+    if (
+      !previous ||
+      !matrix.every((value, index) => value === previous![index])
+    )
       ctx.setTransform(...matrix);
     previous = matrix;
     switch (command.op) {

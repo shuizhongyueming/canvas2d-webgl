@@ -60,7 +60,9 @@ export const cases: CaseDefinition[] = [
         rectDraw(generation, { x: 0, y: 0, width: 2, height: 4 }, RED),
       );
       const appended = Promise.resolve().then(() => {
-        device.draw(rectDraw(generation, { x: 2, y: 0, width: 2, height: 4 }, BLUE));
+        device.draw(
+          rectDraw(generation, { x: 2, y: 0, width: 2, height: 4 }, BLUE),
+        );
       });
       await hooks.whenPresented(generation);
       // The promise-appended draw missed this task's checkpoint: the first

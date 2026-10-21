@@ -1,7 +1,10 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { SUPPORT_MATRIX } from "../dist/contracts/support.js";
-import { apiCases, interactionCases } from "../.build/test/cases/manifest/index.js";
+import {
+  apiCases,
+  interactionCases,
+} from "../.build/test/cases/manifest/index.js";
 import { provenance } from "./provenance.mjs";
 import { STATES, TICKETS, owners, stateOf, ticketOf } from "./matrix.mjs";
 
@@ -150,8 +153,7 @@ push(
   "| --- | --- |",
 );
 for (const state of STATES)
-  if ((totals.get(state) ?? 0) > 0)
-    push(`| ${state} | ${totals.get(state)} |`);
+  if ((totals.get(state) ?? 0) > 0) push(`| ${state} | ${totals.get(state)} |`);
 push(
   "",
   `本运行不存在语义失败或评审拒绝：${failures.length === 0 ? "是" : "否"}`,

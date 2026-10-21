@@ -506,11 +506,7 @@ class SceneDevice implements GPUDevice {
       }
       // Pass 1: mark source coverage at depth + 1 without touching color.
       gl.stencilMask(0xff);
-      gl.stencilFunc(
-        clipDepth === 0 ? gl.ALWAYS : gl.EQUAL,
-        clipDepth,
-        0xff,
-      );
+      gl.stencilFunc(clipDepth === 0 ? gl.ALWAYS : gl.EQUAL, clipDepth, 0xff);
       gl.stencilOp(gl.KEEP, gl.KEEP, gl.INCR);
       gl.colorMask(false, false, false, false);
       this.drawSolidQuad(corners, TRANSPARENT, "replace", 1, true);
@@ -619,8 +615,12 @@ class SceneDevice implements GPUDevice {
     }
     const corners = rectCorners(source.destinationRect, source.transform);
     const { width, height } = sourcePixels(source.image);
-    const { x, y, width: sourceWidth, height: sourceHeight } =
-      source.sourceRect;
+    const {
+      x,
+      y,
+      width: sourceWidth,
+      height: sourceHeight,
+    } = source.sourceRect;
     const u0 = x / width;
     const v0 = y / height;
     const u1 = (x + sourceWidth) / width;
@@ -798,7 +798,12 @@ class SceneDevice implements GPUDevice {
           ERROR_CODES.SIZE_UNSUPPORTED,
           `platform refused canvas size ${width}x${height}`,
         );
-      scene = createSceneFramebuffer(this.gl, width, height, this.maxTextureSize);
+      scene = createSceneFramebuffer(
+        this.gl,
+        width,
+        height,
+        this.maxTextureSize,
+      );
     } catch (failure) {
       restoreTarget();
       const code = (failure as { code?: unknown } | null)?.code;
@@ -843,10 +848,7 @@ class SceneDevice implements GPUDevice {
         "restore() requires a lost device",
       );
     if (this.gl.isContextLost())
-      throw createCompatError(
-        ERROR_CODES.CAPABILITY,
-        "context is still lost",
-      );
+      throw createCompatError(ERROR_CODES.CAPABILITY, "context is still lost");
     try {
       this.createGpuObjects();
       this.scene = createSceneFramebuffer(
@@ -875,7 +877,9 @@ class SceneDevice implements GPUDevice {
     this.owner.releaseAll();
   }
 
-  acquireTexture(source: RasterSource | ImageSource | PatternBitmap): ResourceLease {
+  acquireTexture(
+    source: RasterSource | ImageSource | PatternBitmap,
+  ): ResourceLease {
     if (this.status === "disposed")
       throw createCompatError(ERROR_CODES.DISPOSED, "device is disposed");
     if (this.status === "lost")

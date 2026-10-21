@@ -75,14 +75,18 @@ export function uploadSourceTexture(
     );
   const texture = gl.createTexture();
   if (!texture)
-    throw createCompatError(ERROR_CODES.INITIALIZATION, "texture creation failed");
+    throw createCompatError(
+      ERROR_CODES.INITIALIZATION,
+      "texture creation failed",
+    );
   try {
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, 1);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
-    const filter = isRasterSource(source) || isPatternBitmap(source)
-      ? gl.NEAREST
-      : gl.LINEAR;
+    const filter =
+      isRasterSource(source) || isPatternBitmap(source)
+        ? gl.NEAREST
+        : gl.LINEAR;
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);

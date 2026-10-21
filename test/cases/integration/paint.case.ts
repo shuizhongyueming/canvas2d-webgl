@@ -48,7 +48,8 @@ function blueish(scene: Scene, area: Rect): number {
   for (let row = y; row < y + height; row += 1)
     for (let column = x; column < x + width; column += 1) {
       const pixel = scene.pixel(column, row);
-      if (pixel[3] > 0 && (pixel[2] as number) > (pixel[0] as number)) total += 1;
+      if (pixel[3] > 0 && (pixel[2] as number) > (pixel[0] as number))
+        total += 1;
     }
   return total;
 }

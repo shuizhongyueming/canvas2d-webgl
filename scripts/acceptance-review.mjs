@@ -1,7 +1,11 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { decode } from "../test/harness/evidence.mjs";
-import { injectionPoints, isolatedInjection, measurePair } from "./review-index.mjs";
+import {
+  injectionPoints,
+  isolatedInjection,
+  measurePair,
+} from "./review-index.mjs";
 
 /**
  * Build the review packet for one collected run: one row per pixel-bearing
@@ -20,7 +24,9 @@ if (!runPath) {
 const outIndex = args.indexOf("--out");
 const runFile = resolve(runPath);
 const outPath =
-  outIndex >= 0 ? resolve(args[outIndex + 1]) : join(dirname(runFile), "review-index.md");
+  outIndex >= 0
+    ? resolve(args[outIndex + 1])
+    : join(dirname(runFile), "review-index.md");
 const run = JSON.parse(await readFile(runFile, "utf8"));
 const directory = dirname(runFile);
 

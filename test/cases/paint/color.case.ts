@@ -60,10 +60,7 @@ function styleCases(member: "fillStyle" | "strokeStyle"): CaseDefinition[] {
         a.observe("alpha", context[member]);
         assignStyle(context, member, "rgba(1,2,3,1)");
         a.observe("opaque", context[member]);
-        a.assert(
-          context[member] === "#010203",
-          "alpha 1 canonicalizes to hex",
-        );
+        a.assert(context[member] === "#010203", "alpha 1 canonicalizes to hex");
       },
     },
     {
@@ -147,7 +144,11 @@ export const cases: CaseDefinition[] = [
       const context = asNative(a.context);
       const table: string[] = [];
       for (let byte = 0; byte < 256; byte += 1) {
-        assignStyle(context, "fillStyle", `#000000${byte.toString(16).padStart(2, "0")}`);
+        assignStyle(
+          context,
+          "fillStyle",
+          `#000000${byte.toString(16).padStart(2, "0")}`,
+        );
         const serialized = context.fillStyle as string;
         table.push(serialized);
         // Re-assigning the serialization must be idempotent.

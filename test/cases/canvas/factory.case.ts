@@ -31,7 +31,10 @@ export const cases: CaseDefinition[] = [
       const canvas = createCompatCanvas(target);
       const context = canvas.getContext("2d");
       a.assert(!!context, "default creation succeeds");
-      a.assert(canvas.getContext("2d") === context, "context identity is stable");
+      a.assert(
+        canvas.getContext("2d") === context,
+        "context identity is stable",
+      );
       a.assert(context.canvas === canvas, "context.canvas is the facade");
       a.assert(
         canvas.width === 8 && canvas.height === 6,
@@ -81,37 +84,36 @@ export const cases: CaseDefinition[] = [
     requirements: ["CAN-01"],
     async run(a) {
       const { createCompatCanvas } = await loadFactory();
-      const scenarios: Array<
-        [string, (target: HTMLCanvasElement) => Factory]
-      > = [
-        ["null", () => (() => null) as unknown as Factory],
-        ["plainObject", () => (() => ({})) as unknown as Factory],
+      const scenarios: Array<[string, (target: HTMLCanvasElement) => Factory]> =
         [
-          "noGetContext",
-          () => (() => ({ width: 4, height: 3 })) as unknown as Factory,
-        ],
-        ["targetItself", (target) => (() => target) as unknown as Factory],
-        [
-          "nonIndependent",
-          () => {
-            const shared = makeTarget(4, 3);
-            return (() => shared) as unknown as Factory;
-          },
-        ],
-        [
-          "wrongDimensions",
-          () => (() => makeTarget(1, 1)) as unknown as Factory,
-        ],
-        [
-          "throws",
-          () =>
-            (() => {
-              throw new Error("factory boom");
-            }) as unknown as Factory,
-        ],
-        ["without2d", () => without2d],
-        ["notAFunction", () => 42 as unknown as Factory],
-      ];
+          ["null", () => (() => null) as unknown as Factory],
+          ["plainObject", () => (() => ({})) as unknown as Factory],
+          [
+            "noGetContext",
+            () => (() => ({ width: 4, height: 3 })) as unknown as Factory,
+          ],
+          ["targetItself", (target) => (() => target) as unknown as Factory],
+          [
+            "nonIndependent",
+            () => {
+              const shared = makeTarget(4, 3);
+              return (() => shared) as unknown as Factory;
+            },
+          ],
+          [
+            "wrongDimensions",
+            () => (() => makeTarget(1, 1)) as unknown as Factory,
+          ],
+          [
+            "throws",
+            () =>
+              (() => {
+                throw new Error("factory boom");
+              }) as unknown as Factory,
+          ],
+          ["without2d", () => without2d],
+          ["notAFunction", () => 42 as unknown as Factory],
+        ];
       const results: Record<string, string> = {};
       for (const [name, makeFactory] of scenarios) {
         const target = makeTarget();
@@ -153,9 +155,7 @@ export const cases: CaseDefinition[] = [
       );
       a.observe(
         "noGetContext",
-        outcome(() =>
-          createCompatCanvas({ width: 1, height: 1 } as never),
-        ),
+        outcome(() => createCompatCanvas({ width: 1, height: 1 } as never)),
       );
       a.observe(
         "primitiveOptions",
@@ -183,10 +183,7 @@ export const cases: CaseDefinition[] = [
         outcome(() => createCompatCanvas(target)) === "webgl-unavailable",
         "a 2D-bound target reports webgl-unavailable",
       );
-      a.observe(
-        "callerBindingUntouched",
-        target.getContext("2d") !== null,
-      );
+      a.observe("callerBindingUntouched", target.getContext("2d") !== null);
     },
   },
   {
@@ -204,7 +201,10 @@ export const cases: CaseDefinition[] = [
       });
       if (!gl) a.skip("webgl-unavailable");
       const canvas = createCompatCanvas(target);
-      a.assert(!!canvas.getContext("2d"), "pre-bound conforming WebGL is accepted");
+      a.assert(
+        !!canvas.getContext("2d"),
+        "pre-bound conforming WebGL is accepted",
+      );
       a.observe("sameContext", target.getContext("webgl") === gl);
       a.observe("ready", true);
       canvas.dispose();
@@ -251,10 +251,7 @@ export const cases: CaseDefinition[] = [
       );
       a.assert(failed === "invalid-factory", "the factory failure is reported");
       a.observe("failed", failed);
-      a.observe(
-        "targetUnbound",
-        target.getContext("2d") !== null,
-      );
+      a.observe("targetUnbound", target.getContext("2d") !== null);
       const retry = createCompatCanvas(makeTarget());
       a.assert(!!retry.getContext("2d"), "creation after a failure succeeds");
       retry.dispose();

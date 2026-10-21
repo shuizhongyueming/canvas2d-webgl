@@ -17,11 +17,23 @@ export const cases: CaseDefinition[] = [
     run(a) {
       const c = a.context;
       a.assert(typeof c.translate === "function", "translate is a function");
-      a.observe("finite", outcome(() => c.translate(10, 20)));
-      a.observe("nan", outcome(() => c.translate(NaN, 0)));
-      a.observe("infinity", outcome(() => c.translate(Infinity, 1)));
+      a.observe(
+        "finite",
+        outcome(() => c.translate(10, 20)),
+      );
+      a.observe(
+        "nan",
+        outcome(() => c.translate(NaN, 0)),
+      );
+      a.observe(
+        "infinity",
+        outcome(() => c.translate(Infinity, 1)),
+      );
       const translate = c.translate as (x: unknown, y: unknown) => void;
-      a.observe("coerced", outcome(() => translate.call(c, "3", "4")));
+      a.observe(
+        "coerced",
+        outcome(() => translate.call(c, "3", "4")),
+      );
     },
   },
   {
@@ -30,7 +42,10 @@ export const cases: CaseDefinition[] = [
     requirements: ["context.translate"],
     run(a) {
       const c = a.context;
-      a.observe("twoArgs", outcome(() => c.translate(5, 6)));
+      a.observe(
+        "twoArgs",
+        outcome(() => c.translate(5, 6)),
+      );
       const translate = c.translate as (...args: unknown[]) => void;
       a.assert(
         outcome(() => translate.call(c, 7)) === "TypeError",
@@ -49,9 +64,18 @@ export const cases: CaseDefinition[] = [
     run(a) {
       const c = a.context;
       a.assert(typeof c.rotate === "function", "rotate is a function");
-      a.observe("finite", outcome(() => c.rotate(Math.PI / 4)));
-      a.observe("nan", outcome(() => c.rotate(NaN)));
-      a.observe("infinity", outcome(() => c.rotate(Infinity)));
+      a.observe(
+        "finite",
+        outcome(() => c.rotate(Math.PI / 4)),
+      );
+      a.observe(
+        "nan",
+        outcome(() => c.rotate(NaN)),
+      );
+      a.observe(
+        "infinity",
+        outcome(() => c.rotate(Infinity)),
+      );
     },
   },
   {
@@ -60,7 +84,10 @@ export const cases: CaseDefinition[] = [
     requirements: ["context.rotate"],
     run(a) {
       const c = a.context;
-      a.observe("oneArg", outcome(() => c.rotate(0.25)));
+      a.observe(
+        "oneArg",
+        outcome(() => c.rotate(0.25)),
+      );
       const rotate = c.rotate as (...args: unknown[]) => void;
       a.assert(
         outcome(() => rotate.call(c)) === "TypeError",
@@ -75,9 +102,18 @@ export const cases: CaseDefinition[] = [
     run(a) {
       const c = a.context;
       a.assert(typeof c.scale === "function", "scale is a function");
-      a.observe("finite", outcome(() => c.scale(2, 0.5)));
-      a.observe("zero", outcome(() => c.scale(0, 0)));
-      a.observe("nan", outcome(() => c.scale(NaN, 1)));
+      a.observe(
+        "finite",
+        outcome(() => c.scale(2, 0.5)),
+      );
+      a.observe(
+        "zero",
+        outcome(() => c.scale(0, 0)),
+      );
+      a.observe(
+        "nan",
+        outcome(() => c.scale(NaN, 1)),
+      );
     },
   },
   {
@@ -86,7 +122,10 @@ export const cases: CaseDefinition[] = [
     requirements: ["context.scale"],
     run(a) {
       const c = a.context;
-      a.observe("twoArgs", outcome(() => c.scale(2, 3)));
+      a.observe(
+        "twoArgs",
+        outcome(() => c.scale(2, 3)),
+      );
       const scale = c.scale as (...args: unknown[]) => void;
       a.assert(
         outcome(() => scale.call(c, 2)) === "TypeError",
@@ -100,10 +139,22 @@ export const cases: CaseDefinition[] = [
     requirements: ["context.setTransform"],
     run(a) {
       const c = a.context;
-      a.assert(typeof c.setTransform === "function", "setTransform is a function");
-      a.observe("finite", outcome(() => c.setTransform(2, 0, 0, 2, 5, 5)));
-      a.observe("negative", outcome(() => c.setTransform(-1, 0, 0, -1, 0, 0)));
-      a.observe("nan", outcome(() => c.setTransform(1, 0, 0, NaN, 0, 0)));
+      a.assert(
+        typeof c.setTransform === "function",
+        "setTransform is a function",
+      );
+      a.observe(
+        "finite",
+        outcome(() => c.setTransform(2, 0, 0, 2, 5, 5)),
+      );
+      a.observe(
+        "negative",
+        outcome(() => c.setTransform(-1, 0, 0, -1, 0, 0)),
+      );
+      a.observe(
+        "nan",
+        outcome(() => c.setTransform(1, 0, 0, NaN, 0, 0)),
+      );
     },
   },
   {
@@ -112,9 +163,15 @@ export const cases: CaseDefinition[] = [
     requirements: ["context.setTransform"],
     run(a) {
       const c = a.context;
-      a.observe("six", outcome(() => c.setTransform(1, 0, 0, 1, 2, 3)));
+      a.observe(
+        "six",
+        outcome(() => c.setTransform(1, 0, 0, 1, 2, 3)),
+      );
       const setTransform = c.setTransform as (...args: unknown[]) => void;
-      a.observe("extra", outcome(() => setTransform.call(c, 3, 0, 0, 3, 1, 1, 99)));
+      a.observe(
+        "extra",
+        outcome(() => setTransform.call(c, 3, 0, 0, 3, 1, 1, 99)),
+      );
       a.assert(
         outcome(() => setTransform.call(c, 1, 2, 3, 4, 5)) === "TypeError",
         "five arguments throw TypeError",
@@ -127,11 +184,20 @@ export const cases: CaseDefinition[] = [
     requirements: ["context.scale"],
     run(a) {
       const c = a.context;
-      a.observe("mirrorBoth", outcome(() => c.scale(-2, -1)));
+      a.observe(
+        "mirrorBoth",
+        outcome(() => c.scale(-2, -1)),
+      );
       c.save();
-      a.observe("mirrorX", outcome(() => c.scale(-3, 2)));
+      a.observe(
+        "mirrorX",
+        outcome(() => c.scale(-3, 2)),
+      );
       c.restore();
-      a.observe("nested", outcome(() => c.scale(-1, -4)));
+      a.observe(
+        "nested",
+        outcome(() => c.scale(-1, -4)),
+      );
     },
   },
   {
@@ -139,7 +205,9 @@ export const cases: CaseDefinition[] = [
     id: "state.setTransform.overload-unsupported",
     requirements: ["context.setTransform"],
     run(a) {
-      const setTransform = a.context.setTransform as (...args: unknown[]) => void;
+      const setTransform = a.context.setTransform as (
+        ...args: unknown[]
+      ) => void;
       const context = a.context;
       const zero = outcome(() => setTransform.call(context));
       const objectForm = outcome(() =>
@@ -149,27 +217,61 @@ export const cases: CaseDefinition[] = [
       const expected = isCompat(a)
         ? { zero: "unsupported-api", objectForm: "unsupported-api" }
         : { zero: "ok", objectForm: "ok" };
-      a.assert(zero === expected.zero, "zero-argument form follows approved semantics");
-      a.assert(objectForm === expected.objectForm, "matrix-object form follows approved semantics");
-      a.assert(primitive === "TypeError", "primitive single argument throws TypeError");
+      a.assert(
+        zero === expected.zero,
+        "zero-argument form follows approved semantics",
+      );
+      a.assert(
+        objectForm === expected.objectForm,
+        "matrix-object form follows approved semantics",
+      );
+      a.assert(
+        primitive === "TypeError",
+        "primitive single argument throws TypeError",
+      );
       a.observe("zero", zero === expected.zero ? "as-approved" : zero);
-      a.observe("objectForm", objectForm === expected.objectForm ? "as-approved" : objectForm);
-      a.observe("primitive", primitive === "TypeError" ? "as-approved" : primitive);
+      a.observe(
+        "objectForm",
+        objectForm === expected.objectForm ? "as-approved" : objectForm,
+      );
+      a.observe(
+        "primitive",
+        primitive === "TypeError" ? "as-approved" : primitive,
+      );
     },
   },
   {
     ...base,
     id: "state.transform.singular-ctm",
-    requirements: ["context.translate", "context.scale", "context.setTransform"],
+    requirements: [
+      "context.translate",
+      "context.scale",
+      "context.setTransform",
+    ],
     run(a) {
       const c = a.context;
       c.setTransform(1, 0, 0, 0, 0, 0);
-      a.observe("translateOnSingular", outcome(() => c.translate(5, 5)));
-      a.observe("scaleOnSingular", outcome(() => c.scale(2, 2)));
-      a.observe("rotateOnSingular", outcome(() => c.rotate(1)));
-      a.observe("rescue", outcome(() => c.setTransform(1, 0, 0, 1, 0, 0)));
+      a.observe(
+        "translateOnSingular",
+        outcome(() => c.translate(5, 5)),
+      );
+      a.observe(
+        "scaleOnSingular",
+        outcome(() => c.scale(2, 2)),
+      );
+      a.observe(
+        "rotateOnSingular",
+        outcome(() => c.rotate(1)),
+      );
+      a.observe(
+        "rescue",
+        outcome(() => c.setTransform(1, 0, 0, 1, 0, 0)),
+      );
       c.scale(0, 0);
-      a.observe("translateAfterZeroScale", outcome(() => c.translate(5, 5)));
+      a.observe(
+        "translateAfterZeroScale",
+        outcome(() => c.translate(5, 5)),
+      );
     },
   },
   {
@@ -189,14 +291,42 @@ export const cases: CaseDefinition[] = [
       const rotate = c.rotate as (...args: unknown[]) => void;
       const scale = c.scale as (...args: unknown[]) => void;
       const setTransform = c.setTransform as (...args: unknown[]) => void;
-      const loose = c as unknown as { globalAlpha: unknown; lineWidth: unknown };
-      a.observe("translate", outcome(() => translate.call(c, 1n, 0)));
-      a.observe("rotate", outcome(() => rotate.call(c, 1n)));
-      a.observe("scale", outcome(() => scale.call(c, 1n, 1)));
-      a.observe("setTransform", outcome(() => setTransform.call(c, 1n, 0, 0, 1, 0, 0)));
-      a.observe("globalAlpha", outcome(() => { loose.globalAlpha = 1n; }));
-      a.observe("lineWidth", outcome(() => { loose.lineWidth = 1n; }));
-      a.assert(c.globalAlpha === 1 && c.lineWidth === 1, "BigInt assignments change nothing");
+      const loose = c as unknown as {
+        globalAlpha: unknown;
+        lineWidth: unknown;
+      };
+      a.observe(
+        "translate",
+        outcome(() => translate.call(c, 1n, 0)),
+      );
+      a.observe(
+        "rotate",
+        outcome(() => rotate.call(c, 1n)),
+      );
+      a.observe(
+        "scale",
+        outcome(() => scale.call(c, 1n, 1)),
+      );
+      a.observe(
+        "setTransform",
+        outcome(() => setTransform.call(c, 1n, 0, 0, 1, 0, 0)),
+      );
+      a.observe(
+        "globalAlpha",
+        outcome(() => {
+          loose.globalAlpha = 1n;
+        }),
+      );
+      a.observe(
+        "lineWidth",
+        outcome(() => {
+          loose.lineWidth = 1n;
+        }),
+      );
+      a.assert(
+        c.globalAlpha === 1 && c.lineWidth === 1,
+        "BigInt assignments change nothing",
+      );
     },
   },
 ];

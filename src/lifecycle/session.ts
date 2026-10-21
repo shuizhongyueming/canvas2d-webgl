@@ -28,10 +28,7 @@ export interface ContextEvent {
 }
 
 export interface ContextEventTarget {
-  addEventListener(
-    type: string,
-    listener: (event: ContextEvent) => void,
-  ): void;
+  addEventListener(type: string, listener: (event: ContextEvent) => void): void;
   removeEventListener(
     type: string,
     listener: (event: ContextEvent) => void,

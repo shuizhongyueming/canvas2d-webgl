@@ -80,9 +80,7 @@ const CLEAR_PAINT: Paint = Object.freeze({
   color: Object.freeze([0, 0, 0, 1]) as Color,
 }) as Paint;
 
-export const rectFeature: FeatureFactory = (
-  environment,
-): FeatureDefinition => {
+export const rectFeature: FeatureFactory = (environment): FeatureDefinition => {
   const state = environment?.state;
   const gpu = environment?.gpu;
   const raster = environment?.raster;
@@ -120,9 +118,10 @@ export const rectFeature: FeatureFactory = (
         generation: gpu.generation,
         kind: "draw",
         state: snapshot,
-        source: source.bounds.width <= 0 || source.bounds.height <= 0
-          ? { kind: "empty" }
-          : source,
+        source:
+          source.bounds.width <= 0 || source.bounds.height <= 0
+            ? { kind: "empty" }
+            : source,
         sourceBounds: source.bounds,
         clip: snapshot.clip,
       });

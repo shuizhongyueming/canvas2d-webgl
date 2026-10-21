@@ -50,12 +50,18 @@ export const cases: CaseDefinition[] = [
     async run(a) {
       const context = asNative(a.context);
       const image = await loadImage(STRIPES_3x5);
-      a.observe("two", errorInfo(() => context.createPattern(image, "repeat")));
+      a.observe(
+        "two",
+        errorInfo(() => context.createPattern(image, "repeat")),
+      );
       a.observe(
         "one",
         errorInfo(() => callRaw(context, "createPattern", image)),
       );
-      a.observe("zero", errorInfo(() => callRaw(context, "createPattern")));
+      a.observe(
+        "zero",
+        errorInfo(() => callRaw(context, "createPattern")),
+      );
     },
   },
   {
@@ -76,8 +82,14 @@ export const cases: CaseDefinition[] = [
     async run(a) {
       const context = asNative(a.context);
       const image = await loadImage(STRIPES_3x5);
-      a.observe("repeat", errorInfo(() => context.createPattern(image, "repeat")));
-      a.observe("empty", errorInfo(() => context.createPattern(image, "")));
+      a.observe(
+        "repeat",
+        errorInfo(() => context.createPattern(image, "repeat")),
+      );
+      a.observe(
+        "empty",
+        errorInfo(() => context.createPattern(image, "")),
+      );
       a.observe(
         "null",
         errorInfo(() => callRaw(context, "createPattern", image, null)),
@@ -108,8 +120,14 @@ export const cases: CaseDefinition[] = [
     async run(a) {
       const context = asNative(a.context);
       const image = await loadImage(STRIPES_3x5);
-      a.observe("bogus", errorInfo(() => context.createPattern(image, "bogus")));
-      a.observe("case", errorInfo(() => context.createPattern(image, "REPEAT")));
+      a.observe(
+        "bogus",
+        errorInfo(() => context.createPattern(image, "bogus")),
+      );
+      a.observe(
+        "case",
+        errorInfo(() => context.createPattern(image, "REPEAT")),
+      );
       a.observe(
         "undefined",
         errorInfo(() => callRaw(context, "createPattern", image, undefined)),
@@ -209,7 +227,10 @@ export const cases: CaseDefinition[] = [
         broken.onerror = resolve;
         broken.src = "data:image/png;base64,bogus";
       });
-      a.observe("broken", errorInfo(() => context.createPattern(broken, "repeat")));
+      a.observe(
+        "broken",
+        errorInfo(() => context.createPattern(broken, "repeat")),
+      );
       // Repetition validates before usability, on both sides.
       a.observe(
         "pendingBadRep",
@@ -223,7 +244,10 @@ export const cases: CaseDefinition[] = [
     requirements: ["context.createPattern", "context.translate"],
     async run(a) {
       const context = asNative(a.context);
-      const pattern = context.createPattern(await loadImage(STRIPES_3x5), "repeat");
+      const pattern = context.createPattern(
+        await loadImage(STRIPES_3x5),
+        "repeat",
+      );
       context.translate(1, 0);
       assignFill(context, pattern);
       context.fillRect(0, 0, 24, 24);
@@ -243,7 +267,10 @@ export const cases: CaseDefinition[] = [
       const context = asNative(a.context);
       context.save();
       context.translate(1, 0);
-      const pattern = context.createPattern(await loadImage(STRIPES_3x5), "repeat");
+      const pattern = context.createPattern(
+        await loadImage(STRIPES_3x5),
+        "repeat",
+      );
       context.restore(); // draw-time space is identity again
       assignFill(context, pattern);
       context.fillRect(0, 0, 24, 24);
@@ -258,7 +285,10 @@ export const cases: CaseDefinition[] = [
     requirements: ["context.createPattern", "context.scale"],
     async run(a) {
       const context = asNative(a.context);
-      const pattern = context.createPattern(await loadImage(STRIPES_3x5), "repeat");
+      const pattern = context.createPattern(
+        await loadImage(STRIPES_3x5),
+        "repeat",
+      );
       context.scale(2, 3);
       assignFill(context, pattern);
       context.fillRect(0, 0, 24, 16);
@@ -270,7 +300,10 @@ export const cases: CaseDefinition[] = [
     requirements: ["context.createPattern", "context.rotate"],
     async run(a) {
       const context = asNative(a.context);
-      const pattern = context.createPattern(await loadImage(STRIPES_3x5), "repeat");
+      const pattern = context.createPattern(
+        await loadImage(STRIPES_3x5),
+        "repeat",
+      );
       context.translate(32, 32);
       context.rotate(Math.PI / 6);
       assignFill(context, pattern);
@@ -283,7 +316,10 @@ export const cases: CaseDefinition[] = [
     requirements: ["context.createPattern", "context.fillRect"],
     async run(a) {
       const context = asNative(a.context);
-      const pattern = context.createPattern(await loadImage(STRIPES_3x5), "repeat");
+      const pattern = context.createPattern(
+        await loadImage(STRIPES_3x5),
+        "repeat",
+      );
       assignFill(context, pattern);
       // Rect edges exactly on tile boundaries (multiples of 3 and 5) and
       // straddling partial tiles, to expose wrap seams and phase offsets.

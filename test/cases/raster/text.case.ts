@@ -28,7 +28,10 @@ async function run(a: CaseAdapter): Promise<void> {
     const expected = reference.measureText("Canvas-2d").width;
     const actual = lab.rasterizer.measureWidth("Canvas-2d", state);
     a.observe(`measure:${align}`, actual);
-    a.assert(actual === expected, `measureText width matches native for ${align}`);
+    a.assert(
+      actual === expected,
+      `measureText width matches native for ${align}`,
+    );
   }
 
   for (const align of ALIGNS) {
@@ -65,7 +68,13 @@ async function run(a: CaseAdapter): Promise<void> {
   strokeReference.lineJoin = "round";
   strokeReference.strokeStyle = "rgba(26,64,191,1)";
   strokeReference.strokeText("Outline", 100, 100);
-  const stroked = lab.rasterizer.text("Outline", 100, 100, strokeState, "stroke");
+  const stroked = lab.rasterizer.text(
+    "Outline",
+    100,
+    100,
+    strokeState,
+    "stroke",
+  );
   compareAsset(a, strokeReference, stroked, "strokeText");
   stroked.release();
 

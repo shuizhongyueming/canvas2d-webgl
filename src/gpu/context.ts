@@ -35,7 +35,9 @@ export function acquireWebGLContext(
 }
 
 /** Validate the real attributes and required capabilities of a live context. */
-export function validateContext(gl: WebGLRenderingContext): ContextCapabilities {
+export function validateContext(
+  gl: WebGLRenderingContext,
+): ContextCapabilities {
   const attributes = gl.getContextAttributes?.();
   if (!attributes)
     throw createCompatError(

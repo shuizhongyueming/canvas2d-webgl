@@ -226,10 +226,7 @@ export const cases: CaseDefinition[] = [
         record.sceneAtRestore?.cleared === true,
         "the restored callback observes an empty scene",
       );
-      a.assert(
-        record.drawAtRestore === "ok",
-        "the restored callback can draw",
-      );
+      a.assert(record.drawAtRestore === "ok", "the restored callback can draw");
       await present(hooks);
       const scene = hooks.readScene();
       a.assert(
@@ -281,7 +278,11 @@ export const cases: CaseDefinition[] = [
       const before = sceneState(hooks);
 
       extension.loseContext();
-      await waitFor(() => record.lost === 1, "the real context-loss event", 10000);
+      await waitFor(
+        () => record.lost === 1,
+        "the real context-loss event",
+        10000,
+      );
       a.assert(gl.isContextLost(), "the platform really lost the context");
       a.assert(
         capture(() => hooks.readScene()) === "capability-unavailable",

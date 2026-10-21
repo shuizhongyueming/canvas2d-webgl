@@ -71,9 +71,7 @@ function unsupportedPath2D(): never {
   );
 }
 
-export const clipFeature: FeatureFactory = (
-  environment,
-): FeatureDefinition => {
+export const clipFeature: FeatureFactory = (environment): FeatureDefinition => {
   const state = environment?.state;
   const path = environment?.path;
   const gpu = environment?.gpu;

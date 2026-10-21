@@ -40,7 +40,10 @@ function compileShader(
 ): WebGLShader {
   const shader = gl.createShader(type);
   if (!shader)
-    throw createCompatError(ERROR_CODES.INITIALIZATION, "shader creation failed");
+    throw createCompatError(
+      ERROR_CODES.INITIALIZATION,
+      "shader creation failed",
+    );
   gl.shaderSource(shader, source);
   gl.compileShader(shader);
   if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {

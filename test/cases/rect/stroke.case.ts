@@ -35,7 +35,13 @@ export const cases: CaseDefinition[] = [
   {
     ...renderBase,
     id: "rect.strokeRect.transform",
-    requirements: ["context.strokeRect", "context.rotate", "context.translate", "context.setTransform", "context.lineWidth"],
+    requirements: [
+      "context.strokeRect",
+      "context.rotate",
+      "context.translate",
+      "context.setTransform",
+      "context.lineWidth",
+    ],
     run(a) {
       const context = a.context;
       context.lineWidth = 2;
@@ -103,7 +109,12 @@ export const cases: CaseDefinition[] = [
   {
     ...renderBase,
     id: "rect.strokeRect.alpha-overlap",
-    requirements: ["context.strokeRect", "context.fillRect", "context.globalAlpha", "context.lineWidth"],
+    requirements: [
+      "context.strokeRect",
+      "context.fillRect",
+      "context.globalAlpha",
+      "context.lineWidth",
+    ],
     run(a) {
       const context = a.context;
       context.fillStyle = "#0000ff";

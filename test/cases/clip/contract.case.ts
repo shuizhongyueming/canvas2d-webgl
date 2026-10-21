@@ -13,10 +13,7 @@ const base = {
 type ClipContext = CanvasRenderingContext2D;
 
 /** Invoke clip with arguments outside its declared signature. */
-export function callClip(
-  context: unknown,
-  ...args: unknown[]
-): unknown {
+export function callClip(context: unknown, ...args: unknown[]): unknown {
   return Reflect.apply(
     (context as { clip: (...realArgs: unknown[]) => unknown }).clip,
     context,
@@ -75,18 +72,38 @@ export const cases: CaseDefinition[] = [
       );
       // Exact native enum conversion messages: the compat side must not
       // invent its own wording for legal-but-unsupported or illegal values.
-      a.observe("invalidRule", message(() => callClip(context, "foo")));
-      a.observe("nullRule", message(() => callClip(context, null)));
-      a.observe("numberRule", message(() => callClip(context, 1)));
-      a.observe("objectRule", message(() => callClip(context, {})));
-      a.observe("symbolRule", message(() => callClip(context, Symbol("x"))));
+      a.observe(
+        "invalidRule",
+        message(() => callClip(context, "foo")),
+      );
+      a.observe(
+        "nullRule",
+        message(() => callClip(context, null)),
+      );
+      a.observe(
+        "numberRule",
+        message(() => callClip(context, 1)),
+      );
+      a.observe(
+        "objectRule",
+        message(() => callClip(context, {})),
+      );
+      a.observe(
+        "symbolRule",
+        message(() => callClip(context, Symbol("x"))),
+      );
       // Two arguments select the Path2D overload at the WebIDL layer. Compat
       // reports the unapproved overload; native runs the spec-legal form.
       const path = path2D();
       if (path !== null) {
-        const result = outcome(() => isolated(context, () => callClip(context, path)));
+        const result = outcome(() =>
+          isolated(context, () => callClip(context, path)),
+        );
         const expected = isCompat(a) ? "unsupported-api" : "ok";
-        a.assert(result === expected, "Path2D overload follows approved semantics");
+        a.assert(
+          result === expected,
+          "Path2D overload follows approved semantics",
+        );
         a.observe("path2d", result === expected ? "as-approved" : result);
         const withRule = outcome(() =>
           isolated(context, () => callClip(context, path, "evenodd")),
@@ -103,7 +120,9 @@ export const cases: CaseDefinition[] = [
         // resolution in both implementations.
         a.observe(
           "twoArguments",
-          outcome(() => isolated(context, () => callClip(context, "evenodd", 1))),
+          outcome(() =>
+            isolated(context, () => callClip(context, "evenodd", 1)),
+          ),
         );
       }
       // clip never draws: existing pixels survive the call itself.
@@ -131,17 +150,29 @@ export const cases: CaseDefinition[] = [
       const context = a.context as ClipContext;
       // A zero-argument clip on an empty path empties the region; keep it
       // isolated so the intersection sequence below starts fresh.
-      a.observe("zero", outcome(() => isolated(context, () => callClip(context))));
+      a.observe(
+        "zero",
+        outcome(() => isolated(context, () => callClip(context))),
+      );
       context.save();
       context.beginPath();
       context.rect(0, 0, 32, 32);
-      a.observe("zeroWithPath", outcome(() => callClip(context)));
+      a.observe(
+        "zeroWithPath",
+        outcome(() => callClip(context)),
+      );
       context.beginPath();
       context.rect(4, 4, 24, 24);
-      a.observe("intersectAgain", outcome(() => callClip(context)));
+      a.observe(
+        "intersectAgain",
+        outcome(() => callClip(context)),
+      );
       context.beginPath();
       context.rect(8, 8, 16, 16);
-      a.observe("thirdClip", outcome(() => callClip(context)));
+      a.observe(
+        "thirdClip",
+        outcome(() => callClip(context)),
+      );
       context.fillStyle = "#0000ff";
       context.fillRect(0, 0, 32, 32);
       const scene = await dumpScene(a);
@@ -172,7 +203,10 @@ export const cases: CaseDefinition[] = [
         context.save();
         context.beginPath();
         context.rect(0, 0, 32, 32);
-        a.observe(label, outcome(() => callClip(context, rule)));
+        a.observe(
+          label,
+          outcome(() => callClip(context, rule)),
+        );
         context.restore();
       }
       // Extra arguments beyond one still select the Path2D overload; the

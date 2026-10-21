@@ -22,7 +22,10 @@ export const cases: CaseDefinition[] = [
       const calls: Array<[string, () => unknown]> = [
         ["bezierCurveTo", () => context.bezierCurveTo!(0, 0, 1, 1, 2, 2)],
         ["setLineDash", () => context.setLineDash!([1, 2])],
-        ["createRadialGradient", () => context.createRadialGradient!(0, 0, 1, 0, 0, 2)],
+        [
+          "createRadialGradient",
+          () => context.createRadialGradient!(0, 0, 1, 0, 0, 2),
+        ],
       ];
       const expected = isCompat(a) ? "unsupported-api" : "ok";
       const results = calls.map(

@@ -34,7 +34,10 @@ export const cases: CaseDefinition[] = [
       await present(hooks);
       const generation = hooks.readScene().generation;
       const displayed = displayPixel(gl, 8, 6, 0, 0);
-      a.assert(displayed[0] === 255 && displayed[3] === 255, "red is on display");
+      a.assert(
+        displayed[0] === 255 && displayed[3] === 255,
+        "red is on display",
+      );
 
       // Queue another draw, then dispose before the microtask checkpoint.
       context.fillStyle = "#0000ff";
@@ -63,7 +66,10 @@ export const cases: CaseDefinition[] = [
       a.observe("displayed", afterDispose);
       a.observe("contextAlive", !gl.isContextLost());
       a.observe("targetSize", [target.width, target.height]);
-      a.observe("hookAfterDispose", capture(() => hooks.readScene()));
+      a.observe(
+        "hookAfterDispose",
+        capture(() => hooks.readScene()),
+      );
     },
   },
   {
@@ -113,7 +119,10 @@ export const cases: CaseDefinition[] = [
       );
       a.assert(!gl.isContextLost(), "dispose does not lose the context");
       a.observe("disposedCode", "disposed");
-      a.observe("styleForwarded", canvas.style.getPropertyValue("--c2w-dispose"));
+      a.observe(
+        "styleForwarded",
+        canvas.style.getPropertyValue("--c2w-dispose"),
+      );
       a.observe("contextAlive", !gl.isContextLost());
       a.observe("targetSize", [target.width, target.height]);
     },
@@ -137,14 +146,15 @@ export const cases: CaseDefinition[] = [
       canvas.dispose();
 
       // A platform event after disposal must not re-enter the library.
-      target.dispatchEvent(
-        new Event("webglcontextlost", { cancelable: true }),
-      );
+      target.dispatchEvent(new Event("webglcontextlost", { cancelable: true }));
       target.dispatchEvent(new Event("webglcontextrestored"));
       await task();
       a.assert(lost === 0, "the lost listener was removed");
       a.assert(restored === 0, "the restored listener was removed");
-      a.assert(!gl.isContextLost(), "a late lost event did not lose the context");
+      a.assert(
+        !gl.isContextLost(),
+        "a late lost event did not lose the context",
+      );
       a.observe("lostCallbacks", lost);
       a.observe("restoredCallbacks", restored);
       a.observe("contextAlive", !gl.isContextLost());

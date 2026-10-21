@@ -1,7 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { capture } from "./helpers.mjs";
-import { LinearGradientPaint, isCompatGradient } from "../../../dist/paint/gradient.js";
+import {
+  LinearGradientPaint,
+  isCompatGradient,
+} from "../../../dist/paint/gradient.js";
 
 const make = () => new LinearGradientPaint(1, [0, 0], [10, 0]);
 

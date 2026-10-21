@@ -94,12 +94,18 @@ export async function loadTilePaint(
   id: number,
 ): Promise<{ image: HTMLImageElement; paint: Paint }> {
   const image = await loadTileImage();
-  const pattern = createRepeatPattern(image, "repeat", 2, () => id, (width, height) => {
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    return canvas;
-  });
+  const pattern = createRepeatPattern(
+    image,
+    "repeat",
+    2,
+    () => id,
+    (width, height) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      return canvas;
+    },
+  );
   if (!pattern) throw new Error("tile pattern unavailable");
   return { image, paint: pattern.snapshot() };
 }
@@ -124,7 +130,9 @@ function readRegion(
 }
 
 export function sourcePixels(source: RasterSource): Uint8ClampedArray {
-  const context = source.canvas.getContext("2d") as CanvasRenderingContext2D | null;
+  const context = source.canvas.getContext(
+    "2d",
+  ) as CanvasRenderingContext2D | null;
   if (!context) throw new Error("asset canvas is not readable");
   return readRegion(context, 0, 0, source.pixelWidth, source.pixelHeight);
 }
@@ -146,7 +154,13 @@ export function diffAsset(
     for (let i = 3; i < scene.length; i += 4) if (scene[i] !== 0) ink += 1;
     return { mismatched: ink, escaped: 0 };
   }
-  const covered = readRegion(reference, bounds.x, bounds.y, bounds.width, bounds.height);
+  const covered = readRegion(
+    reference,
+    bounds.x,
+    bounds.y,
+    bounds.width,
+    bounds.height,
+  );
   let mismatched = covered.length === asset.length ? 0 : 1;
   for (let i = 0; i < asset.length && i < covered.length; i += 1)
     if (asset[i] !== covered[i]) mismatched += 1;
@@ -180,7 +194,10 @@ export function compareAsset(
   const { bounds } = source;
   if (bounds.width === 0 || bounds.height === 0) {
     const { mismatched } = diffAsset(reference, source);
-    a.assert(mismatched === 0, `${label}: degenerate asset and native render are both empty`);
+    a.assert(
+      mismatched === 0,
+      `${label}: degenerate asset and native render are both empty`,
+    );
     return;
   }
   const { mismatched, escaped } = diffAsset(reference, source);

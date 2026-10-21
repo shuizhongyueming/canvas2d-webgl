@@ -24,7 +24,10 @@ export const cases: CaseDefinition[] = [
         a.canvas.style.getPropertyValue("--c2w-probe") === "7",
         "style writes reach the computed declaration",
       );
-      a.observe("customProperty", a.canvas.style.getPropertyValue("--c2w-probe"));
+      a.observe(
+        "customProperty",
+        a.canvas.style.getPropertyValue("--c2w-probe"),
+      );
       a.observe("identityStable", style === a.canvas.style);
     },
   },
@@ -46,7 +49,10 @@ export const cases: CaseDefinition[] = [
       a.canvas.removeEventListener(PROBE_EVENT, listener);
       a.assert(fired === 1, "a registered listener fires exactly once");
       a.assert(observedType === PROBE_EVENT, "the event type matches");
-      a.assert(thisIsCurrentTarget, "the listener runs on the real event target");
+      a.assert(
+        thisIsCurrentTarget,
+        "the listener runs on the real event target",
+      );
       a.observe("fired", fired);
       a.observe("type", observedType);
     },

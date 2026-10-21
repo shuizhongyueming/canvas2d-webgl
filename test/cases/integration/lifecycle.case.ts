@@ -198,7 +198,9 @@ export const cases: CaseDefinition[] = [
       try {
         await fillCaches(context);
         const generation = hooks.readScene().generation;
-        target.dispatchEvent(new Event("webglcontextlost", { cancelable: true }));
+        target.dispatchEvent(
+          new Event("webglcontextlost", { cancelable: true }),
+        );
         // Approved context-lost semantics: drawing is silently ineffective and
         // is never queued, matching native rather than reporting an error.
         const whileLost = capture(() => {

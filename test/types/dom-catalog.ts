@@ -1,4 +1,5 @@
-type DeclaredContextMember = "drawImage"
+type DeclaredContextMember =
+  | "drawImage"
   | "fillRect"
   | "clearRect"
   | "strokeRect"
@@ -72,5 +73,10 @@ type DeclaredContextMember = "drawImage"
   | "letterSpacing"
   | "wordSpacing"
   | "lang";
-const allDOMMembersAccountedFor: Exclude<keyof CanvasRenderingContext2D, DeclaredContextMember> extends never ? true : Exclude<keyof CanvasRenderingContext2D, DeclaredContextMember> = true;
+const allDOMMembersAccountedFor: Exclude<
+  keyof CanvasRenderingContext2D,
+  DeclaredContextMember
+> extends never
+  ? true
+  : Exclude<keyof CanvasRenderingContext2D, DeclaredContextMember> = true;
 void allDOMMembersAccountedFor;

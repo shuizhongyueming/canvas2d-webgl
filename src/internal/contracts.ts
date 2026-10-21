@@ -178,7 +178,9 @@ export interface GPUDevice {
   lose(): void;
   restore(): void;
   dispose(): void;
-  acquireTexture(source: RasterSource | ImageSource | PatternBitmap): ResourceLease;
+  acquireTexture(
+    source: RasterSource | ImageSource | PatternBitmap,
+  ): ResourceLease;
   /** Obtain a separate lease for a live handle; stale generations fail explicitly. */
   retain(handle: ResourceHandle): ResourceLease;
 }
@@ -277,7 +279,10 @@ export interface FeatureEnvironment {
    * (CompatOptions.createOffscreenCanvas). Consumers that need it fail
    * capability-unavailable when it is absent; no silent fallback.
    */
-  readonly createOffscreenCanvas?: (width: number, height: number) => NativeCanvas;
+  readonly createOffscreenCanvas?: (
+    width: number,
+    height: number,
+  ) => NativeCanvas;
 }
 export interface FeatureDefinition {
   readonly id: string;

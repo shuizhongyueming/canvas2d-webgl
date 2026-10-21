@@ -4,7 +4,10 @@ import { relative } from "node:path";
 import { pathToFileURL } from "node:url";
 import { discover } from "../../scripts/discover.mjs";
 import { SUPPORT_MATRIX } from "../../dist/contracts/support.js";
-import { apiCases, interactionCases } from "../../.build/test/cases/manifest/index.js";
+import {
+  apiCases,
+  interactionCases,
+} from "../../.build/test/cases/manifest/index.js";
 export const requiredCatalog = [...apiCases, ...interactionCases];
 export function validateCases(cases, requirements, required = requiredCatalog) {
   const ids = new Set();

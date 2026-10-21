@@ -34,7 +34,10 @@ export const cases: CaseDefinition[] = [
         stencil: attributes?.stencil === true,
         preserveDrawingBuffer: attributes?.preserveDrawingBuffer === false,
       });
-      a.observe("stencilBitsPositive", (gl.getParameter(gl.STENCIL_BITS) as number) > 0);
+      a.observe(
+        "stencilBitsPositive",
+        (gl.getParameter(gl.STENCIL_BITS) as number) > 0,
+      );
       a.observe("status", device.status);
       a.observe("generation", device.generation);
       a.observe("size", [device.width, device.height]);
@@ -78,8 +81,9 @@ export const cases: CaseDefinition[] = [
         canvas.height = 8;
         a.observe(
           `failAfter:${step}`,
-          captureError(() => gpu.createSceneRenderer(canvas, { failAfter: step }))
-            ?.code ?? "no-error",
+          captureError(() =>
+            gpu.createSceneRenderer(canvas, { failAfter: step }),
+          )?.code ?? "no-error",
         );
         const gl = canvas.getContext("webgl") as WebGLRenderingContext | null;
         a.observe(`aliveAfter:${step}`, !!gl && !gl.isContextLost());

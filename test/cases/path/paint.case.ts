@@ -19,7 +19,14 @@ export const cases: CaseDefinition[] = [
   {
     ...renderBase,
     id: "path.fill.paint-gradient",
-    requirements: ["context.fill", "context.createLinearGradient", "context.fillStyle", "context.rect", "context.translate", "context.setTransform"],
+    requirements: [
+      "context.fill",
+      "context.createLinearGradient",
+      "context.fillStyle",
+      "context.rect",
+      "context.translate",
+      "context.setTransform",
+    ],
     run(a) {
       const context = a.context;
       const ramp = context.createLinearGradient(0, 0, 32, 0);
@@ -45,10 +52,20 @@ export const cases: CaseDefinition[] = [
   {
     ...renderBase,
     id: "path.fill.paint-pattern",
-    requirements: ["context.fill", "context.createPattern", "context.fillStyle", "context.rect", "context.translate", "context.setTransform"],
+    requirements: [
+      "context.fill",
+      "context.createPattern",
+      "context.fillStyle",
+      "context.rect",
+      "context.translate",
+      "context.setTransform",
+    ],
     async run(a) {
       const context = a.context;
-      const pattern = context.createPattern(await loadImage(STRIPES_3x5), "repeat");
+      const pattern = context.createPattern(
+        await loadImage(STRIPES_3x5),
+        "repeat",
+      );
       a.assert(pattern !== null, "repeat pattern created");
       if (!pattern) throw new Error("repeat pattern unavailable");
       context.fillStyle = pattern;
@@ -70,7 +87,14 @@ export const cases: CaseDefinition[] = [
   {
     ...renderBase,
     id: "path.stroke.paint-gradient",
-    requirements: ["context.stroke", "context.createLinearGradient", "context.strokeStyle", "context.moveTo", "context.lineTo", "context.lineWidth"],
+    requirements: [
+      "context.stroke",
+      "context.createLinearGradient",
+      "context.strokeStyle",
+      "context.moveTo",
+      "context.lineTo",
+      "context.lineWidth",
+    ],
     run(a) {
       const context = a.context;
       const ramp = context.createLinearGradient(0, 0, 64, 0);
@@ -94,10 +118,19 @@ export const cases: CaseDefinition[] = [
   {
     ...renderBase,
     id: "path.stroke.paint-pattern",
-    requirements: ["context.stroke", "context.createPattern", "context.strokeStyle", "context.rect", "context.lineWidth"],
+    requirements: [
+      "context.stroke",
+      "context.createPattern",
+      "context.strokeStyle",
+      "context.rect",
+      "context.lineWidth",
+    ],
     async run(a) {
       const context = a.context;
-      const pattern = context.createPattern(await loadImage(STRIPES_3x5), "repeat");
+      const pattern = context.createPattern(
+        await loadImage(STRIPES_3x5),
+        "repeat",
+      );
       a.assert(pattern !== null, "repeat pattern created");
       if (!pattern) throw new Error("repeat pattern unavailable");
       context.strokeStyle = pattern;
@@ -112,59 +145,87 @@ export const cases: CaseDefinition[] = [
       context.stroke();
     },
   },
-  ...(["fill", "stroke"] as const).map((mode): CaseDefinition => ({
-    ...renderBase,
-    id: `path.paint.gradient-stop-mutation-${mode}`,
-    requirements: [`context.${mode}`, "context.createLinearGradient", "gradient.addColorStop", "context.rect"],
-    kind: "combined",
-    async run(a) {
-      const context = a.context;
-      const ramp = context.createLinearGradient(0, 0, 32, 0);
-      ramp.addColorStop(0, "#ff0000");
-      ramp.addColorStop(1, "#ff0000");
-      context.fillStyle = ramp;
-      context.strokeStyle = ramp;
-      context.lineWidth = 4;
-      context.beginPath();
-      context.rect(4, 4, 24, 24);
-      context[mode]();
-      const before = await dumpScene(a);
-      a.assert(pixelsEqual(before.pixel(5, 16), [255, 0, 0, 255]), "initial paint is red");
-      ramp.addColorStop(0.01, "#0000ff");
-      ramp.addColorStop(0.99, "#0000ff");
-      context[mode]();
-      const after = await dumpScene(a);
-      a.assert(pixelsEqual(after.pixel(5, 16), [0, 0, 255, 255]), "mutating stops invalidates the retained path asset");
-      a.observe("mutatedPixels", [after.pixel(5, 16), after.pixel(26, 16)]);
-    },
-  })),
-  ...(["gradient", "pattern"] as const).map((paint): CaseDefinition => ({
-    ...renderBase,
-    id: `rect.strokeRect.paint-${paint}`,
-    requirements: ["context.strokeRect", "context.strokeStyle", "context.createLinearGradient", "context.createPattern"],
-    async run(a) {
-      const context = a.context;
-      if (paint === "gradient") {
-        const ramp = context.createLinearGradient(0, 0, 64, 0);
+  ...(["fill", "stroke"] as const).map(
+    (mode): CaseDefinition => ({
+      ...renderBase,
+      id: `path.paint.gradient-stop-mutation-${mode}`,
+      requirements: [
+        `context.${mode}`,
+        "context.createLinearGradient",
+        "gradient.addColorStop",
+        "context.rect",
+      ],
+      kind: "combined",
+      async run(a) {
+        const context = a.context;
+        const ramp = context.createLinearGradient(0, 0, 32, 0);
         ramp.addColorStop(0, "#ff0000");
-        ramp.addColorStop(1, "#0000ff");
+        ramp.addColorStop(1, "#ff0000");
+        context.fillStyle = ramp;
         context.strokeStyle = ramp;
-      } else {
-        const pattern = context.createPattern(await loadImage(STRIPES_3x5), "repeat");
-        if (!pattern) throw new Error("repeat pattern unavailable");
-        context.strokeStyle = pattern;
-      }
-      context.lineWidth = 6;
-      context.strokeRect(8, 8, 40, 24);
-      context.translate(32, 44);
-      context.rotate(Math.PI / 8);
-      context.strokeRect(-12, -8, 24, 16);
-    },
-  })),
+        context.lineWidth = 4;
+        context.beginPath();
+        context.rect(4, 4, 24, 24);
+        context[mode]();
+        const before = await dumpScene(a);
+        a.assert(
+          pixelsEqual(before.pixel(5, 16), [255, 0, 0, 255]),
+          "initial paint is red",
+        );
+        ramp.addColorStop(0.01, "#0000ff");
+        ramp.addColorStop(0.99, "#0000ff");
+        context[mode]();
+        const after = await dumpScene(a);
+        a.assert(
+          pixelsEqual(after.pixel(5, 16), [0, 0, 255, 255]),
+          "mutating stops invalidates the retained path asset",
+        );
+        a.observe("mutatedPixels", [after.pixel(5, 16), after.pixel(26, 16)]);
+      },
+    }),
+  ),
+  ...(["gradient", "pattern"] as const).map(
+    (paint): CaseDefinition => ({
+      ...renderBase,
+      id: `rect.strokeRect.paint-${paint}`,
+      requirements: [
+        "context.strokeRect",
+        "context.strokeStyle",
+        "context.createLinearGradient",
+        "context.createPattern",
+      ],
+      async run(a) {
+        const context = a.context;
+        if (paint === "gradient") {
+          const ramp = context.createLinearGradient(0, 0, 64, 0);
+          ramp.addColorStop(0, "#ff0000");
+          ramp.addColorStop(1, "#0000ff");
+          context.strokeStyle = ramp;
+        } else {
+          const pattern = context.createPattern(
+            await loadImage(STRIPES_3x5),
+            "repeat",
+          );
+          if (!pattern) throw new Error("repeat pattern unavailable");
+          context.strokeStyle = pattern;
+        }
+        context.lineWidth = 6;
+        context.strokeRect(8, 8, 40, 24);
+        context.translate(32, 44);
+        context.rotate(Math.PI / 8);
+        context.strokeRect(-12, -8, 24, 16);
+      },
+    }),
+  ),
   {
     ...renderBase,
     id: "rect.paint.gradient-stop-mutation",
-    requirements: ["context.fillRect", "context.strokeRect", "context.createLinearGradient", "gradient.addColorStop"],
+    requirements: [
+      "context.fillRect",
+      "context.strokeRect",
+      "context.createLinearGradient",
+      "gradient.addColorStop",
+    ],
     kind: "combined",
     async run(a) {
       const context = a.context;
@@ -177,15 +238,27 @@ export const cases: CaseDefinition[] = [
       context.fillRect(4, 4, 20, 20);
       context.strokeRect(36, 4, 20, 20);
       const before = await dumpScene(a);
-      a.assert(pixelsEqual(before.pixel(8, 8), [255, 0, 0, 255]), "initial rect fill is red");
-      a.assert(pixelsEqual(before.pixel(36, 12), [255, 0, 0, 255]), "initial rect stroke is red");
+      a.assert(
+        pixelsEqual(before.pixel(8, 8), [255, 0, 0, 255]),
+        "initial rect fill is red",
+      );
+      a.assert(
+        pixelsEqual(before.pixel(36, 12), [255, 0, 0, 255]),
+        "initial rect stroke is red",
+      );
       ramp.addColorStop(0.01, "#0000ff");
       ramp.addColorStop(0.99, "#0000ff");
       context.fillRect(4, 4, 20, 20);
       context.strokeRect(36, 4, 20, 20);
       const after = await dumpScene(a);
-      a.assert(pixelsEqual(after.pixel(8, 8), [0, 0, 255, 255]), "rect fill consumes updated stops");
-      a.assert(pixelsEqual(after.pixel(36, 12), [0, 0, 255, 255]), "rect stroke consumes updated stops");
+      a.assert(
+        pixelsEqual(after.pixel(8, 8), [0, 0, 255, 255]),
+        "rect fill consumes updated stops",
+      );
+      a.assert(
+        pixelsEqual(after.pixel(36, 12), [0, 0, 255, 255]),
+        "rect stroke consumes updated stops",
+      );
     },
   },
 ];

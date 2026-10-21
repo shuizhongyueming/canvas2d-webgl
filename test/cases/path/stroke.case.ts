@@ -19,7 +19,13 @@ export const cases: CaseDefinition[] = [
   {
     ...renderBase,
     id: "context.stroke.render",
-    requirements: ["context.stroke", "context.beginPath", "context.moveTo", "context.lineTo", "context.lineWidth"],
+    requirements: [
+      "context.stroke",
+      "context.beginPath",
+      "context.moveTo",
+      "context.lineTo",
+      "context.lineWidth",
+    ],
     run(a) {
       const context = a.context;
       context.lineWidth = 2;
@@ -40,7 +46,14 @@ export const cases: CaseDefinition[] = [
   {
     ...renderBase,
     id: "path.stroke.nonuniform-scale",
-    requirements: ["context.stroke", "context.moveTo", "context.lineTo", "context.scale", "context.setTransform", "context.lineWidth"],
+    requirements: [
+      "context.stroke",
+      "context.moveTo",
+      "context.lineTo",
+      "context.scale",
+      "context.setTransform",
+      "context.lineWidth",
+    ],
     run(a) {
       const context = a.context;
       // The stroke width scales with the draw-time transform, anisotropically:
@@ -78,7 +91,15 @@ export const cases: CaseDefinition[] = [
   {
     ...renderBase,
     id: "path.stroke.linejoin-linecap",
-    requirements: ["context.stroke", "context.lineJoin", "context.lineCap", "context.lineWidth", "context.moveTo", "context.lineTo", "context.arc"],
+    requirements: [
+      "context.stroke",
+      "context.lineJoin",
+      "context.lineCap",
+      "context.lineWidth",
+      "context.moveTo",
+      "context.lineTo",
+      "context.arc",
+    ],
     run(a) {
       const context = a.context;
       context.lineWidth = 8;
@@ -114,7 +135,14 @@ export const cases: CaseDefinition[] = [
   {
     ...renderBase,
     id: "path.stroke.degenerate-caps",
-    requirements: ["context.stroke", "context.moveTo", "context.lineTo", "context.closePath", "context.lineCap", "context.lineWidth"],
+    requirements: [
+      "context.stroke",
+      "context.moveTo",
+      "context.lineTo",
+      "context.closePath",
+      "context.lineCap",
+      "context.lineWidth",
+    ],
     run(a) {
       const context = a.context;
       context.lineWidth = 6;
@@ -143,7 +171,16 @@ export const cases: CaseDefinition[] = [
   {
     ...renderBase,
     id: "path.stroke.construction-transform",
-    requirements: ["context.stroke", "context.rect", "context.translate", "context.rotate", "context.setTransform", "context.save", "context.restore", "context.lineWidth"],
+    requirements: [
+      "context.stroke",
+      "context.rect",
+      "context.translate",
+      "context.rotate",
+      "context.setTransform",
+      "context.save",
+      "context.restore",
+      "context.lineWidth",
+    ],
     run(a) {
       const context = a.context;
       // Built under rotation, stroked under identity: geometry keeps the

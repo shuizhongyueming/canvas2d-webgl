@@ -42,10 +42,29 @@ const NORMAL_ALIAS = "normal";
  * accepted input alias rather than a legal-but-unsupported value.
  */
 const RECOGNIZED_MODES: ReadonlySet<string> = new Set([
-  "clear", "copy", "destination-over", "destination-in", "destination-out",
-  "destination-atop", "source-out", "xor", "multiply", "screen", "overlay",
-  "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light",
-  "difference", "exclusion", "hue", "saturation", "color", "luminosity",
+  "clear",
+  "copy",
+  "destination-over",
+  "destination-in",
+  "destination-out",
+  "destination-atop",
+  "source-out",
+  "xor",
+  "multiply",
+  "screen",
+  "overlay",
+  "darken",
+  "lighten",
+  "color-dodge",
+  "color-burn",
+  "hard-light",
+  "soft-light",
+  "difference",
+  "exclusion",
+  "hue",
+  "saturation",
+  "color",
+  "luminosity",
 ]);
 
 export const compositeFeature: FeatureFactory = (
@@ -57,7 +76,10 @@ export const compositeFeature: FeatureFactory = (
       ERROR_CODES.CONTRACT,
       "composite feature requires environment.state",
     );
-  let parser: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null = null;
+  let parser:
+    | CanvasRenderingContext2D
+    | OffscreenCanvasRenderingContext2D
+    | null = null;
 
   function classifyFilter(
     context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
@@ -84,7 +106,10 @@ export const compositeFeature: FeatureFactory = (
         canvas.width = 0;
         canvas.height = 0;
       }
-      throw createCompatError(ERROR_CODES.CAPABILITY, "native filter parser is unavailable");
+      throw createCompatError(
+        ERROR_CODES.CAPABILITY,
+        "native filter parser is unavailable",
+      );
     }
     const release = () => {
       canvas.width = 0;

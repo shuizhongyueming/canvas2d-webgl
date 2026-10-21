@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { capture } from "./helpers.mjs";
-import { paintFeature, defaultStylePaint, DEFAULT_STYLE_IDS } from "../../../dist/paint/index.js";
+import {
+  paintFeature,
+  defaultStylePaint,
+  DEFAULT_STYLE_IDS,
+} from "../../../dist/paint/index.js";
 
 // Minimal StateStore double implementing the paint seam ("fill"/"stroke").
 function stateDouble(initial = {}) {
@@ -78,7 +82,11 @@ test("fillStyle/strokeStyle parse, canonicalize and keep invalid input ignored",
   }, TypeError);
   ctx.strokeStyle = "#010203";
   assert.equal(ctx.strokeStyle, "#010203");
-  assert.equal(ctx.fillStyle, "rgba(255, 120, 40, 0.5)", "independent state keys");
+  assert.equal(
+    ctx.fillStyle,
+    "rgba(255, 120, 40, 0.5)",
+    "independent state keys",
+  );
 });
 
 test("legal but out-of-scope style values report unsupported-api", () => {
@@ -146,7 +154,10 @@ test("createPattern captures through the environment factory or fails capability
   assert.equal(missing.code, "capability-unavailable");
   assert.throws(() => bare.createPattern({}, "repeat"), TypeError);
   assert.equal(
-    bare.createPattern({ complete: false, naturalWidth: 0, naturalHeight: 0 }, "repeat"),
+    bare.createPattern(
+      { complete: false, naturalWidth: 0, naturalHeight: 0 },
+      "repeat",
+    ),
     null,
   );
 });

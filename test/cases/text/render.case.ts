@@ -51,7 +51,11 @@ export const cases: CaseDefinition[] = [
   {
     ...renderBase,
     id: "text.render.align-baseline",
-    requirements: ["context.fillText", "context.textAlign", "context.textBaseline"],
+    requirements: [
+      "context.fillText",
+      "context.textAlign",
+      "context.textBaseline",
+    ],
     width: 132,
     height: 132,
     fonts: ["16px sans-serif"],
@@ -78,7 +82,12 @@ export const cases: CaseDefinition[] = [
   {
     ...renderBase,
     id: "text.render.transform",
-    requirements: ["context.fillText", "context.rotate", "context.scale", "context.setTransform"],
+    requirements: [
+      "context.fillText",
+      "context.rotate",
+      "context.scale",
+      "context.setTransform",
+    ],
     width: 128,
     height: 128,
     fonts: ["20px sans-serif"],
@@ -118,7 +127,12 @@ export const cases: CaseDefinition[] = [
   {
     ...renderBase,
     id: "text.render.paint-alpha",
-    requirements: ["context.fillText", "context.fillStyle", "context.globalAlpha", "context.createLinearGradient"],
+    requirements: [
+      "context.fillText",
+      "context.fillStyle",
+      "context.globalAlpha",
+      "context.createLinearGradient",
+    ],
     width: 128,
     height: 64,
     fonts: ["24px sans-serif"],
@@ -146,7 +160,12 @@ export const cases: CaseDefinition[] = [
   {
     ...renderBase,
     id: "text.render.paint-stroke",
-    requirements: ["context.strokeText", "context.strokeStyle", "context.createLinearGradient", "context.createPattern"],
+    requirements: [
+      "context.strokeText",
+      "context.strokeStyle",
+      "context.createLinearGradient",
+      "context.createPattern",
+    ],
     width: 128,
     height: 64,
     fonts: ["28px sans-serif"],
@@ -159,7 +178,10 @@ export const cases: CaseDefinition[] = [
       gradient.addColorStop(1, "#0000ff");
       assignStyle(context, "strokeStyle", gradient);
       context.strokeText("Grad", 2, 28);
-      const pattern = context.createPattern(await loadImage(STRIPES_3x5), "repeat");
+      const pattern = context.createPattern(
+        await loadImage(STRIPES_3x5),
+        "repeat",
+      );
       a.assert(pattern !== null, "repeat pattern created for the stroke");
       context.lineJoin = "round";
       assignStyle(context, "strokeStyle", pattern);
@@ -169,14 +191,21 @@ export const cases: CaseDefinition[] = [
   {
     ...renderBase,
     id: "text.render.pattern-transform",
-    requirements: ["context.fillText", "context.createPattern", "context.rotate"],
+    requirements: [
+      "context.fillText",
+      "context.createPattern",
+      "context.rotate",
+    ],
     width: 128,
     height: 96,
     fonts: ["24px sans-serif"],
     async run(a) {
       const context = a.context;
       context.font = "24px sans-serif";
-      const pattern = context.createPattern(await loadImage(STRIPES_3x5), "repeat");
+      const pattern = context.createPattern(
+        await loadImage(STRIPES_3x5),
+        "repeat",
+      );
       a.assert(pattern !== null, "repeat pattern created for text fill");
       assignStyle(context, "fillStyle", pattern);
       context.fillText("Pattern", 4, 28);

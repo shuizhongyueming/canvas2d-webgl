@@ -21,11 +21,7 @@ export class SolidPaint implements PaintRef {
 
 /** Initial fill/stroke value per the support matrix default "#000000". */
 export function defaultStylePaint(id: number): SolidPaint {
-  return new SolidPaint(
-    id,
-    Object.freeze([0, 0, 0, 1]) as Color,
-    "#000000",
-  );
+  return new SolidPaint(id, Object.freeze([0, 0, 0, 1]) as Color, "#000000");
 }
 
 /**

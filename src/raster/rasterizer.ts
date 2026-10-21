@@ -12,12 +12,7 @@ import { createCompatError, ERROR_CODES } from "../contracts/errors.js";
 import { RasterCache } from "./cache.js";
 import type { RasterLease } from "./cache.js";
 import { pathGeometryBounds } from "./bounds.js";
-import {
-  alignOutset,
-  applyPoint,
-  offsetMatrix,
-  scaleBound,
-} from "./matrix.js";
+import { alignOutset, applyPoint, offsetMatrix, scaleBound } from "./matrix.js";
 import { context2d, destroyCanvas } from "./native.js";
 import type { Native2DContext } from "./native.js";
 import { applyPaint } from "./paint.js";
@@ -86,7 +81,11 @@ class NativeRasterizer implements Rasterizer {
     });
   }
 
-  path(path: PathSnapshot, state: DrawState, mode: "fill" | "stroke"): RasterSource {
+  path(
+    path: PathSnapshot,
+    state: DrawState,
+    mode: "fill" | "stroke",
+  ): RasterSource {
     this.#assertLive();
     const key = [
       "path",
@@ -346,7 +345,8 @@ class NativeRasterizer implements Rasterizer {
     if (!geometry) return emptyAsset(this.#options.createCanvas);
     const margin =
       mode === "stroke"
-        ? scaleBound(state.transform) * state.lineWidth * (MITER_LIMIT + 0.5) + 2
+        ? scaleBound(state.transform) * state.lineWidth * (MITER_LIMIT + 0.5) +
+          2
         : 1;
     const bounds = alignOutset(geometry, margin, this.#scene());
     if (!bounds) return emptyAsset(this.#options.createCanvas);
@@ -359,7 +359,10 @@ class NativeRasterizer implements Rasterizer {
       const stage = this.#stageContext(scene.width, scene.height);
       replayPath(stage.ctx, path, 0, 0);
       const lastTransform = path.commands[path.commands.length - 1]?.transform;
-      if (!lastTransform || !lastTransform.every((value, index) => value === state.transform[index]))
+      if (
+        !lastTransform ||
+        !lastTransform.every((value, index) => value === state.transform[index])
+      )
         stage.ctx.setTransform(...state.transform);
       if (mode === "stroke") {
         // Stroke-time CTM scales the width and evaluates the stroke paint.
@@ -417,7 +420,12 @@ class NativeRasterizer implements Rasterizer {
       const size = /(\d+(?:\.\d+)?)px/.exec(state.font);
       const em = size ? Number(size[1]) : 16;
       const width = metrics.width;
-      left = state.textAlign === "center" ? width / 2 : state.textAlign === "right" ? width : 0;
+      left =
+        state.textAlign === "center"
+          ? width / 2
+          : state.textAlign === "right"
+            ? width
+            : 0;
       right = width - left;
       ascent = 2 * em;
       descent = 2 * em;
@@ -428,17 +436,24 @@ class NativeRasterizer implements Rasterizer {
       [x + right, y + descent],
       [x - left, y + descent],
     ] as const;
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
     for (const [cx, cy] of corners) {
       const [dx, dy] = applyPoint(state.transform, cx, cy);
       if (!Number.isFinite(dx) || !Number.isFinite(dy)) continue;
-      minX = Math.min(minX, dx); maxX = Math.max(maxX, dx);
-      minY = Math.min(minY, dy); maxY = Math.max(maxY, dy);
+      minX = Math.min(minX, dx);
+      maxX = Math.max(maxX, dx);
+      minY = Math.min(minY, dy);
+      maxY = Math.max(maxY, dy);
     }
-    if (minX > maxX || minY > maxY) return emptyAsset(this.#options.createCanvas);
+    if (minX > maxX || minY > maxY)
+      return emptyAsset(this.#options.createCanvas);
     const margin =
       mode === "stroke"
-        ? scaleBound(state.transform) * state.lineWidth * (MITER_LIMIT + 0.5) + 2
+        ? scaleBound(state.transform) * state.lineWidth * (MITER_LIMIT + 0.5) +
+          2
         : 2;
     const bounds = alignOutset(
       { x: minX, y: minY, width: maxX - minX, height: maxY - minY },
@@ -490,7 +505,12 @@ class NativeRasterizer implements Rasterizer {
         if (mode === "fill") stage.ctx.fillText(text, x, y);
         else stage.ctx.strokeText(text, x, y);
         ctx.putImageData(
-          stage.ctx.getImageData(bounds.x, bounds.y, bounds.width, bounds.height),
+          stage.ctx.getImageData(
+            bounds.x,
+            bounds.y,
+            bounds.width,
+            bounds.height,
+          ),
           0,
           0,
         );
@@ -528,7 +548,12 @@ class NativeRasterizer implements Rasterizer {
       stage.ctx.fillStyle = "#ffffff";
       stage.ctx.fill(rule);
       ctx.putImageData(
-        stage.ctx.getImageData(aligned.x, aligned.y, aligned.width, aligned.height),
+        stage.ctx.getImageData(
+          aligned.x,
+          aligned.y,
+          aligned.width,
+          aligned.height,
+        ),
         0,
         0,
       );

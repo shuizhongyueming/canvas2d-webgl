@@ -24,5 +24,9 @@ test("repeatUv matches GLSL fract() semantics, including negatives", () => {
   assert.deepEqual(repeatUv(-0.25, -1.25), [0.75, 0.75]);
   assert.deepEqual(repeatUv(0, 3), [0, 0]);
   const [u] = repeatUv(-1 / 4, 0);
-  assert.equal(u, 0.75, "phase after translate(-1) wraps to the last texel column");
+  assert.equal(
+    u,
+    0.75,
+    "phase after translate(-1) wraps to the last texel column",
+  );
 });

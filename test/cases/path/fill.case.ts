@@ -20,7 +20,14 @@ export const cases: CaseDefinition[] = [
   {
     ...renderBase,
     id: "context.fill.render",
-    requirements: ["context.fill", "context.beginPath", "context.moveTo", "context.lineTo", "context.closePath", "context.arc"],
+    requirements: [
+      "context.fill",
+      "context.beginPath",
+      "context.moveTo",
+      "context.lineTo",
+      "context.closePath",
+      "context.arc",
+    ],
     run(a) {
       const context = a.context;
       context.fillStyle = "#ff0000";
@@ -41,7 +48,12 @@ export const cases: CaseDefinition[] = [
   {
     ...renderBase,
     id: "path.fill.concave-self-intersect",
-    requirements: ["context.fill", "context.moveTo", "context.lineTo", "context.closePath"],
+    requirements: [
+      "context.fill",
+      "context.moveTo",
+      "context.lineTo",
+      "context.closePath",
+    ],
     run(a) {
       const context = a.context;
       // A concave arrow and a self-intersecting bowtie, nonzero winding.
@@ -93,7 +105,14 @@ export const cases: CaseDefinition[] = [
   {
     ...renderBase,
     id: "path.fill.arcTo-ellipse-quadratic",
-    requirements: ["context.fill", "context.arcTo", "context.ellipse", "context.quadraticCurveTo", "context.moveTo", "context.lineTo"],
+    requirements: [
+      "context.fill",
+      "context.arcTo",
+      "context.ellipse",
+      "context.quadraticCurveTo",
+      "context.moveTo",
+      "context.lineTo",
+    ],
     run(a) {
       const context = a.context;
       context.fillStyle = "#ff0000";
@@ -120,7 +139,13 @@ export const cases: CaseDefinition[] = [
   {
     ...renderBase,
     id: "path.fill.multi-subpath-closePath",
-    requirements: ["context.fill", "context.moveTo", "context.lineTo", "context.closePath", "context.rect"],
+    requirements: [
+      "context.fill",
+      "context.moveTo",
+      "context.lineTo",
+      "context.closePath",
+      "context.rect",
+    ],
     run(a) {
       const context = a.context;
       // One fill covers every subpath; an unclosed subpath closes implicitly,
@@ -149,7 +174,16 @@ export const cases: CaseDefinition[] = [
   {
     ...renderBase,
     id: "path.fill.construction-transform",
-    requirements: ["context.fill", "context.rect", "context.translate", "context.rotate", "context.scale", "context.setTransform", "context.save", "context.restore"],
+    requirements: [
+      "context.fill",
+      "context.rect",
+      "context.translate",
+      "context.rotate",
+      "context.scale",
+      "context.setTransform",
+      "context.save",
+      "context.restore",
+    ],
     run(a) {
       const context = a.context;
       // Geometry bakes the construction-time transform; the fill-time
@@ -206,7 +240,12 @@ export const cases: CaseDefinition[] = [
   {
     ...renderBase,
     id: "path.fill.degenerate",
-    requirements: ["context.fill", "context.moveTo", "context.lineTo", "context.closePath"],
+    requirements: [
+      "context.fill",
+      "context.moveTo",
+      "context.lineTo",
+      "context.closePath",
+    ],
     kind: "combined",
     async run(a) {
       const context = a.context;
@@ -223,7 +262,10 @@ export const cases: CaseDefinition[] = [
       context.lineTo(20, 20);
       context.fill();
       const empty = await dumpScene(a);
-      a.assert(empty.count((pixel) => pixel[3] !== 0) === 0, "empty and point-only paths paint nothing");
+      a.assert(
+        empty.count((pixel) => pixel[3] !== 0) === 0,
+        "empty and point-only paths paint nothing",
+      );
       context.beginPath();
       context.moveTo(4, 4);
       context.lineTo(NaN, 8);
@@ -239,29 +281,43 @@ export const cases: CaseDefinition[] = [
       a.observe("degenerateHandled", true);
     },
   },
-  ...(["fill", "stroke"] as const).map((mode): CaseDefinition => ({
-    ...renderBase,
-    id: `path.${mode}.empty-path`,
-    kind: "combined",
-    requirements: [`context.${mode}`],
-    async run(a) {
-      const context = a.context;
-      context.fillStyle = "#ff0000";
-      context.fillRect(0, 0, 64, 64);
-      context[mode]();
-      const empty = await dumpScene(a);
-      a.assert(pixelsEqual(empty.pixel(8, 8), [255, 0, 0, 255]), "empty path preserves the destination");
-      context.rect(100, 100, 8, 8);
-      context[mode]();
-      const outside = await dumpScene(a);
-      a.assert(pixelsEqual(outside.pixel(8, 8), [255, 0, 0, 255]), "offscreen source-over preserves the destination");
-      a.observe("sourceIn", "pending-#22");
-    },
-  })),
+  ...(["fill", "stroke"] as const).map(
+    (mode): CaseDefinition => ({
+      ...renderBase,
+      id: `path.${mode}.empty-path`,
+      kind: "combined",
+      requirements: [`context.${mode}`],
+      async run(a) {
+        const context = a.context;
+        context.fillStyle = "#ff0000";
+        context.fillRect(0, 0, 64, 64);
+        context[mode]();
+        const empty = await dumpScene(a);
+        a.assert(
+          pixelsEqual(empty.pixel(8, 8), [255, 0, 0, 255]),
+          "empty path preserves the destination",
+        );
+        context.rect(100, 100, 8, 8);
+        context[mode]();
+        const outside = await dumpScene(a);
+        a.assert(
+          pixelsEqual(outside.pixel(8, 8), [255, 0, 0, 255]),
+          "offscreen source-over preserves the destination",
+        );
+        a.observe("sourceIn", "pending-#22");
+      },
+    }),
+  ),
   {
     ...renderBase,
     id: "path.fill.state-stack",
-    requirements: ["context.fill", "context.rect", "context.save", "context.restore", "context.globalAlpha"],
+    requirements: [
+      "context.fill",
+      "context.rect",
+      "context.save",
+      "context.restore",
+      "context.globalAlpha",
+    ],
     kind: "combined",
     async run(a) {
       const context = a.context;
