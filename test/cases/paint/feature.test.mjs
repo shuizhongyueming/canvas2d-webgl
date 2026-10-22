@@ -188,3 +188,28 @@ test("defaultStylePaint provides the matrix default", () => {
   assert.equal(paint.publicValue, "#000000");
   assert.deepEqual(paint.snapshot(), { kind: "solid", color: [0, 0, 0, 1] });
 });
+
+test("paint ids stay unique across canvases so cache keys never collide", () => {
+  const stateA = stateDouble();
+  const stateB = stateDouble();
+  const a = make(stateA);
+  const b = make(stateB);
+  a.fillStyle = a.createLinearGradient(0, 0, 1, 1);
+  b.fillStyle = b.createLinearGradient(0, 0, 1, 1);
+  const gradientA = stateA.get("fill");
+  const gradientB = stateB.get("fill");
+  assert.notEqual(
+    gradientA.id,
+    gradientB.id,
+    "two canvases must not hand out the same paint id",
+  );
+  // The raster cache keys assets by kind/id/version, so equal ids would let
+  // one canvas serve the other canvas's cached asset.
+  assert.notDeepEqual(
+    [gradientA.id, gradientA.version],
+    [gradientB.id, gradientB.version],
+  );
+  // A paint may still be assigned across canvases; only its identity differs.
+  b.fillStyle = a.createLinearGradient(0, 0, 1, 1);
+  assert.notEqual(stateB.get("fill").id, stateA.get("fill").id);
+});

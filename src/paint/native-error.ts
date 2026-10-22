@@ -35,12 +35,12 @@ export function webidlString(value: unknown): string {
 }
 
 /**
- * WebIDL double conversion: BigInt throws a TypeError, everything else
- * coerces with Number (numeric strings, null, booleans, ...).
+ * WebIDL double conversion: unary plus is exactly the ToNumber abstract
+ * operation, so a Symbol, a primitive BigInt, a wrapper such as Object(1n) and
+ * an object whose valueOf() returns a BigInt all raise the native TypeError.
+ * Number(value) would instead accept the wrapper forms, because the Number
+ * constructor special-cases BigInt primitives after ToNumeric.
  */
 export function webidlDouble(value: unknown): number {
-  if (typeof value === "bigint") {
-    throw new TypeError("Cannot convert a BigInt value to a number");
-  }
-  return Number(value);
+  return +(value as number);
 }

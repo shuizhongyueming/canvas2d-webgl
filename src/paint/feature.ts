@@ -9,7 +9,8 @@ import { classifyColorValue, parseSupportedColor } from "./color.js";
 import { LinearGradientPaint, isCompatGradient } from "./gradient.js";
 import { webidlDouble, webidlString } from "./native-error.js";
 import { createRepeatPattern, isCompatPattern } from "./pattern.js";
-import { DEFAULT_STYLE_IDS, SolidPaint } from "./solid.js";
+import { allocPaintId } from "./ids.js";
+import { SolidPaint } from "./solid.js";
 
 /** A PaintRef carrying the value the fillStyle/strokeStyle getter returns. */
 export interface StylePaintRef extends PaintRef {
@@ -31,17 +32,17 @@ type StyleMember = "fillStyle" | "strokeStyle";
 
 /**
  * Installs fillStyle, strokeStyle, createLinearGradient and createPattern.
- * Paint objects are per-canvas: ids are unique within one canvas instance,
- * as the Paint contract requires.
+ * Paint objects are per-canvas in ownership but their ids come from one
+ * realm-wide sequence, because a brand-valid paint can cross canvases and the
+ * raster cache keys assets by id.
  */
 export function paintFeature(
   environment: FeatureEnvironment,
 ): FeatureDefinition {
   const state = environment.state;
-  // Ids at or below DEFAULT_STYLE_IDS.stroke are reserved for the default
-  // fill/stroke styles installed by the state ticket.
-  let nextPaintId = DEFAULT_STYLE_IDS.stroke + 1;
-  const allocId = (): number => nextPaintId++;
+  // Realm-wide ids: a paint created on one canvas can be assigned to another,
+  // so per-canvas counters would collide in the raster cache (see ./ids.ts).
+  const allocId = allocPaintId;
 
   const keyOf = (member: StyleMember): string =>
     member === "fillStyle" ? PAINT_STATE_KEYS.fill : PAINT_STATE_KEYS.stroke;

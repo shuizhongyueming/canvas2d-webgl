@@ -25,8 +25,8 @@ export function defaultStylePaint(id: number): SolidPaint {
 }
 
 /**
- * Paint ids reserved for the default fill/stroke styles. paintFeature
- * allocates style ids above this range, keeping Paint.id unique per canvas
- * as the contract requires.
+ * Paint ids reserved for the default fill/stroke styles. Every allocated id
+ * sits above this range, so a default style can never be mistaken for a
+ * gradient or pattern key.
  */
 export const DEFAULT_STYLE_IDS = Object.freeze({ fill: 1, stroke: 2 });
