@@ -56,7 +56,7 @@
 - **转发三分法**：拦截类（`getContext`、`width`/`height`）由库接管语义；直通类（`style`、事件、`getBoundingClientRect` 等其余属性）默认转发目标画布；排除类（`toDataURL`/`toBlob`/`captureStream`/`transferControlToOffscreen` 及全部读回 API）显式抛错。不保证真实 DOM 身份不变。
 - **读回/导出全部排除**：`getImageData`/`putImageData`/`createImageData`/`toDataURL`/`toBlob`/`captureStream` 均显式不支持。依据：样例零使用；WebGL 后端读回代价高；CAN-05 为条件句；差分测试读像素走测试钩子，不依赖公开 API。
 - **上下文丢失/恢复**：`options.onContextLost()`/`onContextRestored()` 回调，不模拟 DOM 事件；丢失期间绘制与尺寸变更按原生 context-lost 语义静默无效（不抛错、不排队）；恢复后重建资源、清屏、回调通知重绘，不承诺历史像素。
-- **dispose**：`compatCanvas.dispose()` 幂等；释放库资源、停止内部调度，不销毁目标画布、不主动丢失其 GL context；处置后拦截类 API 抛 `code: 'disposed'` 错误，直通类照常。
+- **dispose**：`compatCanvas.dispose()` 幂等；释放库资源、停止内部调度，不销毁目标画布、不主动丢失其 GL context；处置后拦截类 API 抛 `code: 'disposed'` 错误，直通类照常。**处置检查优先于参数转换与 no-op 判断**：处置后即使参数非法（如 `fillRect(NaN, 0, 10, 10)`）、参数缺失（`fillRect(0, 0)`）或本就该静默无效（`fillRect(0, 0, 0, 0)`），受支持的拦截类入口一律抛 `disposed`，顺序由装配层统一实施，不由各特性模块自行决定；直通类与 `dispose()` 自身不受影响。
 - **未支持能力报告**：规范内未覆盖 API 挂载显式抛错桩（`code: 'unsupported-api'`，message 含 API 名）；规范外拼写错误得原生 TypeError；受支持 API 的非法参数保持原生异常语义。
 
 ### 首版 API 验收矩阵
@@ -158,3 +158,4 @@
 - 2026-10-16：依据 [#8](https://github.com/shuizhongyueming/canvas2d-webgl/issues/8) 确定样例游戏运行时场景验收办法：7 项场景清单（loading、战斗、换装、结算两形态、窗口缩放、上下文丢失/恢复）、可重复人工步骤脚本（作弊键与存档预设）、按场景 API 轨迹与矩阵对账、未触发由单元差分兜底、命中矩阵外 API 另建决策票、证据格式与仓外存放边界；待决策项第 5 条相应移除。
 - 2026-10-16：依据 [#6](https://github.com/shuizhongyueming/canvas2d-webgl/issues/6) 确定目标环境矩阵：首批 Web（不锁版本）+ vivo 快游戏（min_platform_version 1200），其余平台为未来候选；入口输入修订为「未绑定或已按期望 GL options 绑定 WebGL 的画布」（同步修订 CAN-01 与创建入口契约）；平台接入改造、XYX-VM 接入与字体加载由调用方负责；小游戏主画布不可调整尺寸按 CAN-04 报能力限制；上下文丢失/恢复平台核验暂缓；待决策项第 3 条相应移除。
 - 2026-10-16：依据 [#7](https://github.com/shuizhongyueming/canvas2d-webgl/issues/7) 确定差分一致性判定办法：实现前不预设区域分类与数值阈值、否决代理渲染校准；实现阶段人工+AI 评审实测渲染对，量化阈值随评审证据另定；明确不用单一全图平均误差（有实测证据）；待决策项第 4 条相应移除。
+- 2026-10-22：依据 [项目审核](../reviews/project-review-2026-10-22.md) 的复核结果补两条口径。其一，dispose 处置检查的**优先级**写入公开契约：受支持的拦截类入口先判处置再转换参数，顺序由装配层统一实施。其二，明确「跨光栅后端差异」的归因规则：`willReadFrequently` 只是读取优化提示，不代表跨平台或跨驱动的逐字节确定性；内部光栅回归使用与内部画布一致配置的参考并保留严格断言，公开 API 差分仍与实际原生画布比较，两个后端表现不同只记为待归因、需单独评审，不自动进入接受项。最终验收由 [#57](https://github.com/shuizhongyueming/canvas2d-webgl/issues/57) 与 [#58](https://github.com/shuizhongyueming/canvas2d-webgl/issues/58) 承接。

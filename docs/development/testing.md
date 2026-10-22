@@ -88,6 +88,16 @@ pnpm run test:acceptance --run <run.json> --reviews <reviews.json>
 
 采集在写文件之前校验输出路径：仓内仅允许被 Git 忽略的 test-results/，路径先解析符号链接；仓外目录可用。报告包含导入的人工/AI身份、日期、verdict和notes，即使记录过期也显示原文供排查，但有效性仍由门禁判断，不因展示记录而放行。
 
+## 光栅后端与逐字节比较
+
+`willReadFrequently: true` 是读取优化提示，不是「软件后端」或「逐字节确定性」的保证。库内部的 stage 画布和 asset 画布使用**同一**读取优化配置，因为 asset 承接的是 stage 经 `getImageData` 摘出的像素；两边配置不一致会把同一几何放到两条光栅路径上，使部分覆盖的像素相差一到两个字节。
+
+据此区分三类比较，规则不同：
+
+- **内部光栅回归**（`test/cases/raster/*`）：参考上下文与内部画布使用相同配置，保留逐字节相等断言。这里不放宽容差、不删断言、不改成「通过」。
+- **公开 API 差分**（compat 与真实原生 Canvas 对照）：必须与调用方实际拿到的原生画布比较，不能为了消除差异把参考换成「与内部画布同后端」的新画布。
+- **跨后端观测**：同一段代码在两个光栅后端下表现不同，记为**待归因**，需单独评审后才可能成为接受项；不得自动计入接受结论。
+
 ## TypeScript 用例与构建
 
 运行库 `src/**/*.ts`、共享接口及浏览器用例 `test/cases/**/*.case.ts` 均进入 strict 类型检查，并开启 noUncheckedIndexedAccess、noImplicitOverride、verbatimModuleSyntax。Node 工程脚本和测试驱动仍使用 .mjs / .js，不作为生产实现模板。类型导入使用 import type；相对 ESM import 保持 .js 后缀，TypeScript 编译时解析到 .ts 文件。
