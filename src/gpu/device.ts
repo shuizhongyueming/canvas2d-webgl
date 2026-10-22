@@ -344,6 +344,43 @@ class SceneDevice implements GPUDevice {
     gl.disable(gl.DEPTH_TEST);
   }
 
+  /**
+   * Establish the complete pipeline baseline the device assumes.
+   *
+   * CAN-01 lets the target arrive already bound to a WebGL context, and the
+   * library only owns the calls it makes itself: per-draw code sets its own
+   * framebuffer, viewport, blend and stencil state, but culling, color writes,
+   * the blend equation and the unpack flags survive untouched. An external
+   * context left with `CULL_FACE + FRONT_AND_BACK`, a closed color mask or
+   * `FUNC_REVERSE_SUBTRACT` renders nothing here, so the baseline is
+   * re-established on init and after every context restore.
+   */
+  establishBaseline(): void {
+    this.bindSceneState();
+    const gl = this.gl;
+    gl.disable(gl.CULL_FACE);
+    gl.disable(gl.BLEND);
+    gl.frontFace(gl.CCW);
+    gl.blendEquation(gl.FUNC_ADD);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    gl.colorMask(true, true, true, true);
+    gl.depthMask(true);
+    gl.depthFunc(gl.LEQUAL);
+    gl.stencilMask(0xff);
+    gl.stencilFunc(gl.ALWAYS, 0, 0xff);
+    gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clearStencil(0);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.pixelStorei(
+      gl.UNPACK_COLORSPACE_CONVERSION_WEBGL,
+      gl.BROWSER_DEFAULT_WEBGL,
+    );
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+    gl.activeTexture(gl.TEXTURE0);
+  }
+
   private applyBlend(composite: CompositeMode | "replace"): void {
     const gl = this.gl;
     if (composite === "replace") {
@@ -865,7 +902,9 @@ class SceneDevice implements GPUDevice {
     }
     this.generation += 1;
     this.status = "active";
-    this.bindSceneState();
+    // A restored context starts from the platform defaults, so the full
+    // baseline is re-established rather than only the scene bindings.
+    this.establishBaseline();
     this.presenterQueue.request(this.generation);
   }
 
@@ -993,7 +1032,7 @@ export function createSceneRenderer(
         ERROR_CODES.INITIALIZATION,
         "injected failure after scene creation",
       );
-    device.bindSceneState();
+    device.establishBaseline();
     owner.register(() => device.shutdown());
     const hooks = createTestHooks({
       readRaw: () => device.readSceneRaw(),

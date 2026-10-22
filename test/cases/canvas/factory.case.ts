@@ -200,12 +200,41 @@ export const cases: CaseDefinition[] = [
         preserveDrawingBuffer: false,
       });
       if (!gl) a.skip("webgl-unavailable");
+      const bound = gl as WebGLRenderingContext;
+      // CAN-01 accepts a context the caller already bound; it may carry any
+      // pipeline state. These three make every later draw invisible, so the
+      // takeover must normalize them before the first frame.
+      bound.enable(bound.CULL_FACE);
+      bound.cullFace(bound.FRONT_AND_BACK);
+      bound.colorMask(false, false, false, false);
+      bound.enable(bound.BLEND);
+      bound.blendEquation(bound.FUNC_REVERSE_SUBTRACT);
       const canvas = createCompatCanvas(target);
       a.assert(
         !!canvas.getContext("2d"),
         "pre-bound conforming WebGL is accepted",
       );
-      a.observe("sameContext", target.getContext("webgl") === gl);
+      a.observe("sameContext", target.getContext("webgl") === bound);
+      a.observe("cullFaceEnabled", bound.isEnabled(bound.CULL_FACE));
+      a.observe(
+        "colorWriteMask",
+        (bound.getParameter(bound.COLOR_WRITEMASK) as boolean[]).join(","),
+      );
+      a.observe("blendEquation", bound.getParameter(bound.BLEND_EQUATION));
+      a.assert(
+        !bound.isEnabled(bound.CULL_FACE),
+        "takeover disables culling the caller had enabled",
+      );
+      a.assert(
+        (bound.getParameter(bound.COLOR_WRITEMASK) as boolean[]).every(
+          (open) => open,
+        ),
+        "takeover reopens every color write channel",
+      );
+      a.assert(
+        bound.getParameter(bound.BLEND_EQUATION) === bound.FUNC_ADD,
+        "takeover restores the additive blend equation",
+      );
       a.observe("ready", true);
       canvas.dispose();
     },
