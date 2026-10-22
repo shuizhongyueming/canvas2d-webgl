@@ -5,9 +5,16 @@ import { createCompatError, ERROR_CODES } from "./errors.js";
 /**
  * Construct descriptors before touching a private context object. No global
  * registry: one collection per canvas, validated atomically before installation.
+ *
+ * `guard` runs before every installed member: it is how the assembly layer
+ * enforces one disposal rule for the whole surface instead of leaving each
+ * feature to decide when to check. Because it runs first, a disposed canvas
+ * reports `disposed` even when the call would also have failed argument
+ * conversion or been a silent no-op.
  */
 export function contextDescriptors(
   features: readonly FeatureDefinition[],
+  guard?: () => void,
 ): PropertyDescriptorMap {
   const members = new Map<string, PropertyDescriptor>();
   const ids = new Set<string>();
@@ -47,7 +54,7 @@ export function contextDescriptors(
           fail(`invalid setter: ${name}`);
       }
       members.set(name, {
-        ...descriptor,
+        ...(guard ? guarded(descriptor, guard) : descriptor),
         configurable: false,
         enumerable: true,
       });
@@ -83,4 +90,43 @@ export function contextDescriptors(
 
 function fail(detail: string): never {
   throw createCompatError(ERROR_CODES.CONTRACT, detail);
+}
+
+/**
+ * Wrap one installed member so `guard` runs before any of its work. The
+ * wrapper keeps the original arity: the support matrix is expressed in
+ * argument counts, and browsers expose those counts through `.length`.
+ */
+function guarded(
+  descriptor: PropertyDescriptor,
+  guard: () => void,
+): PropertyDescriptor {
+  if (typeof descriptor.value === "function") {
+    const impl = descriptor.value as (...args: unknown[]) => unknown;
+    const wrapper = function (this: unknown, ...args: unknown[]): unknown {
+      guard();
+      return impl.apply(this, args);
+    };
+    Object.defineProperty(wrapper, "length", {
+      value: impl.length,
+      configurable: true,
+    });
+    return { ...descriptor, value: wrapper };
+  }
+  const { get, set } = descriptor;
+  return {
+    ...descriptor,
+    get: get
+      ? function (this: unknown): unknown {
+          guard();
+          return get.call(this);
+        }
+      : undefined,
+    set: set
+      ? function (this: unknown, value: unknown): void {
+          guard();
+          set.call(this, value);
+        }
+      : undefined,
+  };
 }

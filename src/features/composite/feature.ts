@@ -115,8 +115,9 @@ export const compositeFeature: FeatureFactory = (
       canvas.width = 0;
       canvas.height = 0;
     };
-    // After disposal the owner has already drained, so a cached parser would
-    // never be released. Classify with a throwaway canvas and release it
+    // The public setter is rejected at assembly before it reaches here, so
+    // this branch only covers internal callers after disposal: the owner has
+    // already drained, so classify with a throwaway canvas and release it
     // immediately instead of registering into the released owner.
     if (environment.gpu?.status === "disposed") {
       try {

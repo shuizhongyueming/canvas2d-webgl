@@ -436,3 +436,35 @@ test("strokeRect with a non-solid stroke rasterizes through the shared path serv
   assert.equal(ops[0].source, pathCalls[0].source);
   assert.equal(pathCalls[0].source.releases, 1);
 });
+
+test("disposed is reported before argument conversion or a no-op decision", () => {
+  const { context, gpu } = setup();
+  gpu.status = "disposed";
+  const disposed = (fn) => assert.throws(fn, { code: "disposed" });
+  disposed(() => context.save());
+  disposed(() => context.restore());
+  disposed(() => context.beginPath());
+  disposed(() => context.fillStyle);
+  disposed(() => {
+    context.fillStyle = "#ff0000";
+  });
+  disposed(() => context.createLinearGradient(0, 0, 1, 1));
+  disposed(() => context.measureText("x"));
+  // Valid geometry and geometry that would otherwise be silently ignored both
+  // report the disposal: the assembly layer runs the guard first.
+  disposed(() => context.fillRect(0, 0, 10, 10));
+  disposed(() => context.fillRect(NaN, 0, 10, 10));
+  disposed(() => context.fillRect(0, 0, 0, 0));
+  // Argument-count errors do not win over disposal either.
+  disposed(() => context.fillRect(0, 0));
+});
+
+test("the disposal guard keeps each member's declared arity", () => {
+  const { context } = setup();
+  // A declared-parameter signature keeps its count through the wrapper...
+  assert.equal(context.createLinearGradient.length, 4);
+  // ...and a rest-parameter signature keeps its zero, exactly as the feature
+  // declares it; the guard never manufactures arity.
+  assert.equal(context.save.length, 0);
+  assert.equal(context.fillRect.length, 0);
+});
