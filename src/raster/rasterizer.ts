@@ -333,7 +333,16 @@ class NativeRasterizer implements Rasterizer {
         `raster asset ${bounds.width}x${bounds.height} exceeds ${limit}`,
       );
     const canvas = this.#options.createCanvas(bounds.width, bounds.height);
-    return { canvas, ctx: context2d(canvas) };
+    // The asset receives the stage readback that #renderPath copies out of
+    // getImageData, so it must share the stage's readback-optimized context
+    // configuration. Mixing an optimized and a default context puts the two
+    // canvases on different raster paths and shifts partially covered pixels
+    // by a byte or two. This is a configuration hint, not a guarantee of
+    // identical bytes across platforms or drivers.
+    return {
+      canvas,
+      ctx: context2d(canvas, { willReadFrequently: true }),
+    };
   }
 
   #renderPath(
