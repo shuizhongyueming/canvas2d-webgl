@@ -15,8 +15,25 @@ import type {
 
 export interface View {
   render(state: ControllerState): void;
-  /** 页面级快捷键在控件聚焦期间不得触发（issue #60 键盘冲突）。 */
+  /**
+   * 页面级快捷键在控件聚焦期间不得触发（issue #60 键盘冲突）。
+   * 焦点策略：由外层页面把 document 的 keydown 转交本方法；iframe 内的
+   * 键盘事件属于子执行环境，不经过外层 document，因此 iframe 内操作
+   * 不会被页面级快捷键拦截；集成票（#71）负责接线并在集成中验证。
+   */
   handleKey(key: string): void;
+  /**
+   * 复制反馈上下文（issue #64 反馈协议）。
+   * 调用协议：用户点击按钮只派发 copy-feedback 事件；controller 收到后
+   * 仅在终态（completed/failed）用当前轮次的 difference 调用本方法。
+   * 本方法在非终态或无当前轮次时拒绝并返回 false，不复制旧数据。
+   */
+  copyFeedback(difference: FeedbackDifference): Promise<boolean>;
+  /**
+   * 复制当前用例 ID。调用协议同 copyFeedback：按钮派发 copy-case-id，
+   * controller 收到后调用本方法；复制 ID 在任何有选中用例时可用。
+   */
+  copyCaseId(): Promise<boolean>;
 }
 
 /** 控制器注入的宿主环境；真实浏览器默认实现见 createBrowserHost。 */
@@ -52,9 +69,6 @@ type Scale = ControllerState["display"]["scale"];
 
 const OVERLAY_OPACITY_DEFAULT = 0.5;
 const NOTICE_DURATION_MS = 2500;
-
-/** 差异图固定为二值定位图的品红色（issue #64）。 */
-const DIFF_MARKER = [255, 0, 180, 255] as const;
 
 interface ViewRefs {
   readonly errorBox: HTMLElement;
@@ -322,10 +336,15 @@ class ComparisonView implements View {
     }, NOTICE_DURATION_MS + 20);
   }
 
-  /** 由 controller 构造反馈 JSON 后复制；失败时展示提示。 */
   async copyFeedback(difference: FeedbackDifference): Promise<boolean> {
     const state = this.state;
-    if (!state?.caseId) return false;
+    // 防御：controller 误调用时拒绝，非终态不复制旧反馈（issue #64）。
+    if (
+      !state?.caseId ||
+      (state.stage !== "completed" && state.stage !== "failed")
+    ) {
+      return false;
+    }
     const info = this.options.host.browserInfo();
     const report = {
       caseId: state.caseId,
@@ -368,6 +387,8 @@ class ComparisonView implements View {
     const total = this.options.cases.length;
     if (!total) return;
     const current = this.currentIndex;
+    // 无有效选中（如 caseId 不在列表）时不做相对步进。
+    if (current < 0) return;
     // 首尾停止：越界时不派发事件。
     if (direction < 0 && current <= 0) return;
     if (direction > 0 && current >= total - 1) return;
@@ -414,11 +435,10 @@ class ComparisonView implements View {
     const index = this.options.cases.findIndex(
       (entry) => entry.id === state.caseId,
     );
-    if (index >= 0) {
-      this.currentIndex = index;
-      if (this.select.value !== state.caseId && state.caseId)
-        this.select.value = state.caseId;
-    }
+    // caseId 不在列表（含 null）时重置索引，避免基于过期位置步进。
+    this.currentIndex = index;
+    if (index >= 0 && this.select.value !== state.caseId && state.caseId)
+      this.select.value = state.caseId;
     this.prevButton.disabled = total === 0 || this.currentIndex <= 0;
     this.nextButton.disabled =
       total === 0 || this.currentIndex < 0 || this.currentIndex >= total - 1;
@@ -468,8 +488,9 @@ class ComparisonView implements View {
     this.compatPane.style.opacity = String(
       display.mode === "overlay" ? display.overlayOpacity : 1,
     );
-    if (Number(this.opacitySlider.value) !== display.overlayOpacity * 100) {
-      this.opacitySlider.value = String(display.overlayOpacity * 100);
+    const targetPercent = Math.round(display.overlayOpacity * 100);
+    if (Number(this.opacitySlider.value) !== targetPercent) {
+      this.opacitySlider.value = String(targetPercent);
     }
     this.opacityValue.textContent = ` ${Math.round(display.overlayOpacity * 100)}%`;
     markActive(this.modeButtons.split, display.mode === "split");
@@ -486,8 +507,9 @@ class ComparisonView implements View {
 
   private renderDiff(state: ControllerState): void {
     const { diffBox, diffEmpty, diffStats, diffBounds, diffCanvas } = this.refs;
-    const metrics = state.difference;
-    // 执行中/等待/失败均无有效指标；controller 已清空 difference。
+    // 防御：仅 completed 状态接受 metrics；controller 异常传入
+    // running+metrics 时视图不提前显示最终差异（issue #63）。
+    const metrics = state.stage === "completed" ? state.difference : null;
     diffBox.classList.toggle("live-diff-active", metrics !== null);
     if (!metrics) {
       diffEmpty.textContent =
@@ -509,35 +531,18 @@ class ComparisonView implements View {
         `宽 ${metrics.differenceBounds.width}, 高 ${metrics.differenceBounds.height}` +
         "（最小包围矩形，内部不保证全部不同）"
       : "差异区域：无";
-    this.renderDiffCanvas(diffCanvas, metrics);
+    this.renderDiffCanvas(diffCanvas);
   }
 
   /**
-   * 差异图为二值定位图（品红/透明）。开发期桩只携带指标，
-   * 视图按 bbox 还原定位矩形；完整逐像素图由量测票提供后在同一画布绘制。
+   * 逐像素二值定位图（品红/透明，issue #64）的数据由量测票（#68）提供；
+   * 本票只携带 bbox 指标，不能把 bbox 整块染成品红冒充差异图——
+   * bbox 内部不保证全部不同。逐像素数据接入前显示占位，不画伪图。
    */
-  private renderDiffCanvas(
-    canvas: HTMLCanvasElement,
-    metrics: DifferenceMetrics,
-  ): void {
-    const bounds = metrics.differenceBounds;
-    if (!bounds) {
-      canvas.width = 0;
-      canvas.height = 0;
-      return;
-    }
-    canvas.width = bounds.width;
-    canvas.height = bounds.height;
-    const context = canvas.getContext("2d");
-    if (!context) return;
-    const image = context.createImageData(bounds.width, bounds.height);
-    for (let i = 0; i < image.data.length; i += 4) {
-      image.data[i] = DIFF_MARKER[0];
-      image.data[i + 1] = DIFF_MARKER[1];
-      image.data[i + 2] = DIFF_MARKER[2];
-      image.data[i + 3] = DIFF_MARKER[3];
-    }
-    context.putImageData(image, 0, 0);
+  private renderDiffCanvas(canvas: HTMLCanvasElement): void {
+    canvas.width = 0;
+    canvas.height = 0;
+    canvas.dataset.placeholder = "差异图等待逐像素数据（量测票 #68）";
   }
 
   private renderActions(state: ControllerState): void {
@@ -730,7 +735,12 @@ const VIEW_CSS = `
   background: rgba(255, 255, 255, 0.7);
 }
 .live-pane-label { font-size: 12px; padding: 2px 6px; color: #333; }
-.live-stage[data-scale="fit"] .live-canvas-slot canvas {
+/* fit 缩放作用于 overlay 整体：重叠时两侧保持同一缩放比例对齐（issue #63）。 */
+.live-stage[data-scale="fit"] .live-overlay {
+  max-width: 100%;
+  overflow: hidden;
+}
+.live-stage[data-scale="fit"] .live-overlay canvas {
   max-width: 100%;
   height: auto;
 }
