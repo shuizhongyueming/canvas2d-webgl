@@ -456,31 +456,61 @@ test("差异图开关可切换显示；无量测时开关禁用", async (t) => {
   assert.equal(await page.locator(".live-diff-image-box").isVisible(), true);
 });
 
-test("fit 模式对重叠整体应用统一缩放因子", async (t) => {
+test("fit 模式对重叠整体应用统一缩放因子；1:1 清除内联尺寸", async (t) => {
   const { page, setState } = await launch(t);
   await page.setViewportSize({ width: 300, height: 600 });
   await setState({
     ...selected("case.alpha"),
     display: { ...IDLE_STATE.display, scale: "fit", mode: "overlay" },
   });
-  const scale = await page.evaluate(() =>
-    document
-      .querySelector(".live-overlay")
-      .style.getPropertyValue("--live-fit-scale"),
-  );
-  // 桩画布宽 40，舞台宽约 300-16 padding-2 border ≈ 280；不缩小应为 1。
-  assert.equal(Number(scale) <= 1, true);
-
-  // 1:1 模式不设置缩放因子。
-  await setState({
-    display: { ...IDLE_STATE.display, scale: "actual" },
+  const fitState = await page.evaluate(() => {
+    const overlay = document.querySelector(".live-overlay");
+    return {
+      scale: overlay.style.getPropertyValue("--live-fit-scale"),
+      transform: getComputedStyle(overlay).transform,
+      width: overlay.style.width,
+      height: overlay.style.height,
+    };
   });
-  const cleared = await page.evaluate(() =>
-    document
-      .querySelector(".live-overlay")
-      .style.getPropertyValue("--live-fit-scale"),
-  );
-  assert.equal(cleared, "");
+  // 桩画布 40×24 + 标签高，舞台约 280px 宽：不缩小，因子恰好为 1。
+  assert.equal(Number(fitState.scale), 1);
+  assert.equal(fitState.width, "40px");
+  assert.equal(Number.parseFloat(fitState.height) > 24, true);
+
+  // 分屏：内容宽 = 两栏总宽（40*2+16=96），高度含标签。
+  await setState({
+    display: { ...IDLE_STATE.display, scale: "fit", mode: "split" },
+  });
+  const splitState = await page.evaluate(() => {
+    const overlay = document.querySelector(".live-overlay");
+    return {
+      width: overlay.style.width,
+      scale: overlay.style.getPropertyValue("--live-fit-scale"),
+    };
+  });
+  assert.equal(splitState.width, "96px");
+  assert.equal(Number(splitState.scale), 1);
+
+  // 1:1：缩放因子与内联尺寸全部清除，恢复滚动能力。
+  await setState({
+    display: { ...IDLE_STATE.display, scale: "actual", mode: "split" },
+  });
+  const actual = await page.evaluate(() => {
+    const overlay = document.querySelector(".live-overlay");
+    const inner = document.querySelector(".live-stage-inner");
+    return {
+      scale: overlay.style.getPropertyValue("--live-fit-scale"),
+      width: overlay.style.width,
+      height: overlay.style.height,
+      innerWidth: inner.style.width,
+    };
+  });
+  assert.deepEqual(actual, {
+    scale: "",
+    width: "",
+    height: "",
+    innerWidth: "",
+  });
 });
 
 test("选中用例展示观察重点", async (t) => {
