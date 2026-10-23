@@ -253,3 +253,297 @@ test("old single-page harness execute is unchanged", async (t) => {
     await server.close();
   }
 });
+
+test("start before ready is terminal: no ready after failed", async (t) => {
+  const driver = await launchDriver();
+  const server = await serve(root);
+  try {
+    const page = await driver.page(server.url);
+    try {
+      const outcome = await page.evaluate(async () => {
+        const { RunnerSession, createCleanupRegistry } = await import(
+          "/dist/live/runner/executor.js"
+        );
+        const messages = [];
+        const session = new RunnerSession(
+          {
+            sessionId: "s-order",
+            side: "native",
+            caseModuleUrl: "/.build/test/cases/rect/fill.case.js",
+            caseId: "context.fillRect.render",
+            libraryUrl: "/dist/index.js",
+            hooksUrl: "/dist/gpu/hooks.js",
+            timeouts: { prepare: 8000, run: 8000 },
+            post: (message) => messages.push(message),
+          },
+          createCleanupRegistry,
+        );
+        // start 在 prepare 完成前到达：报错后 prepare 不得再发 ready。
+        const preparePromise = session.handle({
+          type: "prepare",
+          sessionId: "s-order",
+          side: "native",
+          caseId: "context.fillRect.render",
+        });
+        await session.handle({
+          type: "start",
+          sessionId: "s-order",
+          side: "native",
+        });
+        await preparePromise;
+        return { stage: session.stage, messages };
+      });
+      const error = outcome.messages.find((m) => m.type === "error");
+      assert.ok(error, "error expected");
+      assert.equal(error.stage, "preparing");
+      // failed 终态：不得出现 ready 或 completed。
+      assert.ok(!outcome.messages.some((m) => m.type === "ready"));
+      assert.ok(!outcome.messages.some((m) => m.type === "completed"));
+    } finally {
+      await page.close();
+    }
+  } finally {
+    await driver.close();
+    await server.close();
+  }
+});
+
+test("concurrent duplicate prepare is rejected", async (t) => {
+  const driver = await launchDriver();
+  const server = await serve(root);
+  try {
+    const page = await driver.page(server.url);
+    try {
+      const outcome = await page.evaluate(async () => {
+        const { RunnerSession, createCleanupRegistry } = await import(
+          "/dist/live/runner/executor.js"
+        );
+        const messages = [];
+        const session = new RunnerSession(
+          {
+            sessionId: "s-dup",
+            side: "native",
+            caseModuleUrl: "/.build/test/cases/rect/fill.case.js",
+            caseId: "context.fillRect.render",
+            libraryUrl: "/dist/index.js",
+            hooksUrl: "/dist/gpu/hooks.js",
+            timeouts: { prepare: 8000, run: 8000 },
+            post: (message) => messages.push(message),
+          },
+          createCleanupRegistry,
+        );
+        const first = session.handle({
+          type: "prepare",
+          sessionId: "s-dup",
+          side: "native",
+          caseId: "context.fillRect.render",
+        });
+        const second = session.handle({
+          type: "prepare",
+          sessionId: "s-dup",
+          side: "native",
+          caseId: "context.fillRect.render",
+        });
+        await Promise.all([first, second]);
+        // 被拒的 prepare 已报错；成功的 prepare 完成后 dispose，统计残留画布。
+        await session.dispose();
+        return {
+          stage: session.stage,
+          canvasesAfter: document.querySelectorAll("canvas").length,
+          readyCount: messages.filter((m) => m.type === "ready").length,
+          errorReasons: messages
+            .filter((m) => m.type === "error")
+            .map((m) => m.reason),
+        };
+      });
+      // 恰好一次 ready；第二次 prepare 以 duplicate prepare 报错。
+      assert.equal(
+        outcome.readyCount,
+        1,
+        `expected exactly one ready, errors=${JSON.stringify(outcome.errorReasons)}`,
+      );
+      assert.ok(
+        outcome.errorReasons.some((reason) => /duplicate prepare/.test(reason)),
+        `expected duplicate prepare error, got ${JSON.stringify(outcome.errorReasons)}`,
+      );
+      // dispose 后不得残留画布。
+      assert.equal(outcome.canvasesAfter, 0);
+    } finally {
+      await page.close();
+    }
+  } finally {
+    await driver.close();
+    await server.close();
+  }
+});
+
+test("dispose during prepare removes the canvas", async (t) => {
+  const driver = await launchDriver();
+  const server = await serve(root);
+  try {
+    const page = await driver.page(server.url);
+    try {
+      const outcome = await page.evaluate(async () => {
+        const { RunnerSession, createCleanupRegistry } = await import(
+          "/dist/live/runner/executor.js"
+        );
+        const messages = [];
+        const session = new RunnerSession(
+          {
+            sessionId: "s-race",
+            side: "native",
+            caseModuleUrl: "/.build/test/cases/rect/fill.case.js",
+            caseId: "context.fillRect.render",
+            libraryUrl: "/dist/index.js",
+            hooksUrl: "/dist/gpu/hooks.js",
+            timeouts: { prepare: 8000, run: 8000 },
+            post: (message) => messages.push(message),
+          },
+          createCleanupRegistry,
+        );
+        const preparePromise = session.handle({
+          type: "prepare",
+          sessionId: "s-race",
+          side: "native",
+          caseId: "context.fillRect.render",
+        });
+        // 立即 dispose：prepare 恢复执行后不得挂载或保留画布。
+        await session.handle({
+          type: "dispose",
+          sessionId: "s-race",
+          side: "native",
+        });
+        await preparePromise;
+        return {
+          stage: session.stage,
+          canvases: document.querySelectorAll("canvas").length,
+          messages,
+        };
+      });
+      assert.equal(outcome.stage, "disposed");
+      assert.equal(outcome.canvases, 0);
+      // dispose 后不得发 ready/completed。
+      assert.ok(!outcome.messages.some((m) => m.type === "ready"));
+      assert.ok(!outcome.messages.some((m) => m.type === "completed"));
+    } finally {
+      await page.close();
+    }
+  } finally {
+    await driver.close();
+    await server.close();
+  }
+});
+
+test("wrong side and wrong caseId are rejected", async (t) => {
+  const driver = await launchDriver();
+  const server = await serve(root);
+  try {
+    const page = await driver.page(server.url);
+    try {
+      const outcome = await page.evaluate(async () => {
+        const { RunnerSession, createCleanupRegistry } = await import(
+          "/dist/live/runner/executor.js"
+        );
+        const messages = [];
+        const session = new RunnerSession(
+          {
+            sessionId: "s-guard",
+            side: "native",
+            caseModuleUrl: "/.build/test/cases/rect/fill.case.js",
+            caseId: "context.fillRect.render",
+            libraryUrl: "/dist/index.js",
+            hooksUrl: "/dist/gpu/hooks.js",
+            timeouts: { prepare: 8000, run: 8000 },
+            post: (message) => messages.push(message),
+          },
+          createCleanupRegistry,
+        );
+        await session.handle({
+          type: "prepare",
+          sessionId: "s-guard",
+          side: "compat", // 侧别不匹配：忽略
+          caseId: "context.fillRect.render",
+        });
+        await session.handle({
+          type: "prepare",
+          sessionId: "s-guard",
+          side: "native",
+          caseId: "other.case", // caseId 不匹配：报错
+        });
+        return { stage: session.stage, messages };
+      });
+      assert.equal(outcome.messages.length, 1);
+      const error = outcome.messages[0];
+      assert.equal(error.type, "error");
+      assert.match(error.reason, /case-mismatch/);
+    } finally {
+      await page.close();
+    }
+  } finally {
+    await driver.close();
+    await server.close();
+  }
+});
+
+test("cleanup failure still reaches disposed and reports the error", async (t) => {
+  const driver = await launchDriver();
+  const server = await serve(root);
+  try {
+    const page = await driver.page(server.url);
+    try {
+      const outcome = await page.evaluate(async () => {
+        const { RunnerSession, createCleanupRegistry } = await import(
+          "/dist/live/runner/executor.js"
+        );
+        const messages = [];
+        // 注入一个会抛错的清理回调。
+        const failingRegistry = () => {
+          const registry = createCleanupRegistry();
+          registry.register(() => {
+            throw new Error("cleanup-boom");
+          });
+          return registry;
+        };
+        const session = new RunnerSession(
+          {
+            sessionId: "s-clean",
+            side: "native",
+            caseModuleUrl: "/.build/test/cases/rect/fill.case.js",
+            caseId: "context.fillRect.render",
+            libraryUrl: "/dist/index.js",
+            hooksUrl: "/dist/gpu/hooks.js",
+            timeouts: { prepare: 8000, run: 8000 },
+            post: (message) => messages.push(message),
+          },
+          failingRegistry,
+        );
+        await session.handle({
+          type: "prepare",
+          sessionId: "s-clean",
+          side: "native",
+          caseId: "context.fillRect.render",
+        });
+        await session.handle({
+          type: "start",
+          sessionId: "s-clean",
+          side: "native",
+        });
+        await session.dispose();
+        // 再次 dispose 复用同一结果，阶段保持 disposed。
+        await session.dispose();
+        return { stage: session.stage, messages };
+      });
+      assert.equal(outcome.stage, "disposed");
+      const error = outcome.messages.find(
+        (m) => m.type === "error" && m.stage === "disposing",
+      );
+      assert.ok(error, "cleanup error must be reported");
+      assert.match(error.reason, /cleanup-boom/);
+    } finally {
+      await page.close();
+    }
+  } finally {
+    await driver.close();
+    await server.close();
+  }
+});

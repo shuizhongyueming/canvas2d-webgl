@@ -46,6 +46,34 @@ interface CompatLike {
   dispose(): void;
 }
 
+/**
+ * 与旧 execute 一致的 observation 校验：重复 key 报错，值必须可无歧义 JSON 化。
+ * 新工具不展示观测值，但保留校验，避免形成第二套用例语义。
+ */
+function assertObservationValue(value: unknown): void {
+  const visit = (v: unknown): void => {
+    if (v === null || typeof v === "string" || typeof v === "boolean") return;
+    if (typeof v === "number" && Number.isFinite(v) && !Object.is(v, -0))
+      return;
+    if (Array.isArray(v)) {
+      for (const item of v) visit(item);
+      return;
+    }
+    if (
+      typeof v === "object" &&
+      Object.getPrototypeOf(v) === Object.prototype
+    ) {
+      for (const item of Object.values(v)) visit(item);
+      return;
+    }
+    throw new Error(
+      "Observation must be lossless JSON; encode exceptional values explicitly",
+    );
+  };
+  visit(value);
+  JSON.stringify(value);
+}
+
 /** 同输入种子的 PRNG；与旧 execute 的序列完全一致。 */
 export function seededRandomFrom(seed: number): () => number {
   let state = seed >>> 0;
@@ -107,10 +135,12 @@ export function prepareCaseExecution(
   target.width = definition.width;
   target.height = definition.height;
   target.style.cssText = "display:block;";
-  targetParent.append(target);
+  // 先登记清理再挂载，保证登记成功前 target 不进入 DOM；
+  // registry 在 disposing 期登记会立即执行清理（见 executor.ts 的登记实现）。
   registry.register(() => {
     target.remove();
   });
+  targetParent.append(target);
 
   let context: CanvasRenderingContext2D | null = null;
   let hooks: TestHooks | null = null;
@@ -124,6 +154,11 @@ export function prepareCaseExecution(
       throw new Error("compat side requires createCompatCanvas");
     compat = createCompatCanvas(target);
     canvas = compat;
+    // 先登记 dispose，再做可能失败的能力检查；prepare 失败时 compat 资源不泄漏。
+    const instance = compat;
+    registry.register(() => {
+      instance.dispose();
+    });
     context = compat.getContext("2d") as CanvasRenderingContext2D;
     if (!target.getContext("webgl"))
       throw new Error("Compatibility target is not bound to WebGL 1");
@@ -132,14 +167,12 @@ export function prepareCaseExecution(
     const found = lookupTestHooks(compat);
     if (!found) throw new Error("GPU test hooks are not registered");
     hooks = found;
-    registry.register(() => {
-      compat?.dispose();
-    });
   }
   if (!context) throw new Error("2d-unavailable");
 
   const settledContext = context;
   const settledHooks = hooks;
+  const observations = new Set<string>();
   const adapter: CaseAdapter = {
     canvas: canvas as CaseAdapter["canvas"],
     context: settledContext as CaseAdapter["context"],
@@ -148,8 +181,10 @@ export function prepareCaseExecution(
       if (!value) throw new Error(message);
     },
     observe(key: string, value: unknown) {
-      void key;
-      void value;
+      if (observations.has(key))
+        throw new Error(`Duplicate observation: ${key}`);
+      assertObservationValue(value);
+      observations.add(key);
     },
     skip(reason: string): never {
       const error = new Error(`skip: ${reason}`);

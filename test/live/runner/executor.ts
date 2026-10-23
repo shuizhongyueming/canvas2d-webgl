@@ -3,6 +3,9 @@
  * 每个 iframe 文档只承载一侧一轮：加载用例定义 → prepare（含字体与用例
  * 静态素材准备）→ 发 ready → 等外层 start → run → 最终取样 → 发 completed。
  * prepare/start/dispose 任一时刻可收到 dispose；错误按阶段上报 error。
+ *
+ * 并发纪律：消息事件可并发到达，本类的每个 await 之后都重新核对阶段；
+ * prepare 入口立即占用 preparing 标记，重复 prepare 一律报错。
  */
 import type {
   CleanupCallback,
@@ -80,15 +83,16 @@ function bounded<T>(
 
 async function waitFonts(
   fonts: readonly string[],
-  timeout: number,
+  deadline: number,
 ): Promise<void> {
+  const remaining = () => Math.max(1, deadline - Date.now());
   try {
     await bounded(
       Promise.all(fonts.map((font) => document.fonts.load(font))),
-      timeout,
+      remaining(),
       "font-timeout",
     );
-    await bounded(document.fonts.ready, timeout, "font-timeout");
+    await bounded(document.fonts.ready, remaining(), "font-timeout");
     if (fonts.some((font) => !document.fonts.check(font)))
       throw new Error("font-unavailable");
   } catch (error) {
@@ -98,7 +102,7 @@ async function waitFonts(
 
 /**
  * 单轮单侧执行会话。文档级单例：重复 prepare 或 start 乱序直接报错，
- * 保证每个文档只承载一侧一轮。
+ * 保证每个文档只承载一侧一轮。failed 是终态；只有 dispose 能离开。
  */
 export class RunnerSession {
   #stage: SessionStage = "preparing";
@@ -106,12 +110,16 @@ export class RunnerSession {
   #prepared: PreparedExecution | null = null;
   #controller: AbortController | null = null;
   #disposePromise: Promise<void> | null = null;
+  /** 入口占锁：并发重复 prepare 在第一个 await 前即被拒绝。 */
+  #prepareClaimed = false;
+  #caseId: string;
 
   constructor(
     private readonly bootstrap: RunnerBootstrap,
     private readonly registryFactory: () => CleanupRegistry,
   ) {
     this.#registry = registryFactory();
+    this.#caseId = bootstrap.caseId;
   }
 
   get stage(): SessionStage {
@@ -122,9 +130,14 @@ export class RunnerSession {
     this.bootstrap.post(message);
   }
 
-  #fail(stage: SessionStage, error: unknown): void {
+  /**
+   * 阶段上报。默认进入 failed 终态；terminal=false 只发诊断不改阶段，
+   * 用于重复 prepare 等调用方错误——不影响正在进行的合法 prepare。
+   * disposing/disposed 后不再改状态。
+   */
+  #fail(stage: SessionStage, error: unknown, terminal = true): void {
     if (this.#stage === "disposed" || this.#stage === "disposing") return;
-    this.#stage = "failed";
+    if (terminal) this.#stage = "failed";
     this.#post({
       type: "error",
       sessionId: this.bootstrap.sessionId,
@@ -134,28 +147,56 @@ export class RunnerSession {
     });
   }
 
-  /** 处理外层控制消息；未知类型或轮次/侧别不匹配在类型层已排除，运行时仍核对。 */
+  /** await 之后的阶段守卫：dispose/failed 之后不得继续装配或发 ready。 */
+  #assertAlive(): void {
+    if (this.#stage !== "preparing")
+      throw new Error(`session no longer active: ${this.#stage}`);
+  }
+
+  /** 处理外层控制消息；轮次/侧别/caseId 不匹配或乱序均被拒绝。 */
   async handle(message: ControllerMessage): Promise<void> {
-    if (message.sessionId !== this.bootstrap.sessionId) return;
-    if (message.side !== this.bootstrap.side) return;
-    switch (message.type) {
-      case "prepare":
-        await this.#prepare();
-        break;
-      case "start":
-        await this.#start();
-        break;
-      case "dispose":
-        await this.dispose();
-        break;
+    try {
+      if (message.sessionId !== this.bootstrap.sessionId) return;
+      if (message.side !== this.bootstrap.side) return;
+      switch (message.type) {
+        case "prepare":
+          if (message.caseId !== this.#caseId) {
+            this.#fail(
+              "preparing",
+              new Error(
+                `case-mismatch: expected ${this.#caseId}, got ${message.caseId}`,
+              ),
+            );
+            return;
+          }
+          await this.#prepare();
+          break;
+        case "start":
+          await this.#start();
+          break;
+        case "dispose":
+          await this.dispose();
+          break;
+      }
+    } catch (error) {
+      // handle 不向调用方抛错；异步路径的错误统一按阶段上报。
+      this.#fail(this.#stage, error);
     }
   }
 
   async #prepare(): Promise<void> {
-    if (this.#stage !== "preparing" || this.#prepared) {
-      this.#fail(this.#stage, new Error("duplicate prepare"));
+    // 入口占锁放在任何 await 之前：并发重复 prepare 一律报错。
+    if (this.#prepareClaimed) {
+      this.#fail(this.#stage, new Error("duplicate prepare"), false);
       return;
     }
+    this.#prepareClaimed = true;
+    if (this.#stage !== "preparing") {
+      this.#fail(this.#stage, new Error("prepare-after-terminal"));
+      return;
+    }
+    const deadline = Date.now() + this.bootstrap.timeouts.prepare;
+    const remaining = () => Math.max(1, deadline - Date.now());
     try {
       const [caseModule, library, hooksModule] = (await bounded(
         Promise.all([
@@ -167,19 +208,20 @@ export class RunnerSession {
             ? (import(this.bootstrap.hooksUrl) as Promise<HooksModule>)
             : Promise.resolve(null),
         ]),
-        this.bootstrap.timeouts.prepare,
+        remaining(),
         "prepare-timeout",
       )) as [CaseModule, LibraryModule | null, HooksModule | null];
+      this.#assertAlive();
 
       const definition = caseModule.cases.find(
-        (entry) => entry.id === this.bootstrap.caseId,
+        (entry) => entry.id === this.#caseId,
       );
-      if (!definition)
-        throw new Error(`case-not-found: ${this.bootstrap.caseId}`);
+      if (!definition) throw new Error(`case-not-found: ${this.#caseId}`);
 
       // 显式准备：字体与普通静态素材在 prepare 完成；run 内仍保留测试
-      // 行为自身的加载状态/来源修改。
-      await waitFonts(definition.fonts, this.bootstrap.timeouts.prepare);
+      // 行为自身的加载状态/来源修改。整个 prepare 阶段共用同一 deadline。
+      await waitFonts(definition.fonts, deadline);
+      this.#assertAlive();
 
       const environment: ExecutionEnvironment = {
         side: this.bootstrap.side,
@@ -195,23 +237,26 @@ export class RunnerSession {
         this.#registry,
       );
 
-      // 用例级 prepare 扩展：加载用例声明的静态素材，登记其拥有的资源。
-      // 用例 prepare 复用同一 adapter/registry；其返回的 PreparedExecution
-      // 只链接 dispose（资源释放归用例），run/readPixels 始终以环境装配为准。
-      let casePrepared: PreparedExecution | null = null;
+      // 用例级 prepare 扩展（issue #63）：加载用例声明的静态素材并返回
+      // prepared execution 供外层统一 start。其 run/readPixels 是正式执行
+      // 入口；dispose 链接到本轮清理。没有用例 prepare 时以环境装配为准。
+      let execution = prepared;
       if (definition.prepare) {
-        casePrepared = await bounded(
+        const casePrepared = await bounded(
           Promise.resolve(definition.prepare(adapter, this.#registry)),
-          this.bootstrap.timeouts.prepare,
+          remaining(),
           "prepare-timeout",
         );
-      }
-      if (casePrepared) {
-        const inner = casePrepared;
-        this.#registry.register(() => inner.dispose());
+        this.#assertAlive();
+        // 环境装配的 dispose 只释放登记资源；用例 execution 接管 run/readPixels。
+        execution = {
+          run: (signal) => casePrepared.run(signal),
+          readPixels: () => casePrepared.readPixels(),
+          dispose: () => prepared.dispose(),
+        };
       }
 
-      this.#prepared = prepared;
+      this.#prepared = execution;
       this.#controller = new AbortController();
       this.#stage = "ready";
       this.#post({
@@ -220,14 +265,25 @@ export class RunnerSession {
         side: this.bootstrap.side,
       });
     } catch (error) {
-      this.#fail("preparing", error);
-      await this.dispose();
+      // disposing/disposed 期间由 dispose 负责；这里只覆盖活动阶段失败。
+      // 显式读取到局部变量，绕过 TS 对私有字段在闭包内缩窄的误报。
+      const stage = this.#readStage();
+      if (stage !== "disposing" && stage !== "disposed") {
+        this.#fail("preparing", error);
+        await this.dispose();
+      }
     }
+  }
+
+  #readStage(): SessionStage {
+    return this.#stage;
   }
 
   async #start(): Promise<void> {
     if (this.#stage !== "ready" || !this.#prepared || !this.#controller) {
-      this.#fail(this.#stage, new Error("start-before-ready"));
+      // failed 是终态：不报第二个 error，也不允许恢复。
+      if (this.#stage !== "failed")
+        this.#fail(this.#stage, new Error("start-before-ready"));
       return;
     }
     this.#stage = "running";
@@ -239,8 +295,9 @@ export class RunnerSession {
         this.bootstrap.timeouts.run,
         "run-timeout",
       );
-      const pixels: PixelData = prepared.readPixels();
       if (this.#stage !== "running") return; // 中途进入 disposing/failed
+      const pixels: PixelData = prepared.readPixels();
+      if (this.#stage !== "running") return;
       this.#stage = "completed";
       this.#post({
         type: "completed",
@@ -249,41 +306,76 @@ export class RunnerSession {
         pixels,
       });
     } catch (error) {
-      if (this.#stage === "running") this.#fail("running", error);
-      await this.dispose();
+      if (this.#stage === "running") {
+        this.#fail("running", error);
+        await this.dispose();
+      }
     }
   }
 
-  /** 幂等清理：中断 run（尽力）、执行清理登记、移除目标；不无限阻塞。 */
-  async dispose(): Promise<void> {
-    if (this.#stage === "disposed")
-      return this.#disposePromise ?? Promise.resolve();
+  /**
+   * 幂等清理：中断 run（尽力）、执行清理登记、移除目标；不无限阻塞。
+   * 清理回调抛错时仍然进入 disposed 并上报首个错误；并发调用共享同一 Promise。
+   */
+  dispose(): Promise<void> {
     if (this.#disposePromise) return this.#disposePromise;
     this.#stage = "disposing";
     this.#controller?.abort();
+    const cleanupError: { value: unknown } = { value: undefined };
     this.#disposePromise = (async () => {
       try {
         await this.#prepared?.dispose();
-      } finally {
-        await this.#registry.disposeAll();
-        this.#stage = "disposed";
+      } catch (error) {
+        cleanupError.value = error;
       }
+      try {
+        await this.#registry.disposeAll();
+      } catch (error) {
+        if (cleanupError.value === undefined) cleanupError.value = error;
+      }
+      this.#stage = "disposed";
+      if (cleanupError.value !== undefined)
+        this.#post({
+          type: "error",
+          sessionId: this.bootstrap.sessionId,
+          side: this.bootstrap.side,
+          stage: "disposing",
+          reason: reasonOf(cleanupError.value),
+        });
     })();
     return this.#disposePromise;
   }
 }
 
-/** 创建空清理登记；满足幂等与逆序释放约定（契约票冻结语义）。 */
+/**
+ * 创建空清理登记；满足契约票冻结语义（逆序、幂等、并发共享结果）。
+ * 扩展：disposing 期间登记的清理立即执行并计入本轮，避免 await 竞态
+ * 把已创建资源留在登记之外。
+ */
 export function createCleanupRegistry(): CleanupRegistry {
   // 每项登记持有独立 slot；注销只移除自己的 slot，不受重复回调影响。
   type Slot = { cleanup: CleanupCallback; active: boolean };
   const slots: Slot[] = [];
+  const lateErrors: unknown[] = [];
   let disposed = false;
+  let disposing = false;
   let disposePromise: Promise<void> | null = null;
+  const runCleanup = async (slot: Slot): Promise<void> => {
+    if (!slot.active) return;
+    slot.active = false;
+    await slot.cleanup();
+  };
   return {
     register(cleanup) {
-      if (disposed) throw new Error("cleanup-registry: disposed");
       const slot: Slot = { cleanup, active: true };
+      if (disposing && !disposed) {
+        // disposing 期间登记：立即执行，不让资源逃出清理。
+        void runCleanup(slot).catch((error) => lateErrors.push(error));
+        return () => {
+          slot.active = false;
+        };
+      }
+      if (disposed) throw new Error("cleanup-registry: disposed");
       slots.push(slot);
       return () => {
         if (!slot.active) return;
@@ -294,7 +386,7 @@ export function createCleanupRegistry(): CleanupRegistry {
     },
     disposeAll() {
       if (disposePromise) return disposePromise;
-      disposed = true;
+      disposing = true;
       disposePromise = (async () => {
         // 逆序释放；单项异常不阻塞其余清理，收集后统一抛出首个错误。
         let first: unknown;
@@ -309,6 +401,9 @@ export function createCleanupRegistry(): CleanupRegistry {
           }
         }
         slots.length = 0;
+        disposed = true;
+        // disposing 期间登记的清理若失败，一并纳入首个错误。
+        if (first === undefined && lateErrors.length) first = lateErrors[0];
         if (first !== undefined) throw first;
       })();
       return disposePromise;
@@ -331,6 +426,7 @@ export function installRunnerWindow(
     if (!message || typeof message !== "object") return;
     if (message.sessionId !== bootstrap.sessionId) return;
     if (message.side !== bootstrap.side) return;
+    // handle 内部吸收错误并按阶段上报；不产生 unhandled rejection。
     void session.handle(message);
   });
   return session;
