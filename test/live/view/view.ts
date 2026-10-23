@@ -222,6 +222,7 @@ class ComparisonView implements View {
       if (this.state) this.renderDiff(this.state);
     });
     this.diffToggleButton.classList.add("live-diff-toggle");
+    this.diffToggleButton.setAttribute("aria-pressed", "true");
     toolbar.append(this.diffToggleButton);
 
     this.observationBox = document.createElement("div");
@@ -316,6 +317,15 @@ class ComparisonView implements View {
     // 初始挂载两个插槽；controller 负责放入真实画布。
     options.host.attachCanvas(nativeSlot(nativePane), "native");
     options.host.attachCanvas(nativeSlot(this.compatPane), "compat");
+
+    // 舞台尺寸变化（窗口缩放、画布重挂）时重算 fit 因子。
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(() => {
+        if (this.state?.display.scale === "fit") this.updateFitScale("fit");
+      });
+      observer.observe(stage);
+      observer.observe(overlayWrapper);
+    }
   }
 
   render(state: ControllerState): void {
@@ -526,17 +536,27 @@ class ComparisonView implements View {
   }
 
   /**
-   * fit 模式下计算统一缩放因子：取两侧画布固有尺寸的最大值，
-   * 相对舞台可用宽度等比缩小；两侧共享同一因子，保持重叠对齐。
-   * 1:1 模式不缩放，超出时舞台滚动（issue #60）。
+   * fit 模式下计算统一缩放因子（issue #60：分屏/重叠均完整显示、
+   * 保持相同显示比例）。内容固有尺寸按当前显示模式计算：分屏为两栏
+   * 总宽（含间距），重叠为单栏最大宽；高度计入 pane 标签。
+   * 因子作用于 overlay 整体，两侧共享同一比例，保持重叠对齐。
+   * 1:1 模式清除全部内联尺寸，超出时舞台滚动。
    */
   private updateFitScale(scale: Scale): void {
     const overlay = this.refs.stage.querySelector(".live-overlay");
     if (!(overlay instanceof HTMLElement)) return;
+    const inner = overlay.parentElement;
     if (scale !== "fit") {
       overlay.style.removeProperty("--live-fit-scale");
+      overlay.style.removeProperty("width");
+      overlay.style.removeProperty("height");
+      if (inner instanceof HTMLElement) {
+        inner.style.removeProperty("width");
+        inner.style.removeProperty("height");
+      }
       return;
     }
+    const mode = this.state?.display.mode ?? "overlay";
     let maxWidth = 0;
     let maxHeight = 0;
     for (const canvas of overlay.querySelectorAll("canvas")) {
@@ -545,16 +565,22 @@ class ComparisonView implements View {
       maxHeight = Math.max(maxHeight, canvas.height);
     }
     if (!maxWidth) return;
+    // pane 标签（原生/兼容）的近似高度；内容区为画布加标签。
+    const label = overlay.querySelector(".live-pane-label");
+    const labelHeight = label instanceof HTMLElement ? label.offsetHeight : 20;
+    const split = mode === "split";
+    const gap = split ? 16 : 0;
+    const contentWidth = split ? maxWidth * 2 + gap : maxWidth;
+    const contentHeight = maxHeight + labelHeight;
     const available = this.refs.stage.clientWidth - 4;
-    const factor = Math.min(1, available / maxWidth);
+    const factor = Math.min(1, available / contentWidth);
     overlay.style.setProperty("--live-fit-scale", String(factor));
     // 保持布局尺寸与缩放后一致，避免滚动条按缩放前尺寸出现。
-    overlay.style.width = `${maxWidth}px`;
-    overlay.style.height = `${maxHeight}px`;
-    const inner = overlay.parentElement;
+    overlay.style.width = `${contentWidth}px`;
+    overlay.style.height = `${contentHeight}px`;
     if (inner instanceof HTMLElement) {
-      inner.style.width = `${maxWidth * factor}px`;
-      inner.style.height = `${maxHeight * factor}px`;
+      inner.style.width = `${contentWidth * factor}px`;
+      inner.style.height = `${contentHeight * factor}px`;
     }
   }
 
@@ -576,6 +602,10 @@ class ComparisonView implements View {
     this.diffToggleButton.textContent = this.showDiffImage
       ? "差异图：开"
       : "差异图：关";
+    this.diffToggleButton.setAttribute(
+      "aria-pressed",
+      String(this.showDiffImage),
+    );
     diffImageBox.hidden = !this.showDiffImage || metrics === null;
     if (!metrics) {
       diffEmpty.textContent =
@@ -806,9 +836,7 @@ const VIEW_CSS = `
   transform: scale(var(--live-fit-scale, 1));
   transform-origin: top left;
 }
-.live-stage[data-scale="fit"] .live-stage-inner {
-  overflow: hidden;
-}
+
 .live-diff { display: none; flex-direction: column; gap: 4px; }
 .live-diff-active { display: flex; }
 .live-diff-empty { color: #666; }
