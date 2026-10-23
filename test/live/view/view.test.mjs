@@ -296,6 +296,95 @@ test("复制 ID 始终可用；复制成功与剪贴板失败均有提示", asyn
   assert.match(await page.textContent(".live-notice"), /clipboard-denied/);
 });
 
+test("非终态拒绝复制反馈；无选中用例拒绝复制 ID", async (t) => {
+  const { page, setState } = await launch(t);
+  // running 状态：copyFeedback 直接拒绝，不调用剪贴板。
+  await setState({
+    ...selected("case.alpha", "running"),
+    sides: { native: "running", compat: "running" },
+  });
+  const rejected = await page.evaluate(async () => {
+    const before = window.__live.copies.length;
+    const ok = await window.__live.view.copyFeedback({
+      protocolVersion: 1,
+      status: "failed",
+      side: null,
+      stage: "running",
+      reason: "stale",
+    });
+    return { ok, wrote: window.__live.copies.length > before };
+  });
+  assert.deepEqual(rejected, { ok: false, wrote: false });
+
+  // 无用例：copyCaseId 拒绝；复制按钮禁用。
+  await setState({
+    sessionId: null,
+    caseId: null,
+    stage: "idle",
+    sides: { native: "idle", compat: "idle" },
+    difference: null,
+    error: null,
+  });
+  const noCase = await page.evaluate(async () => {
+    const before = window.__live.copies.length;
+    const ok = await window.__live.view.copyCaseId();
+    return { ok, wrote: window.__live.copies.length > before };
+  });
+  assert.deepEqual(noCase, { ok: false, wrote: false });
+  assert.equal(
+    await page.locator(".live-actions button:nth-of-type(2)").isDisabled(),
+    true,
+  );
+  assert.equal(
+    await page.locator(".live-actions button:nth-of-type(3)").isDisabled(),
+    true,
+  );
+});
+
+test("按钮点击派发 copy 事件，由 controller 回调查询复制（用户路径）", async (t) => {
+  const { page, setState, events } = await launch(t);
+  await setState(selected("case.beta"));
+  await page.click(".live-actions button:nth-of-type(2)");
+  assert.deepEqual(await events(), [{ type: "copy-case-id" }]);
+  // 模拟 controller 收到事件后回调视图复制方法。
+  const copies = await page.evaluate(async () => {
+    await window.__live.view.copyCaseId();
+    return window.__live.copies;
+  });
+  assert.deepEqual(copies, ["case.beta"]);
+
+  await page.click(".live-actions button:nth-of-type(3)");
+  assert.deepEqual(await events(), [{ type: "copy-feedback" }]);
+});
+
+test("重跑按钮派发 rerun；无用例时禁用", async (t) => {
+  const { page, setState, events } = await launch(t);
+  assert.equal(
+    await page.locator(".live-actions button:nth-of-type(1)").isDisabled(),
+    true,
+  );
+  await setState(selected("case.alpha"));
+  await page.click(".live-actions button:nth-of-type(1)");
+  assert.deepEqual(await events(), [{ type: "rerun" }]);
+});
+
+test("执行中传入 metrics 时视图不提前显示差异（防御）", async (t) => {
+  const { page, setState } = await launch(t);
+  await setState({
+    ...selected("case.alpha", "running"),
+    sides: { native: "running", compat: "completed" },
+    difference: {
+      totalPixels: 100,
+      changedPixels: 1,
+      changedRatio: 0.01,
+      maxChannelDelta: 5,
+      differenceBounds: { x: 0, y: 0, width: 1, height: 1 },
+    },
+  });
+  assert.match(await page.textContent(".live-diff-empty"), /等待两侧完成/);
+  assert.equal(await page.textContent(".live-diff-stats"), "");
+});
+
 test("反馈 JSON 只含 caseId、browser、difference；失败状态不带指标", async (t) => {
   const { page, setState } = await launch(t);
   await setState({
@@ -329,7 +418,13 @@ test("反馈 JSON 只含 caseId、browser、difference；失败状态不带指�
   assert.equal(report.difference.changedPixels, undefined);
 });
 
-test("指纹噪声提示可见；完成状态展示 bbox 与差异图", async (t) => {
+test("选中用例展示观察重点", async (t) => {
+  const { page, setState } = await launch(t);
+  await setState(selected("case.beta"));
+  assert.match(await page.textContent(".live-observation"), /观察重点 B/);
+});
+
+test("指纹噪声提示可见；完成状态展示 bbox 与差异图占位", async (t) => {
   const { page, setState } = await launch(t);
   assert.match(await page.textContent(".live-fingerprint-note"), /指纹保护/);
   assert.match(await page.textContent(".live-fingerprint-note"), /not-tested/);
@@ -347,9 +442,13 @@ test("指纹噪声提示可见；完成状态展示 bbox 与差异图", async (t
   const bounds = await page.textContent(".live-diff-bounds");
   assert.match(bounds, /x=1, y=1/);
   assert.match(bounds, /内部不保证全部不同/);
-  const diffSize = await page.evaluate(() => {
+  // 逐像素图数据接入前不画伪图：画布保持空，标注占位。
+  const diffInfo = await page.evaluate(() => {
     const canvas = document.querySelector(".live-diff-canvas");
-    return [canvas.width, canvas.height];
+    return [canvas.width, canvas.height, canvas.dataset.placeholder ?? null];
   });
-  assert.deepEqual(diffSize, [2, 2]);
+  assert.deepEqual(diffSize0(diffInfo), true);
+  function diffSize0([w, h, placeholder]) {
+    return w === 0 && h === 0 && /量测票/.test(placeholder);
+  }
 });
