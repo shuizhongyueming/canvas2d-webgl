@@ -456,6 +456,35 @@ test("差异图开关可切换显示；无量测时开关禁用", async (t) => {
   assert.equal(await page.locator(".live-diff-image-box").isVisible(), true);
 });
 
+test("重叠模式两侧画布同位置对齐（原生下层、兼容上层）", async (t) => {
+  const { page, setState } = await launch(t);
+  await setState({
+    ...selected("case.alpha"),
+    display: { ...IDLE_STATE.display, mode: "overlay" },
+  });
+  const rects = await page.evaluate(() => {
+    const nativeCanvas = document.querySelector(
+      '.live-pane[data-side="native"] canvas',
+    );
+    const compatCanvas = document.querySelector(
+      '.live-pane[data-side="compat"] canvas',
+    );
+    const native = nativeCanvas.getBoundingClientRect();
+    const compat = compatCanvas.getBoundingClientRect();
+    return {
+      topDelta: Math.abs(native.top - compat.top),
+      leftDelta: Math.abs(native.left - compat.left),
+      compatAbove:
+        nativeCanvas.compareDocumentPosition(compatCanvas) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    };
+  });
+  assert.equal(rects.topDelta, 0);
+  assert.equal(rects.leftDelta, 0);
+  // 兼容 pane 在 DOM 中位于原生之后（同透明度下视觉在上层）。
+  assert.notEqual(rects.compatAbove, 0);
+});
+
 test("fit 模式对重叠整体应用统一缩放因子；1:1 清除内联尺寸", async (t) => {
   const { page, setState } = await launch(t);
   await page.setViewportSize({ width: 300, height: 600 });
@@ -472,10 +501,11 @@ test("fit 模式对重叠整体应用统一缩放因子；1:1 清除内联尺寸
       height: overlay.style.height,
     };
   });
-  // 桩画布 40×24 + 标签高，舞台约 280px 宽：不缩小，因子恰好为 1。
+  // 桩画布 40×24，重叠模式标签不占位；舞台约 280px 宽：因子恰好为 1。
   assert.equal(Number(fitState.scale), 1);
+  assert.equal(fitState.transform, "matrix(1, 0, 0, 1, 0, 0)");
   assert.equal(fitState.width, "40px");
-  assert.equal(Number.parseFloat(fitState.height) > 24, true);
+  assert.equal(fitState.height, "24px");
 
   // 分屏：内容宽 = 两栏总宽（40*2+16=96），高度含标签。
   await setState({
@@ -490,6 +520,21 @@ test("fit 模式对重叠整体应用统一缩放因子；1:1 清除内联尺寸
   });
   assert.equal(splitState.width, "96px");
   assert.equal(Number(splitState.scale), 1);
+
+  // 窄窗口：重叠内容 40px 宽，窗口压到 30px 内容区时按比例缩小。
+  await page.setViewportSize({ width: 60, height: 600 });
+  await setState({
+    display: { ...IDLE_STATE.display, scale: "fit", mode: "overlay" },
+  });
+  await page.waitForFunction(() => {
+    const overlay = document.querySelector(".live-overlay");
+    const scale = Number(overlay.style.getPropertyValue("--live-fit-scale"));
+    return scale > 0 && scale < 1;
+  });
+  const shrunk = await page.evaluate(
+    () => getComputedStyle(document.querySelector(".live-overlay")).transform,
+  );
+  assert.match(shrunk, /^matrix\(/);
 
   // 1:1：缩放因子与内联尺寸全部清除，恢复滚动能力。
   await setState({
