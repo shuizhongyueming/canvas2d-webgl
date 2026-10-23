@@ -15,6 +15,10 @@ export const cases: CaseDefinition[] = [
     id: "context.fillText.render",
     requirements: ["context.fillText", "context.font"],
     fonts: ["10px sans-serif", "24px sans-serif"],
+    display: {
+      status: "included",
+      observation: "字形、填充颜色与水平/右对齐位置",
+    },
     run(a) {
       const context = a.context;
       // Default state: 10px sans-serif, black fill, start/alphabetic.

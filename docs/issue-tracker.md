@@ -26,3 +26,10 @@
 实施票同样使用 sub-issues 与原生 dependencies。依赖表示前置票已经合并；用户后续启动 agent 后，先认领并评论分支/工作目录，再用独立 worktree 工作。开放、无 blocker、无 assignee、非 deferred 才可领取。PR 合并、测试与本票需要的人工+AI评审齐备后才关闭；没有运行或仍待评审的票保持开放。
 
 共同接口、文件归属、测试层次与完成门槛见[实施计划](plans/development.md)。已批准方案若被反例推翻，另建决策票作为受影响实施票的 blocker，不由实施 agent 自行改规格。本轮只创建开发计划，未执行任何实施票。
+
+## 实时渲染对比工具
+
+- [Spec：本地实时渲染对比与差异量测工具](https://github.com/shuizhongyueming/canvas2d-webgl/issues/60)：已确认产品约定；[仓库快照](specs/live-render-comparison.md)。
+- [Wayfinder：本地实时渲染对比工具实施前决策地图](https://github.com/shuizhongyueming/canvas2d-webgl/issues/61)：展示目录、执行隔离及像素量测的实施前决策。只规划，不代表开始实现或签署验收。
+
+- [开发计划：本地实时渲染对比工具与多 agent 并行交付](https://github.com/shuizhongyueming/canvas2d-webgl/issues/65)：已确认决策的实施拆解；[仓库快照](plans/live-render-comparison.md)。
