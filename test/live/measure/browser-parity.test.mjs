@@ -52,7 +52,7 @@ test("node baseline on the shared vectors", () => {
   assert.deepEqual(outcome.metrics, expectedMetrics);
 });
 
-test("the pure core loads in Chromium and matches Node on the same vectors", async () => {
+test("the pure core loads in Chromium and matches Node on the same vectors", async (t) => {
   const moduleUrl = `file://${root}/dist/live/measure/diff-core.js`;
   const contractsUrl = `file://${root}/dist/live/contracts/index.js`;
   // file:// ESM 动态 import 在 Chromium 中被限制；改为注入源码文本。
@@ -66,7 +66,15 @@ test("the pure core loads in Chromium and matches Node on the same vectors", asy
   );
   // 契约模块是类型专用，编译产物应为空导出；确认核心不需要它即可加载。
   assert.match(sessionSource, /export \{\}|export\s*\{/);
-  const browser = await chromium.launch({ headless: true });
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true });
+  } catch (error) {
+    // 未安装 Playwright 浏览器或沙箱禁止启动时显式跳过，
+    // 不让默认 Node 单测套件以晦涩的进程崩溃失败。
+    t.skip(`Chromium 不可用：${error?.message?.split("\n")[0] ?? error}`);
+    return;
+  }
   try {
     const page = await browser.newPage();
     page.on("pageerror", (error) => {

@@ -17,17 +17,16 @@ export { MeasurementError };
 
 /** Buffer/TypedArray → 核心 PixelData 视图；仅借出缓冲区，不复制。 */
 function toPixelData(image) {
+  const data = image.data;
+  if (!(data instanceof Uint8Array) && !(data instanceof Uint8ClampedArray))
+    throw new MeasurementError(
+      "invalid-format",
+      `measurement: 像素缓冲必须是 Uint8Array/Uint8ClampedArray，收到 ${data?.constructor?.name ?? typeof data}`,
+    );
   return {
     width: image.width,
     height: image.height,
-    pixels:
-      image.data instanceof Uint8Array
-        ? image.data
-        : new Uint8Array(
-            image.data.buffer,
-            image.data.byteOffset,
-            image.data.byteLength,
-          ),
+    pixels: new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
   };
 }
 
