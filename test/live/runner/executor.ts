@@ -306,7 +306,10 @@ export class RunnerSession {
         pixels,
       });
     } catch (error) {
-      if (this.#stage === "running") {
+      // run 失败路径里 execution.ts 的 fail 回调已把阶段置为 failed；
+      // 无论此处看到 running 还是 failed，都必须销毁环境，不能残留画布。
+      const stage = this.#readStage();
+      if (stage === "running" || stage === "failed") {
         this.#fail("running", error);
         await this.dispose();
       }

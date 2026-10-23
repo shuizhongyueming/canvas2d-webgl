@@ -547,3 +547,59 @@ test("cleanup failure still reaches disposed and reports the error", async (t) =
     await server.close();
   }
 });
+
+test("run failure disposes the environment and removes the canvas", async (t) => {
+  const driver = await launchDriver();
+  const server = await serve(root);
+  try {
+    const page = await driver.page(server.url);
+    try {
+      const outcome = await page.evaluate(async () => {
+        const { RunnerSession, createCleanupRegistry } = await import(
+          "/dist/live/runner/executor.js"
+        );
+        const messages = [];
+        const session = new RunnerSession(
+          {
+            sessionId: "s-runfail",
+            side: "native",
+            caseModuleUrl: "/.build/test/fixtures/infrastructure.case.js",
+            caseId: "self.render-error", // run 内注入绘制失败的用例
+            libraryUrl: "/dist/index.js",
+            hooksUrl: "/dist/gpu/hooks.js",
+            timeouts: { prepare: 8000, run: 8000 },
+            post: (message) => messages.push(message),
+          },
+          createCleanupRegistry,
+        );
+        await session.handle({
+          type: "prepare",
+          sessionId: "s-runfail",
+          side: "native",
+          caseId: "self.render-error",
+        });
+        await session.handle({
+          type: "start",
+          sessionId: "s-runfail",
+          side: "native",
+        });
+        return {
+          stage: session.stage,
+          canvases: document.querySelectorAll("canvas").length,
+          messages,
+        };
+      });
+      // run 失败后必须销毁环境：阶段到 disposed，画布移除，error 阶段为 running。
+      assert.equal(outcome.stage, "disposed");
+      assert.equal(outcome.canvases, 0);
+      const error = outcome.messages.find((m) => m.type === "error");
+      assert.ok(error, "run failure must be reported");
+      assert.equal(error.stage, "running");
+    } finally {
+      await page.close();
+    }
+  } finally {
+    await driver.close();
+    await server.close();
+  }
+});
