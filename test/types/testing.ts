@@ -16,6 +16,7 @@ import type { CaseMetadata } from "../../src/contracts/support.js";
 import type {
   CleanupRegistry,
   DisplayClassification,
+  PreparedExecution,
 } from "../live/contracts/index.js";
 export type { CaseMetadata } from "../../src/contracts/support.js";
 export interface CaseDefinition extends CaseMetadata {
@@ -30,13 +31,14 @@ export interface CaseDefinition extends CaseMetadata {
    */
   readonly display?: DisplayClassification;
   /**
-   * 可选准备扩展（issue #63）：加载用例级资源、等待静态素材。
-   * 旧用例无 prepare 时由执行票提供的迁移入口包装，run 语义不变。
+   * 可选准备扩展（issue #63）：加载用例级资源、等待静态素材，
+   * 返回 prepared execution 供外层统一 start。旧用例无 prepare 时由执行票
+   * 提供的迁移入口包装，run 语义不变。
    */
   prepare?(
     adapter: CaseAdapter,
     registry: CleanupRegistry,
-  ): void | Promise<void>;
+  ): PreparedExecution | Promise<PreparedExecution>;
   /** Run independently against native or compat; no shared mutable globals. */
   run(adapter: CaseAdapter): void | Promise<void>;
 }

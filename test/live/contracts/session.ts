@@ -156,10 +156,14 @@ export interface PreparedExecution {
 /** 用例/执行器登记的清理回调；切换或重跑时按登记逆序执行。 */
 export type CleanupCallback = () => void | Promise<void>;
 
-/** 清理登记协议：返回注销函数；登记与注销均幂等。 */
+/**
+ * 清理登记协议：返回注销函数；登记与注销均幂等。
+ * 注销函数只移除本次登记，不受同一回调重复注册影响。
+ * 并发调用 disposeAll 共享同一 Promise，等待全部清理完成。
+ */
 export interface CleanupRegistry {
   register(cleanup: CleanupCallback): () => void;
-  /** 执行全部未注销的清理；幂等。 */
+  /** 执行全部未注销的清理；幂等；并发调用等待同一结果。 */
   disposeAll(): Promise<void>;
 }
 

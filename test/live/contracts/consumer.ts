@@ -107,8 +107,35 @@ const state: ControllerState = {
 declare const prepared: PreparedExecution;
 const disposing: Promise<void> = prepared.dispose();
 
+// CaseDefinition.prepare 必须返回 PreparedExecution，不能是空值。
+import type { CaseDefinition } from "../../types/testing.js";
+const withPrepare: CaseDefinition = {
+  id: "example.prepare",
+  requirements: [],
+  kind: "render",
+  seed: 1,
+  width: 1,
+  height: 1,
+  fonts: [],
+  prepare: () => prepared,
+  run: () => {},
+};
+const badPrepare: CaseDefinition = {
+  id: "example.bad-prepare",
+  requirements: [],
+  kind: "render",
+  seed: 1,
+  width: 1,
+  height: 1,
+  fonts: [],
+  // @ts-expect-error prepare 返回空值必须被拒绝。
+  prepare: () => {},
+  run: () => {},
+};
+
 export {
   badPixels,
+  badPrepare,
   completed,
   completedNoPixels,
   disposing,
@@ -120,4 +147,5 @@ export {
   missingSide,
   ready,
   state,
+  withPrepare,
 };

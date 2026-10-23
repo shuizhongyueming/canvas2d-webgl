@@ -4,6 +4,7 @@
  * 保持旧 harness 与正式采集行为：本模块不改变 test/harness/browser.js 的语义。
  */
 import type {
+  CleanupCallback,
   CleanupRegistry,
   ControllerMessage,
   PreparedExecution,
@@ -27,34 +28,43 @@ export function handleControllerMessage(
 
 /** 创建空清理登记；实现满足幂等与逆序释放约定。 */
 export function createCleanupRegistry(): CleanupRegistry {
-  const callbacks: (() => void | Promise<void>)[] = [];
+  // 每项登记持有独立 slot；注销只移除自己的 slot，不受重复回调影响。
+  type Slot = { cleanup: CleanupCallback; active: boolean };
+  const slots: Slot[] = [];
   let disposed = false;
+  let disposePromise: Promise<void> | null = null;
   return {
     register(cleanup) {
       if (disposed) throw new Error("cleanup-registry: disposed");
-      let active = true;
-      callbacks.push(cleanup);
+      const slot: Slot = { cleanup, active: true };
+      slots.push(slot);
       return () => {
-        if (!active) return;
-        active = false;
-        const index = callbacks.indexOf(cleanup);
-        if (index >= 0) callbacks.splice(index, 1);
+        if (!slot.active) return;
+        slot.active = false;
+        const index = slots.indexOf(slot);
+        if (index >= 0) slots.splice(index, 1);
       };
     },
-    async disposeAll() {
-      if (disposed) return;
+    disposeAll() {
+      if (disposePromise) return disposePromise;
       disposed = true;
-      // 逆序释放；单项异常不阻塞其余清理，收集后统一抛出首个错误。
-      let first: unknown;
-      for (let i = callbacks.length - 1; i >= 0; i--) {
-        try {
-          await callbacks[i]?.();
-        } catch (error) {
-          if (first === undefined) first = error;
+      disposePromise = (async () => {
+        // 逆序释放；单项异常不阻塞其余清理，收集后统一抛出首个错误。
+        let first: unknown;
+        for (let i = slots.length - 1; i >= 0; i--) {
+          const slot = slots[i];
+          if (!slot?.active) continue;
+          slot.active = false;
+          try {
+            await slot.cleanup();
+          } catch (error) {
+            if (first === undefined) first = error;
+          }
         }
-      }
-      callbacks.length = 0;
-      if (first !== undefined) throw first;
+        slots.length = 0;
+        if (first !== undefined) throw first;
+      })();
+      return disposePromise;
     },
   };
 }

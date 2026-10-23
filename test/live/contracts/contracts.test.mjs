@@ -36,6 +36,51 @@ test("cleanup unregister is idempotent and excludes the callback", async () => {
   assert.equal(calls, 0);
 });
 
+test("cleanup unregister only removes its own registration for duplicate callbacks", async () => {
+  const registry = createCleanupRegistry();
+  const order = [];
+  const cleanup = () => order.push("shared");
+  registry.register(() => order.push("first"));
+  const unregisterShared = registry.register(cleanup);
+  registry.register(() => order.push("middle"));
+  registry.register(cleanup);
+  unregisterShared();
+  await registry.disposeAll();
+  // 注销只移除第一次 shared；逆序执行：shared(第二次) → middle → first。
+  assert.deepEqual(order, ["shared", "middle", "first"]);
+});
+
+test("concurrent disposeAll calls share the same promise and await all callbacks", async () => {
+  const registry = createCleanupRegistry();
+  let resolveCleanup;
+  const gate = new Promise((resolve) => {
+    resolveCleanup = resolve;
+  });
+  const order = [];
+  registry.register(async () => {
+    await gate;
+    order.push("slow");
+  });
+  registry.register(() => order.push("fast"));
+
+  const first = registry.disposeAll();
+  const second = registry.disposeAll();
+  assert.strictEqual(first, second);
+
+  // 清理尚未完成时，并发调用方不会提前收到完成。
+  let settled = false;
+  void Promise.allSettled([first, second]).then(() => {
+    settled = true;
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(settled, false);
+
+  resolveCleanup();
+  await Promise.all([first, second]);
+  assert.deepEqual(order, ["fast", "slow"]);
+  assert.equal(settled, true);
+});
+
 test("live tool modules stay browser-safe: no Node builtins or non-relative imports", async () => {
   for (const path of [
     "dist/live/contracts/session.js",
