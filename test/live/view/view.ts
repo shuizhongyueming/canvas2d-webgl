@@ -80,6 +80,7 @@ interface ViewRefs {
   readonly compatStage: HTMLElement;
   readonly diffBox: HTMLElement;
   readonly diffEmpty: HTMLElement;
+  readonly diffImageBox: HTMLElement;
   readonly diffStats: HTMLElement;
   readonly diffBounds: HTMLElement;
   readonly diffCanvas: HTMLCanvasElement;
@@ -105,10 +106,12 @@ class ComparisonView implements View {
   private readonly copyIdButton: HTMLButtonElement;
   private readonly copyFeedbackButton: HTMLButtonElement;
   private readonly rerunButton: HTMLButtonElement;
+  private readonly diffToggleButton: HTMLButtonElement;
 
   private state: ControllerState | null = null;
   private currentIndex = -1;
   private renderedCaseId: string | null = null;
+  private showDiffImage = true;
   private noticeUntil = 0;
   private noticeTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -213,6 +216,14 @@ class ComparisonView implements View {
     };
     scaleGroup.append(this.scaleButtons.fit, this.scaleButtons.actual);
 
+    // 差异图显示开关（issue #60：可切换的差异图）。
+    this.diffToggleButton = button("差异图：开", () => {
+      this.showDiffImage = !this.showDiffImage;
+      if (this.state) this.renderDiff(this.state);
+    });
+    this.diffToggleButton.classList.add("live-diff-toggle");
+    toolbar.append(this.diffToggleButton);
+
     this.observationBox = document.createElement("div");
     this.observationBox.className = "live-observation";
     layout.append(this.observationBox);
@@ -257,12 +268,19 @@ class ComparisonView implements View {
     diffStats.className = "live-diff-stats";
     const diffBounds = document.createElement("div");
     diffBounds.className = "live-diff-bounds";
+    const diffImageBox = document.createElement("div");
+    diffImageBox.className = "live-diff-image-box";
     const diffCanvasWrap = document.createElement("div");
     diffCanvasWrap.className = "live-diff-canvas-wrap";
     const diffCanvas = document.createElement("canvas");
     diffCanvas.className = "live-diff-canvas";
-    diffCanvasWrap.append(diffCanvas);
-    diffBox.append(diffEmpty, diffStats, diffBounds, diffCanvasWrap);
+    // 逐像素数据接入前的可见占位（不可见 dataset 不算占位）。
+    const diffPlaceholder = document.createElement("div");
+    diffPlaceholder.className = "live-diff-placeholder";
+    diffPlaceholder.textContent = "差异图等待逐像素数据（由量测票 #68 提供）。";
+    diffCanvasWrap.append(diffCanvas, diffPlaceholder);
+    diffImageBox.append(diffCanvasWrap);
+    diffBox.append(diffEmpty, diffStats, diffBounds, diffImageBox);
     layout.append(diffBox);
 
     const fingerprintNote = document.createElement("div");
@@ -287,6 +305,7 @@ class ComparisonView implements View {
       compatStage,
       diffBox,
       diffEmpty,
+      diffImageBox,
       diffStats,
       diffBounds,
       diffCanvas,
@@ -484,6 +503,7 @@ class ComparisonView implements View {
     this.refs.stage.dataset.mode = display.mode;
     this.refs.stage.dataset.background = display.background;
     this.refs.stage.dataset.scale = display.scale;
+    this.updateFitScale(display.scale);
     // 仅调整 CSS 透明度；不改变画布 backing 尺寸，也不重跑。
     this.compatPane.style.opacity = String(
       display.mode === "overlay" ? display.overlayOpacity : 1,
@@ -505,12 +525,58 @@ class ComparisonView implements View {
     markActive(this.scaleButtons.actual, display.scale === "actual");
   }
 
+  /**
+   * fit 模式下计算统一缩放因子：取两侧画布固有尺寸的最大值，
+   * 相对舞台可用宽度等比缩小；两侧共享同一因子，保持重叠对齐。
+   * 1:1 模式不缩放，超出时舞台滚动（issue #60）。
+   */
+  private updateFitScale(scale: Scale): void {
+    const overlay = this.refs.stage.querySelector(".live-overlay");
+    if (!(overlay instanceof HTMLElement)) return;
+    if (scale !== "fit") {
+      overlay.style.removeProperty("--live-fit-scale");
+      return;
+    }
+    let maxWidth = 0;
+    let maxHeight = 0;
+    for (const canvas of overlay.querySelectorAll("canvas")) {
+      if (!(canvas instanceof HTMLCanvasElement)) continue;
+      maxWidth = Math.max(maxWidth, canvas.width);
+      maxHeight = Math.max(maxHeight, canvas.height);
+    }
+    if (!maxWidth) return;
+    const available = this.refs.stage.clientWidth - 4;
+    const factor = Math.min(1, available / maxWidth);
+    overlay.style.setProperty("--live-fit-scale", String(factor));
+    // 保持布局尺寸与缩放后一致，避免滚动条按缩放前尺寸出现。
+    overlay.style.width = `${maxWidth}px`;
+    overlay.style.height = `${maxHeight}px`;
+    const inner = overlay.parentElement;
+    if (inner instanceof HTMLElement) {
+      inner.style.width = `${maxWidth * factor}px`;
+      inner.style.height = `${maxHeight * factor}px`;
+    }
+  }
+
   private renderDiff(state: ControllerState): void {
-    const { diffBox, diffEmpty, diffStats, diffBounds, diffCanvas } = this.refs;
+    const {
+      diffBox,
+      diffEmpty,
+      diffImageBox,
+      diffStats,
+      diffBounds,
+      diffCanvas,
+    } = this.refs;
     // 防御：仅 completed 状态接受 metrics；controller 异常传入
     // running+metrics 时视图不提前显示最终差异（issue #63）。
     const metrics = state.stage === "completed" ? state.difference : null;
+    // 执行中/等待/失败均无有效指标；controller 已清空 difference。
     diffBox.classList.toggle("live-diff-active", metrics !== null);
+    this.diffToggleButton.disabled = metrics === null;
+    this.diffToggleButton.textContent = this.showDiffImage
+      ? "差异图：开"
+      : "差异图：关";
+    diffImageBox.hidden = !this.showDiffImage || metrics === null;
     if (!metrics) {
       diffEmpty.textContent =
         state.stage === "failed"
@@ -537,12 +603,11 @@ class ComparisonView implements View {
   /**
    * 逐像素二值定位图（品红/透明，issue #64）的数据由量测票（#68）提供；
    * 本票只携带 bbox 指标，不能把 bbox 整块染成品红冒充差异图——
-   * bbox 内部不保证全部不同。逐像素数据接入前显示占位，不画伪图。
+   * bbox 内部不保证全部不同。逐像素数据接入前显示可见占位文本，不画伪图。
    */
   private renderDiffCanvas(canvas: HTMLCanvasElement): void {
     canvas.width = 0;
     canvas.height = 0;
-    canvas.dataset.placeholder = "差异图等待逐像素数据（量测票 #68）";
   }
 
   private renderActions(state: ControllerState): void {
@@ -735,19 +800,25 @@ const VIEW_CSS = `
   background: rgba(255, 255, 255, 0.7);
 }
 .live-pane-label { font-size: 12px; padding: 2px 6px; color: #333; }
-/* fit 缩放作用于 overlay 整体：重叠时两侧保持同一缩放比例对齐（issue #63）。 */
+/* fit 缩放因子由 JS 计算后写入 --live-fit-scale 并作用于 overlay 整体：
+   重叠时两侧共享同一缩放比例对齐（issue #63）；缩放只改显示，不改 backing。 */
 .live-stage[data-scale="fit"] .live-overlay {
-  max-width: 100%;
-  overflow: hidden;
+  transform: scale(var(--live-fit-scale, 1));
+  transform-origin: top left;
 }
-.live-stage[data-scale="fit"] .live-overlay canvas {
-  max-width: 100%;
-  height: auto;
+.live-stage[data-scale="fit"] .live-stage-inner {
+  overflow: hidden;
 }
 .live-diff { display: none; flex-direction: column; gap: 4px; }
 .live-diff-active { display: flex; }
 .live-diff-empty { color: #666; }
-.live-diff-canvas-wrap { margin-top: 4px; }
+.live-diff-canvas-wrap { margin-top: 4px; position: relative; }
+.live-diff-placeholder {
+  padding: 8px;
+  border: 1px dashed #999;
+  color: #666;
+  font-size: 12px;
+}
 .live-diff-canvas {
   border: 1px dashed #999;
   background:
