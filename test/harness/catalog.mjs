@@ -8,6 +8,7 @@ import {
   apiCases,
   interactionCases,
 } from "../../.build/test/cases/manifest/index.js";
+import { assertDisplayCatalog } from "../../dist/live/catalog/display-catalog.js";
 export const requiredCatalog = [...apiCases, ...interactionCases];
 export function validateCases(cases, requirements, required = requiredCatalog) {
   const ids = new Set();
@@ -47,6 +48,14 @@ export function validateCases(cases, requirements, required = requiredCatalog) {
   }
   return cases;
 }
+
+// 目录漂移检查（issue #67）：render/combined 必须显式展示分类，
+// 缺分类、非法分类、空说明/原因、ID 重复均报错；与完整 verify 共用入口。
+export function validateDisplayCatalog(cases) {
+  assertDisplayCatalog(cases);
+  return cases;
+}
+
 export async function loadCatalog(root, selfTest = false) {
   await assertCurrentBuild(root);
   const spec = await readFile(`${root}/docs/specs/canvas2d-webgl.md`, "utf8");
@@ -72,6 +81,7 @@ export async function loadCatalog(root, selfTest = false) {
       });
   }
   validateCases(definitions, requirements);
+  if (!selfTest) validateDisplayCatalog(definitions);
   return definitions;
 }
 

@@ -23,6 +23,10 @@ export const cases: CaseDefinition[] = [
       ...base,
       id: `context.globalCompositeOperation.render-${mode}`,
       requirements: ["context.globalCompositeOperation", "ACC-03"],
+      display: {
+        status: "included",
+        observation: "3x3 alpha 网格上各合成模式的最终混合结果",
+      },
       kind: "render",
       async run(a) {
         const context = a.context;
@@ -52,6 +56,10 @@ export const cases: CaseDefinition[] = [
     ...base,
     id: "ACC-03.source-in-outside-source",
     requirements: ["ACC-03"],
+    display: {
+      status: "included",
+      observation: "source-in 只保留小绿块，其余红底全部清空",
+    },
     async run(a) {
       const context = a.context;
       const hooks = await hooksOf(a);
@@ -85,6 +93,10 @@ export const cases: CaseDefinition[] = [
       ...base,
       id: `composite.source-in.${variant}`,
       requirements: ["context.globalCompositeOperation", "ACC-03"],
+      display: {
+        status: "included",
+        observation: "source-in 空源把有效裁剪内全部清空，而不是跳过合成",
+      },
       async run(a) {
         const context = a.context;
         context.fillStyle = "#ff0000";
@@ -108,6 +120,10 @@ export const cases: CaseDefinition[] = [
     ...base,
     id: "composite.normal-alias-renders-as-source-over",
     requirements: ["context.globalCompositeOperation", "context.fillRect"],
+    display: {
+      status: "included",
+      observation: "normal 与 source-over 两半的半透明叠加结果逐像素一致",
+    },
     async run(a) {
       const context = a.context;
       context.fillStyle = "#0000ff";
@@ -147,6 +163,11 @@ export const cases: CaseDefinition[] = [
       ...base,
       id: `composite.empty-source.${mode}`,
       requirements: ["context.globalCompositeOperation", "ACC-03"],
+      display: {
+        status: "included",
+        observation:
+          "空源（globalAlpha 0 / 画布外）在各模式下的合成结果；source-in 清空其余保持不变",
+      },
       async run(a) {
         const context = a.context;
         // source-in still composites an empty source; the other three modes have
@@ -183,6 +204,11 @@ export const cases: CaseDefinition[] = [
     ...base,
     id: "composite.source-in.no-op-and-stencil-reset",
     requirements: ["context.globalCompositeOperation", "context.fillRect"],
+    display: {
+      status: "included",
+      observation:
+        "无效/零尺寸调用不合成；连续 source-in 使用全新模板并保留白色角块",
+    },
     async run(a) {
       const context = a.context;
       context.fillStyle = "#ff0000";
@@ -231,6 +257,10 @@ export const cases: CaseDefinition[] = [
       ...base,
       id: `composite.raster-unit.${mode}`,
       requirements: ["context.globalCompositeOperation", "context.strokeRect"],
+      display: {
+        status: "included",
+        observation: "半透明 strokeRect 在各合成模式下的角/边/内部合成结果",
+      },
       async run(a) {
         const context = a.context;
         context.fillStyle = "#0000ff";
@@ -272,6 +302,10 @@ export const cases: CaseDefinition[] = [
       "context.filter",
       "context.globalCompositeOperation",
     ],
+    display: {
+      status: "included",
+      observation: "clearRect 忽略 alpha/filter/合成模式，只清除 16x16 区域",
+    },
     async run(a) {
       const context = a.context;
       context.fillStyle = "#ff0000";
@@ -296,6 +330,10 @@ export const cases: CaseDefinition[] = [
       ...base,
       id: `context.filter.render-${encodeURIComponent(filter)}`,
       requirements: ["context.filter"],
+      display: {
+        status: "included",
+        observation: "三段灰阶经 none/brightness(120%) 过滤后的亮度与钳制",
+      },
       async run(a) {
         const context = a.context;
         context.filter = filter;
@@ -326,6 +364,10 @@ export const cases: CaseDefinition[] = [
     ...base,
     id: "ACC-03.brightness-alpha",
     requirements: ["ACC-03"],
+    display: {
+      status: "included",
+      observation: "brightness 过滤与 globalAlpha 叠加后的灰阶及半透明色块",
+    },
     kind: "render",
     async run(a) {
       const context = a.context;
@@ -361,6 +403,10 @@ export const cases: CaseDefinition[] = [
       "context.rotate",
       "context.fillRect",
     ],
+    display: {
+      status: "included",
+      observation: "旋转后 source-in 在半透明红底上留下的边缘形状",
+    },
     kind: "render",
     run(a) {
       const context = a.context;
@@ -382,6 +428,10 @@ export const cases: CaseDefinition[] = [
       "context.restore",
       "context.strokeRect",
     ],
+    display: {
+      status: "included",
+      observation: "save/restore 切换 filter 后两侧灰度差异",
+    },
     async run(a) {
       const context = a.context;
       context.filter = "brightness(120%)";

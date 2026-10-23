@@ -19,6 +19,11 @@ export const cases: CaseDefinition[] = [
   {
     ...base,
     id: "IMG-02.same-task-mutations",
+    display: {
+      status: "included",
+      observation:
+        "同一来源画布同任务内多次修改后，各采样点保留各自时间点的颜色",
+    },
     async run(a) {
       const hooks = await hooksOf(a);
       const source = fillSource(
@@ -70,6 +75,10 @@ export const cases: CaseDefinition[] = [
   {
     ...base,
     id: "image.source-resize",
+    display: {
+      status: "included",
+      observation: "来源画布改尺寸后，先前绘制保留旧内容，新绘制使用新尺寸",
+    },
     async run(a) {
       const source = fillSource(
         makeSourceCanvas(4, 4, () => {}),

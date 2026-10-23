@@ -16,6 +16,11 @@ export const cases: CaseDefinition[] = [
   {
     ...base,
     id: "image.offscreen-cross-realm",
+    display: {
+      status: "included",
+      observation:
+        "OffscreenCanvas 与跨 realm 图片/画布绘制到主画布的输出；辅助画布仅作为输入",
+    },
     async run(a) {
       const source = new OffscreenCanvas(4, 4);
       const context = source.getContext("2d");

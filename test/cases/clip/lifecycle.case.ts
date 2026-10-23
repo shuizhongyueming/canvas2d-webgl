@@ -32,6 +32,11 @@ export const cases: CaseDefinition[] = [
     ...base,
     id: "clip.lifecycle-restore-discards-clip",
     requirements: ["context.clip", "LIFE-03", "ACC-03"],
+    display: {
+      status: "excluded",
+      reason:
+        "主 target 仅统一 marker；实际断言针对自建 compat 画布，且 reference 也运行兼容库（决策 #62 明确排除）",
+    },
     async run(a) {
       // The harness canvas keeps the captured pair non-vacuous; the library
       // canvas below owns the loss/restore sequence.

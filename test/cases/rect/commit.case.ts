@@ -22,6 +22,10 @@ export const cases: CaseDefinition[] = [
     ...base,
     id: "CAN-05.microtask-order",
     requirements: ["CAN-05", "context.fillRect"],
+    display: {
+      status: "included",
+      observation: "同步突发绘制与微任务追加绘制在最终画面中共存",
+    },
     async run(a) {
       const context = a.context;
       const hooks = await hooksOf(a);
@@ -82,6 +86,11 @@ export const cases: CaseDefinition[] = [
     id: "CAN-05.display-target",
     requirements: ["CAN-05", "context.fillRect"],
     kind: "render",
+    display: {
+      status: "included",
+      observation:
+        "显示目标上的不对称标记位置（不翻转/不交换）；第二帧内容叠加",
+    },
     width: 64,
     height: 64,
     async run(a) {
@@ -122,6 +131,10 @@ export const cases: CaseDefinition[] = [
     ...base,
     id: "rect.frame-persistence",
     requirements: ["CAN-05", "context.fillRect"],
+    display: {
+      status: "included",
+      observation: "跨帧保留：第一帧红块与第二帧绿块同时可见",
+    },
     async run(a) {
       const context = a.context;
       context.fillStyle = "#ff0000";
@@ -155,6 +168,10 @@ export const cases: CaseDefinition[] = [
       "context.rect",
       "context.fill",
     ],
+    display: {
+      status: "included",
+      observation: "同尺寸赋值清空画面并重置状态；随后可正常重画",
+    },
     width: 16,
     height: 16,
     async run(a) {

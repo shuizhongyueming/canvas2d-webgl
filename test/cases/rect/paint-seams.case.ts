@@ -32,6 +32,10 @@ export const cases: CaseDefinition[] = [
       "context.createLinearGradient",
       "context.lineWidth",
     ],
+    display: {
+      status: "included",
+      observation: "渐变描边的颜色过渡与变换下的接缝",
+    },
     run(a) {
       const context = a.context;
       context.lineWidth = 3;
@@ -56,6 +60,10 @@ export const cases: CaseDefinition[] = [
       "context.strokeStyle",
       "context.createPattern",
     ],
+    display: {
+      status: "included",
+      observation: "图案描边的平铺与变换下的相位",
+    },
     async run(a) {
       const context = a.context;
       const pattern = context.createPattern(

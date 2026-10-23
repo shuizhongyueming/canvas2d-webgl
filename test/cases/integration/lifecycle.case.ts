@@ -70,6 +70,11 @@ export const cases: CaseDefinition[] = [
     ...base,
     id: "ACC-05.dispose-clears-assets-and-present",
     requirements: ["LIFE-01", "ACC-05", "CAN-05"],
+    display: {
+      status: "excluded",
+      reason:
+        "主 target 未绘制；真正验证在自建 compat 画布上（决策 #62 明确排除）",
+    },
     async run(a) {
       const handle = await makeCompat(32, 32);
       const { context, canvas, hooks } = handle;
@@ -136,6 +141,11 @@ export const cases: CaseDefinition[] = [
     ...base,
     id: "ACC-05.resize-clears-assets-and-clip",
     requirements: ["CAN-04", "ACC-05", "context.clip"],
+    display: {
+      status: "excluded",
+      reason:
+        "主 target 未绘制；真正验证在自建 compat 画布上（决策 #62 明确排除）",
+    },
     async run(a) {
       const handle = await makeCompat(32, 32);
       const { context, canvas, hooks } = handle;
@@ -187,6 +197,11 @@ export const cases: CaseDefinition[] = [
     ...base,
     id: "ACC-05.loss-clears-assets",
     requirements: ["LIFE-02", "LIFE-03", "ACC-05"],
+    display: {
+      status: "excluded",
+      reason:
+        "主 target 未绘制；真正验证在自建 compat 画布上（决策 #62 明确排除）",
+    },
     async run(a) {
       let restored = 0;
       const handle = await makeCompat(32, 32, {
@@ -257,6 +272,10 @@ export const cases: CaseDefinition[] = [
       "context.globalAlpha",
     ],
     kind: "render",
+    display: {
+      status: "included",
+      observation: "嵌套裁剪限制下的 clearRect 清除中心区域；清除后可重新绘制",
+    },
     async run(a) {
       const context = a.context;
       // Opaque background, nested clips, then a clear that ignores paint and
@@ -309,6 +328,11 @@ export const cases: CaseDefinition[] = [
     id: "ACC-04.external-source-order-clipped",
     requirements: ["ACC-04", "IMG-02", "context.drawImage", "context.clip"],
     kind: "render",
+    display: {
+      status: "included",
+      observation:
+        "同一来源三次修改依次绘制在裁剪内的红/绿/蓝采样；裁剪外保持透明",
+    },
     async run(a) {
       const context = a.context;
       const source = document.createElement("canvas");

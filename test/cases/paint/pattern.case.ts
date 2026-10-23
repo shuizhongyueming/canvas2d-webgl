@@ -242,6 +242,10 @@ export const cases: CaseDefinition[] = [
     ...renderBase,
     id: "paint.pattern.npot-phase",
     requirements: ["context.createPattern", "context.translate"],
+    display: {
+      status: "included",
+      observation: "图案平铺相位随绘制时平移而移动",
+    },
     async run(a) {
       const context = asNative(a.context);
       const pattern = context.createPattern(
@@ -263,6 +267,10 @@ export const cases: CaseDefinition[] = [
       "context.save",
       "context.restore",
     ],
+    display: {
+      status: "included",
+      observation: "创建时变换不影响图案相位；与未变换填充一致",
+    },
     async run(a) {
       const context = asNative(a.context);
       context.save();
@@ -283,6 +291,10 @@ export const cases: CaseDefinition[] = [
     ...renderBase,
     id: "paint.pattern.npot-scale",
     requirements: ["context.createPattern", "context.scale"],
+    display: {
+      status: "included",
+      observation: "非等比缩放下图案平铺的采样",
+    },
     async run(a) {
       const context = asNative(a.context);
       const pattern = context.createPattern(
@@ -298,6 +310,10 @@ export const cases: CaseDefinition[] = [
     ...renderBase,
     id: "paint.pattern.npot-rotate",
     requirements: ["context.createPattern", "context.rotate"],
+    display: {
+      status: "included",
+      observation: "旋转下图案平铺的采样与边缘",
+    },
     async run(a) {
       const context = asNative(a.context);
       const pattern = context.createPattern(
@@ -314,6 +330,10 @@ export const cases: CaseDefinition[] = [
     ...renderBase,
     id: "paint.pattern.npot-edge",
     requirements: ["context.createPattern", "context.fillRect"],
+    display: {
+      status: "included",
+      observation: "矩形边落在瓦片边界与跨瓦片时的接缝",
+    },
     async run(a) {
       const context = asNative(a.context);
       const pattern = context.createPattern(
@@ -332,6 +352,10 @@ export const cases: CaseDefinition[] = [
     ...renderBase,
     id: "paint.pattern.source-swap-after-create",
     requirements: ["context.createPattern", "context.fillRect"],
+    display: {
+      status: "included",
+      observation: "来源图片 src 更换后图案仍使用创建时位图（红/绿/蓝条纹）",
+    },
     async run(a) {
       const context = asNative(a.context);
       const image = await loadImage(STRIPES_3x5);

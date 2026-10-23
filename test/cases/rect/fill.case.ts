@@ -19,6 +19,10 @@ export const cases: CaseDefinition[] = [
     ...renderBase,
     id: "context.fillRect.render",
     requirements: ["context.fillRect"],
+    display: {
+      status: "included",
+      observation: "基础 fillRect 的颜色与位置",
+    },
     run(a) {
       const context = a.context;
       context.fillStyle = "#ff0000";
@@ -33,6 +37,10 @@ export const cases: CaseDefinition[] = [
     ...renderBase,
     id: "rect.fillRect.subpixel",
     requirements: ["context.fillRect"],
+    display: {
+      status: "included",
+      observation: "小数坐标 fillRect 的抗锯齿边缘",
+    },
     run(a) {
       const context = a.context;
       // Fractional origins and sizes exercise antialiased edges.
@@ -54,6 +62,10 @@ export const cases: CaseDefinition[] = [
       "context.scale",
       "context.setTransform",
     ],
+    display: {
+      status: "included",
+      observation: "旋转/缩放变换下 fillRect 的形状与位置",
+    },
     run(a) {
       const context = a.context;
       context.fillStyle = "#ff0000";
@@ -72,6 +84,10 @@ export const cases: CaseDefinition[] = [
     ...renderBase,
     id: "rect.fillRect.mirror",
     requirements: ["context.fillRect", "context.scale"],
+    display: {
+      status: "included",
+      observation: "负缩放镜像坐标系下 fillRect 的落点",
+    },
     run(a) {
       const context = a.context;
       // Negative scale mirrors the coordinate system; rects follow.
@@ -90,6 +106,10 @@ export const cases: CaseDefinition[] = [
     ...renderBase,
     id: "rect.fillRect.negative-size",
     requirements: ["context.fillRect"],
+    display: {
+      status: "included",
+      observation: "负宽/高 fillRect 从原点角向左/上扩展",
+    },
     run(a) {
       const context = a.context;
       // Negative extents grow the rect left/up from the origin corner.
@@ -105,6 +125,10 @@ export const cases: CaseDefinition[] = [
     ...renderBase,
     id: "rect.fillRect.alpha-overlap",
     requirements: ["context.fillRect", "context.globalAlpha"],
+    display: {
+      status: "included",
+      observation: "globalAlpha 0 不绘制；半透明叠加的混合结果",
+    },
     run(a) {
       const context = a.context;
       // globalAlpha 0 paints nothing at all.
@@ -126,6 +150,10 @@ export const cases: CaseDefinition[] = [
     ...renderBase,
     id: "rect.fillRect.degenerate",
     requirements: ["context.fillRect"],
+    display: {
+      status: "included",
+      observation: "零宽/高 fillRect 不绘制；真实填充正常落位",
+    },
     kind: "combined",
     async run(a) {
       const context = a.context;

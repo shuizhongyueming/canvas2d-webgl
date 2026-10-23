@@ -23,6 +23,10 @@ export const cases: CaseDefinition[] = [
   {
     ...base,
     id: "image.negative-crop-transform",
+    display: {
+      status: "included",
+      observation: "负裁剪不翻转条纹；变换镜像才翻转；越源裁剪留白",
+    },
     async run(a) {
       const image = await loadImage(STRIPES_3x5);
       drawImage(a.context, image, 3, 5, -3, -5, 2, 2, 3, 5);
@@ -59,6 +63,10 @@ export const cases: CaseDefinition[] = [
   {
     ...base,
     id: "image.validity",
+    display: {
+      status: "included",
+      observation: "无效与空矩形 drawImage 后主画布保持完全透明",
+    },
     async run(a) {
       const empty = new Image();
       a.observe(
@@ -110,6 +118,11 @@ export const cases: CaseDefinition[] = [
     ...base,
     id: "context.drawImage.render",
     kind: "render",
+    display: {
+      status: "included",
+      observation:
+        "条纹图与辅助画布的多种 drawImage 形式、缩放、半透明与变换绘制",
+    },
     async run(a) {
       const image = await loadImage(STRIPES_3x5);
       a.context.fillStyle = "#404040";
@@ -128,6 +141,10 @@ export const cases: CaseDefinition[] = [
   {
     ...base,
     id: "image.alpha",
+    display: {
+      status: "included",
+      observation: "globalAlpha 0/0.5/1 下 drawImage 的可见度差异",
+    },
     async run(a) {
       const source = fillSource(
         makeSourceCanvas(4, 4, () => {}),
