@@ -418,6 +418,71 @@ test("反馈 JSON 只含 caseId、browser、difference；失败状态不带指�
   assert.equal(report.difference.changedPixels, undefined);
 });
 
+test("差异图开关可切换显示；无量测时开关禁用", async (t) => {
+  const { page, setState } = await launch(t);
+  // 无量测：开关禁用。
+  await setState(selected("case.alpha", "running"));
+  const toggle = page.locator(".live-diff-toggle");
+  assert.equal(await toggle.isDisabled(), true);
+
+  await setState({
+    ...selected("case.alpha"),
+    difference: {
+      totalPixels: 960,
+      changedPixels: 1,
+      changedRatio: 1 / 960,
+      maxChannelDelta: 3,
+      differenceBounds: { x: 2, y: 3, width: 1, height: 1 },
+    },
+  });
+  assert.equal(await toggle.isDisabled(), false);
+  assert.equal(await toggle.textContent(), "差异图：开");
+  assert.equal(await page.locator(".live-diff-image-box").isVisible(), true);
+
+  // 关闭开关：差异图区域隐藏，指标与 bbox 仍显示。
+  await toggle.click();
+  await page.waitForFunction(
+    () => document.querySelector(".live-diff-image-box").hidden,
+  );
+  assert.equal(await toggle.textContent(), "差异图：关");
+  assert.equal(await page.locator(".live-diff-image-box").isVisible(), false);
+  assert.match(await page.textContent(".live-diff-stats"), /1 \/ 960/);
+
+  // 再打开。
+  await toggle.click();
+  await page.waitForFunction(
+    () => !document.querySelector(".live-diff-image-box").hidden,
+  );
+  assert.equal(await page.locator(".live-diff-image-box").isVisible(), true);
+});
+
+test("fit 模式对重叠整体应用统一缩放因子", async (t) => {
+  const { page, setState } = await launch(t);
+  await page.setViewportSize({ width: 300, height: 600 });
+  await setState({
+    ...selected("case.alpha"),
+    display: { ...IDLE_STATE.display, scale: "fit", mode: "overlay" },
+  });
+  const scale = await page.evaluate(() =>
+    document
+      .querySelector(".live-overlay")
+      .style.getPropertyValue("--live-fit-scale"),
+  );
+  // 桩画布宽 40，舞台宽约 300-16 padding-2 border ≈ 280；不缩小应为 1。
+  assert.equal(Number(scale) <= 1, true);
+
+  // 1:1 模式不设置缩放因子。
+  await setState({
+    display: { ...IDLE_STATE.display, scale: "actual" },
+  });
+  const cleared = await page.evaluate(() =>
+    document
+      .querySelector(".live-overlay")
+      .style.getPropertyValue("--live-fit-scale"),
+  );
+  assert.equal(cleared, "");
+});
+
 test("选中用例展示观察重点", async (t) => {
   const { page, setState } = await launch(t);
   await setState(selected("case.beta"));
@@ -442,13 +507,21 @@ test("指纹噪声提示可见；完成状态展示 bbox 与差异图占位", as
   const bounds = await page.textContent(".live-diff-bounds");
   assert.match(bounds, /x=1, y=1/);
   assert.match(bounds, /内部不保证全部不同/);
-  // 逐像素图数据接入前不画伪图：画布保持空，标注占位。
+  // 逐像素图数据接入前不画伪图：画布保持空，占位文本可见。
   const diffInfo = await page.evaluate(() => {
     const canvas = document.querySelector(".live-diff-canvas");
-    return [canvas.width, canvas.height, canvas.dataset.placeholder ?? null];
+    const placeholder = document.querySelector(".live-diff-placeholder");
+    return [
+      canvas.width,
+      canvas.height,
+      placeholder.textContent,
+      placeholder.offsetParent !== null,
+    ];
   });
-  assert.deepEqual(diffSize0(diffInfo), true);
-  function diffSize0([w, h, placeholder]) {
-    return w === 0 && h === 0 && /量测票/.test(placeholder);
-  }
+  assert.deepEqual(diffInfo, [
+    0,
+    0,
+    "差异图等待逐像素数据（由量测票 #68 提供）。",
+    true,
+  ]);
 });
