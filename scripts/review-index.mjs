@@ -1,4 +1,4 @@
-import { diffPixels } from "../test/harness/evidence.mjs";
+import { diffPixels } from "../test/live/measure/node.mjs";
 
 /**
  * Review-packet measurements over a collected reference/actual pair. Pure
@@ -9,7 +9,6 @@ import { diffPixels } from "../test/harness/evidence.mjs";
 /** Per-pair statistics: changed pixels plus the shape of the difference. */
 export function measurePair(reference, actual) {
   const difference = diffPixels(reference, actual);
-  let maxDelta = 0;
   let edgeFlips = 0;
   let lowAlphaDeltas = 0;
   for (let i = 0; i < reference.data.length; i += 4) {
@@ -22,7 +21,6 @@ export function measurePair(reference, actual) {
         Math.abs(actual.data[i + channel] - reference.data[i + channel]),
       );
     if (delta === 0) continue;
-    if (delta > maxDelta) maxDelta = delta;
     // A hard coverage edge against a soft one, or a fully transparent pixel
     // turning opaque: not a rounding difference.
     if (alpha === 0 || actualAlpha === 0) edgeFlips += 1;
@@ -31,7 +29,7 @@ export function measurePair(reference, actual) {
   return {
     changed: difference.changedPixels,
     bounds: difference.bounds,
-    maxDelta,
+    maxDelta: difference.maxChannelDelta,
     edgeFlips,
     lowAlphaDeltas,
   };
