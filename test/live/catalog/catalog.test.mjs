@@ -83,6 +83,37 @@ test("重复 ID 报错；assertDisplayCatalog 抛出汇总错误", () => {
   );
 });
 
+test("分类对象不得携带另一分支的字段", () => {
+  const issues = validateDisplayClassifications([
+    entry({
+      id: "x.included-with-reason",
+      display: { status: "included", observation: "观察重点", reason: "r" },
+    }),
+    entry({
+      id: "x.excluded-with-observation",
+      display: { status: "excluded", reason: "原因", observation: "o" },
+    }),
+  ]);
+  assert.deepEqual(
+    issues.map((issue) => issue.kind),
+    ["invalid-classification", "invalid-classification"],
+  );
+});
+
+test("运行失败或暂缺执行能力不从目录投影消失", () => {
+  // 目录投影只依据展示分类，不读取任何执行能力/运行结果字段（issue #62）。
+  const cases = [
+    entry({ id: "run.failing", lastRunError: "boom", runnable: false }),
+    entry({ id: "run.ok" }),
+  ];
+  const projection = projectDisplayCatalog(cases);
+  assert.deepEqual(
+    projection.map((item) => item.id),
+    ["run.failing", "run.ok"],
+  );
+  assert.equal(typeof projection[0].lastRunError, "undefined");
+});
+
 test("网页投影只含 included 的可序列化字段，不泄露 run/prepare", async () => {
   const catalog = await loadCatalog(root);
   const projection = projectDisplayCatalog(catalog);
@@ -139,6 +170,40 @@ test("新增候选未分类即漂移：validateDisplayCatalog 拒绝并报错", 
   assert.throws(
     () => validateDisplayCatalog(drifted),
     /drift\.uncategorized.*缺少展示分类/,
+  );
+});
+
+test("新增候选带非法分类或空说明/原因同样经 harness 入口报错", async () => {
+  const catalog = await loadCatalog(root);
+  const withInvalid = [
+    ...catalog,
+    entry({ id: "drift.invalid", display: { status: "maybe" } }),
+  ];
+  assert.throws(
+    () => validateDisplayCatalog(withInvalid),
+    /drift\.invalid.*非法展示分类/,
+  );
+  const withEmptyObservation = [
+    ...catalog,
+    entry({
+      id: "drift.empty-observation",
+      display: { status: "included", observation: "" },
+    }),
+  ];
+  assert.throws(
+    () => validateDisplayCatalog(withEmptyObservation),
+    /drift\.empty-observation.*观察重点/,
+  );
+  const withEmptyReason = [
+    ...catalog,
+    entry({
+      id: "drift.empty-reason",
+      display: { status: "excluded", reason: " " },
+    }),
+  ];
+  assert.throws(
+    () => validateDisplayCatalog(withEmptyReason),
+    /drift\.empty-reason.*原因/,
   );
 });
 

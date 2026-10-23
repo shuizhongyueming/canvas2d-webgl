@@ -115,6 +115,12 @@ export function validateDisplayClassifications(
           kind: "empty-observation",
           message: "展示用例缺少非空观察重点",
         });
+      if ("reason" in display)
+        issues.push({
+          caseId: entry.id,
+          kind: "invalid-classification",
+          message: "included 分类不得携带 reason 字段",
+        });
       continue;
     }
     if (display.status === "excluded") {
@@ -123,6 +129,12 @@ export function validateDisplayClassifications(
           caseId: entry.id,
           kind: "empty-reason",
           message: "排除用例缺少非空原因",
+        });
+      if ("observation" in display)
+        issues.push({
+          caseId: entry.id,
+          kind: "invalid-classification",
+          message: "excluded 分类不得携带 observation 字段",
         });
       continue;
     }
