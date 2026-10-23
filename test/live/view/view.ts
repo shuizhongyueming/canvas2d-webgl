@@ -565,15 +565,20 @@ class ComparisonView implements View {
       maxHeight = Math.max(maxHeight, canvas.height);
     }
     if (!maxWidth) return;
-    // pane 标签（原生/兼容）的近似高度；内容区为画布加标签。
+    // 分屏时标签占文档流高度；重叠时标签绝对定位不占位（画布对齐）。
     const label = overlay.querySelector(".live-pane-label");
     const labelHeight = label instanceof HTMLElement ? label.offsetHeight : 20;
     const split = mode === "split";
     const gap = split ? 16 : 0;
     const contentWidth = split ? maxWidth * 2 + gap : maxWidth;
-    const contentHeight = maxHeight + labelHeight;
-    const available = this.refs.stage.clientWidth - 4;
-    const factor = Math.min(1, available / contentWidth);
+    const contentHeight = maxHeight + (split ? labelHeight : 0);
+    const availableWidth = this.refs.stage.clientWidth - 4;
+    const availableHeight = this.refs.stage.clientHeight - 4;
+    const factor = Math.min(
+      1,
+      availableWidth / contentWidth,
+      availableHeight / contentHeight,
+    );
     overlay.style.setProperty("--live-fit-scale", String(factor));
     // 保持布局尺寸与缩放后一致，避免滚动条按缩放前尺寸出现。
     overlay.style.width = `${contentWidth}px`;
@@ -819,15 +824,26 @@ const VIEW_CSS = `
   position: relative;
   display: inline-block;
 }
+.live-stage[data-mode="overlay"] .live-pane[data-side="native"] {
+  position: relative;
+}
 .live-stage[data-mode="overlay"] .live-pane[data-side="compat"] {
   position: absolute;
   inset: 0;
 }
-.live-stage[data-mode="overlay"] .live-pane[data-side="compat"] .live-pane-label {
+/* 重叠时两侧标签都浮在画布之上、脱离文档流：
+   两画布从各自 pane 顶部开始，保持同位置对齐（issue #63）。 */
+.live-stage[data-mode="overlay"] .live-pane .live-pane-label {
   position: absolute;
   top: 0;
-  right: 0;
   background: rgba(255, 255, 255, 0.7);
+  z-index: 1;
+}
+.live-stage[data-mode="overlay"] .live-pane[data-side="native"] .live-pane-label {
+  left: 0;
+}
+.live-stage[data-mode="overlay"] .live-pane[data-side="compat"] .live-pane-label {
+  right: 0;
 }
 .live-pane-label { font-size: 12px; padding: 2px 6px; color: #333; }
 /* fit 缩放因子由 JS 计算后写入 --live-fit-scale 并作用于 overlay 整体：
