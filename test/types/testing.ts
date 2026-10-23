@@ -13,12 +13,30 @@ export interface TestHooks {
   resourceCounts(): Readonly<Record<string, number>>;
 }
 import type { CaseMetadata } from "../../src/contracts/support.js";
+import type {
+  CleanupRegistry,
+  DisplayClassification,
+} from "../live/contracts/index.js";
 export type { CaseMetadata } from "../../src/contracts/support.js";
 export interface CaseDefinition extends CaseMetadata {
   readonly seed: number;
   readonly width: number;
   readonly height: number;
   readonly fonts: readonly string[];
+  /**
+   * 展示资格分类（issue #62）。render/combined 用例必须显式分类；
+   * 缺失属于未分类，由目录票（#67）的漂移检查报错，网页不得默认纳入。
+   * semantic 用例自动排除，无需填写。
+   */
+  readonly display?: DisplayClassification;
+  /**
+   * 可选准备扩展（issue #63）：加载用例级资源、等待静态素材。
+   * 旧用例无 prepare 时由执行票提供的迁移入口包装，run 语义不变。
+   */
+  prepare?(
+    adapter: CaseAdapter,
+    registry: CleanupRegistry,
+  ): void | Promise<void>;
   /** Run independently against native or compat; no shared mutable globals. */
   run(adapter: CaseAdapter): void | Promise<void>;
 }

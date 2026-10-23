@@ -35,7 +35,9 @@
     "pretest:report": "pnpm run build",
     "pretest:acceptance": "pnpm run build",
     "test:smoke": "node scripts/harness-smoke.mjs",
-    "pretest:smoke": "pnpm run build"
+    "pretest:smoke": "pnpm run build",
+    "test:live": "node scripts/live.mjs",
+    "pretest:live": "pnpm run build"
   },
   "engines": {
     "node": ">=22"

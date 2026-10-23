@@ -14,11 +14,19 @@ await rm(new URL("../dist/", import.meta.url), {
   recursive: true,
   force: true,
 });
+await rm(new URL("../.build-live/", import.meta.url), {
+  recursive: true,
+  force: true,
+});
 const compiler =
   process.platform === "win32"
     ? "node_modules/.bin/tsc.cmd"
     : "node_modules/.bin/tsc";
-for (const project of ["tsconfig.build.json", "tsconfig.package.json"]) {
+for (const project of [
+  "tsconfig.build.json",
+  "tsconfig.package.json",
+  "tsconfig.live.json",
+]) {
   const result = spawnSync(compiler, ["-p", project], {
     cwd: root,
     stdio: "inherit",
@@ -29,6 +37,14 @@ for (const project of ["tsconfig.build.json", "tsconfig.package.json"]) {
     await cp(
       new URL("../.build/src/", import.meta.url),
       new URL("../dist/", import.meta.url),
+      { recursive: true },
+    );
+  // 实时对比工具浏览器模块输出到 dist/live/，与库和用例一并由
+  // browser-imports 检查约束：Node fs/PNG 等依赖不得进入浏览器。
+  if (project === "tsconfig.live.json")
+    await cp(
+      new URL("../.build-live/test/live/", import.meta.url),
+      new URL("../dist/live/", import.meta.url),
       { recursive: true },
     );
 }

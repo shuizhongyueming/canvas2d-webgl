@@ -104,4 +104,6 @@ pnpm run test:acceptance --run <run.json> --reviews <reviews.json>
 
 `pnpm run build` 清理旧产物，将运行库编译到 dist，测试用例编译到 .build/test。类型入口 dist/index.d.ts 从实现生成，另用包入口消费测试验证正反类型约束，不维护第二份公开声明。产物目录均被忽略。
 
+实时渲染对比工具（[开发计划](../plans/live-render-comparison.md)，issue #66 起）的共同契约与模块骨架位于 `test/live/{contracts,measure,runner,controller,view}`，经 `tsconfig.live.json` 编译到 `dist/live/`，与库产物一起受 browser-imports 检查约束：只保留相对 ESM import，Node fs/PNG 等依赖不进入浏览器。这些模块只属于本地测试工具，不从 `src/` 公开入口或 package 导出；契约详情与模块归属见 `test/live/contracts/README.md`。
+
 使用 pnpm run test:unit / test:browser / test:report / test:acceptance / test:smoke 会先构建；直接调用底层 node 脚本前需自行 pnpm run build。采集和报告入口检查源快照及编译产物 hash，发现缺失、过期或被修改的编译产物立即失败，避免用旧 JS 验证新 TS。修改源码/用例/协作文档后应重新构建。

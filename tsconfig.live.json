@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "noEmitOnError": true,
+    "declaration": false,
+    "rootDir": ".",
+    "outDir": ".build-live"
+  },
+  "include": ["test/live/**/*.ts", "test/types/**/*.ts"]
+}
