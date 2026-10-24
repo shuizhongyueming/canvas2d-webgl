@@ -29,12 +29,23 @@ const IDLE_STATE = {
   },
 };
 
-/** 启动本地服务与页面，注入 stub 状态机；返回操作句柄。 */
+/**
+ * 启动本地服务与页面，注入 stub 状态机；返回操作句柄。
+ * 失败路径必须关闭已开资源：chromium.launch 失败时 t.after 尚未注册的
+ * 写法会让并发失败测试遗留 server 句柄，事件循环悬挂（CI 曾因此 6h
+ * 超时被取消）。这里把清理集中到一个始终注册的 after 钩子。
+ */
 async function launch(t) {
   console.log(`[view.test] launch start: ${t.name}`);
-  const server = await serve(root);
+  let server = null;
+  let browser = null;
+  t.after(async () => {
+    if (browser) await browser.close();
+    if (server) await server.close();
+  });
+  server = await serve(root);
   console.log(`[view.test] server up: ${server.url}`);
-  const browser = await chromium.launch({ headless: true });
+  browser = await chromium.launch({ headless: true });
   console.log("[view.test] chromium launched");
   // 把浏览器与服务输出接到 Node 日志：CI 挂起时能看到进度。
   browser.on("disconnected", () =>
@@ -45,10 +56,6 @@ async function launch(t) {
   page.on("pageerror", (error) =>
     console.log("[view.test][pageerror]", error.message),
   );
-  t.after(async () => {
-    await browser.close();
-    await server.close();
-  });
 
   await page.goto(`${server.url}/`, { waitUntil: "domcontentloaded" });
   console.log("[view.test] page ready");
