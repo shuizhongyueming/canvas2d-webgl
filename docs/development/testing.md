@@ -106,4 +106,10 @@ pnpm run test:acceptance --run <run.json> --reviews <reviews.json>
 
 实时渲染对比工具（[开发计划](../plans/live-render-comparison.md)，issue #66 起）的共同契约与模块骨架位于 `test/live/{contracts,measure,runner,controller,view}`，经 `tsconfig.live.json` 编译到 `dist/live/`，与库产物一起受 browser-imports 检查约束：只保留相对 ESM import，Node fs/PNG 等依赖不进入浏览器。这些模块只属于本地测试工具，不从 `src/` 公开入口或 package 导出；契约详情与模块归属见 `test/live/contracts/README.md`。
 
+### 执行票（#69）：iframe 子执行器
+
+`test/live/runner/` 提供 iframe 内子执行器与 prepare/run/cleanup 拆分。每个 iframe 文档只承载一侧一轮：外层发 `prepare`（含 caseId）→ 执行器加载用例定义、等待字体、装配目标 canvas 与 context、执行用例 `prepare` 扩展 → 回 `ready`；外层统一 `start` → 用例 `run` 保留原有 checkpoint/微任务/帧推进语义 → 等待最终呈现后取样 → 回 `completed`（携带最终原始像素）。任一阶段可收到 `dispose`；清理按登记逆序、幂等执行，目标 canvas 与自建兼容实例均登记释放。
+
+iframe 属于可信本地测试的隔离边界，不是安全沙箱或独立线程：**不能强制中断同步死循环**；超时只标记本轮失败，不承诺底层任务停止。切换/重跑时移除旧 iframe 是环境兜底，不能替代已知资源的显式释放。
+
 使用 pnpm run test:unit / test:browser / test:report / test:acceptance / test:smoke 会先构建；直接调用底层 node 脚本前需自行 pnpm run build。采集和报告入口检查源快照及编译产物 hash，发现缺失、过期或被修改的编译产物立即失败，避免用旧 JS 验证新 TS。修改源码/用例/协作文档后应重新构建。
