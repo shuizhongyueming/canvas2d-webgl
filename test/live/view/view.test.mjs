@@ -31,8 +31,11 @@ const IDLE_STATE = {
 
 /** 启动本地服务与页面，注入 stub 状态机；返回操作句柄。 */
 async function launch(t) {
+  console.log(`[view.test] launch start: ${t.name}`);
   const server = await serve(root);
+  console.log(`[view.test] server up: ${server.url}`);
   const browser = await chromium.launch({ headless: true });
+  console.log("[view.test] chromium launched");
   // 把浏览器与服务输出接到 Node 日志：CI 挂起时能看到进度。
   browser.on("disconnected", () =>
     console.log("[view.test] browser disconnected"),
@@ -48,6 +51,7 @@ async function launch(t) {
   });
 
   await page.goto(`${server.url}/`, { waitUntil: "domcontentloaded" });
+  console.log("[view.test] page ready");
   // view.js 是模块文件，直接 goto 不会执行；改为通过模块导入挂载。
   await page.evaluate(
     async ({ cases, idle }) => {
