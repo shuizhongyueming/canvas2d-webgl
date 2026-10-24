@@ -33,15 +33,21 @@ const IDLE_STATE = {
 async function launch(t) {
   const server = await serve(root);
   const browser = await chromium.launch({ headless: true });
+  // 把浏览器与服务输出接到 Node 日志：CI 挂起时能看到进度。
+  browser.on("disconnected", () =>
+    console.log("[view.test] browser disconnected"),
+  );
   const page = await browser.newPage();
+  page.on("console", (msg) => console.log("[view.test][page]", msg.text()));
+  page.on("pageerror", (error) =>
+    console.log("[view.test][pageerror]", error.message),
+  );
   t.after(async () => {
     await browser.close();
     await server.close();
   });
 
-  await page.goto(`${server.url}/dist/live/view/view.js`, {
-    waitUntil: "domcontentloaded",
-  });
+  await page.goto(`${server.url}/`, { waitUntil: "domcontentloaded" });
   // view.js 是模块文件，直接 goto 不会执行；改为通过模块导入挂载。
   await page.evaluate(
     async ({ cases, idle }) => {
