@@ -15,8 +15,11 @@ jobs:
           node-version: '22'
           cache: pnpm
       - run: pnpm install --frozen-lockfile --ignore-scripts
-      - run: pnpm run verify
+      # 视图层浏览器回归（issue #70）由 pnpm run verify 驱动，
+      # Chromium 必须先安装；文件归属例外：工作流属 #66/集成票，
+      # 本次为必要测试设施修复，已在 PR #76 记录。
       - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm run verify
       - name: Real Chromium infrastructure regressions
         # Explicit software WebGL environment, recorded in the evidence. No fallback retry.
         run: pnpm run test:smoke --software
