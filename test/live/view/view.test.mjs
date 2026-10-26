@@ -236,10 +236,31 @@ test(
     await setState(selected("case.alpha"));
 
     // 聚焦下拉框时 ↑/↓/V 不派发页面事件。
+    // 注：浏览器原生行为会让下拉框上的 ↓ 改变选中项并触发 change，
+    // 这属于控件自身键盘操作（规格要求不被页面级快捷键抢占），
+    // 因此只断言不产生 step-case/select 之外的页面级导航语义——
+    // 具体：不允许出现 step-case 与 set-display-mode。
     await page.focus(".live-case-select");
     await page.keyboard.press("ArrowDown");
     await page.keyboard.press("v");
-    assert.deepEqual(await events(), []);
+    const afterSelectKeys = await events();
+    assert.deepEqual(
+      afterSelectKeys.filter(
+        (event) =>
+          event.type === "step-case" || event.type === "set-display-mode",
+      ),
+      [],
+    );
+    // 下拉框 change 若发生，也必须是绝对选择（选中值与事件一致）。
+    const selectedValue = await page.evaluate(
+      () => document.querySelector(".live-case-select").value,
+    );
+    for (const event of afterSelectKeys) {
+      assert.equal(event.type, "select-case");
+      assert.equal(event.caseId, selectedValue);
+    }
+    // 后续用例状态与视图同步。
+    await setState(selected(selectedValue));
 
     // 聚焦滑杆时同样不触发快捷键；input 事件派发透明度。
     await page.focus(".live-opacity input[type=range]");
