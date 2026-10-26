@@ -3,6 +3,11 @@ export { hash, jsonHash } from "../../scripts/hash.mjs";
 import { readFile, realpath } from "node:fs/promises";
 import { resolve, sep } from "node:path";
 import { PNG } from "pngjs";
+import { diffPixels as coreDiffPixels } from "../live/measure/node.mjs";
+
+// 严格差分逻辑委托浏览器/Node 共享纯核心（issue #68）；本层保留
+// 既有返回形状 { width, height, data, changedPixels, bounds }，
+// 既有报告与评审状态不因共享重构而变化。
 export function diffPixels(a, b) {
   if (
     a.width !== b.width ||
@@ -10,34 +15,13 @@ export function diffPixels(a, b) {
     a.data.length !== b.data.length
   )
     throw Error("Image dimensions differ");
-  const data = Buffer.alloc(a.data.length);
-  let changedPixels = 0,
-    minX = a.width,
-    minY = a.height,
-    maxX = -1,
-    maxY = -1;
-  for (let i = 0; i < a.data.length; i += 4) {
-    let changed = false;
-    for (let c = 0; c < 4; c++)
-      if (a.data[i + c] !== b.data[i + c]) changed = true;
-    if (!changed) continue;
-    const x = (i / 4) % a.width,
-      y = Math.floor(i / 4 / a.width);
-    changedPixels++;
-    minX = Math.min(minX, x);
-    minY = Math.min(minY, y);
-    maxX = Math.max(maxX, x);
-    maxY = Math.max(maxY, y);
-    data.set([255, 0, 180, 255], i);
-  }
+  const difference = coreDiffPixels(a, b);
   return {
-    width: a.width,
-    height: a.height,
-    data,
-    changedPixels,
-    bounds: changedPixels
-      ? { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 }
-      : null,
+    width: difference.width,
+    height: difference.height,
+    data: difference.data,
+    changedPixels: difference.changedPixels,
+    bounds: difference.bounds,
   };
 }
 export const encode = (value) => PNG.sync.write(value);

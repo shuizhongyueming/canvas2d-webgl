@@ -86,6 +86,7 @@ test("live tool modules stay browser-safe: no Node builtins or non-relative impo
     "dist/live/contracts/session.js",
     "dist/live/contracts/index.js",
     "dist/live/measure/diff-core.js",
+    "dist/live/measure/feedback.js",
     "dist/live/runner/executor.js",
     "dist/live/controller/coordinator.js",
     "dist/live/view/view.js",
