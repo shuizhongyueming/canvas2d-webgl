@@ -26,6 +26,10 @@ export const cases: CaseDefinition[] = [
       "context.lineTo",
       "context.lineWidth",
     ],
+    display: {
+      status: "included",
+      observation: "折线与曲线的描边形状、线宽与抗锯齿",
+    },
     run(a) {
       const context = a.context;
       context.lineWidth = 2;
@@ -54,6 +58,10 @@ export const cases: CaseDefinition[] = [
       "context.setTransform",
       "context.lineWidth",
     ],
+    display: {
+      status: "included",
+      observation: "非等比缩放下描边宽度随变换拉伸",
+    },
     run(a) {
       const context = a.context;
       // The stroke width scales with the draw-time transform, anisotropically:
@@ -100,6 +108,10 @@ export const cases: CaseDefinition[] = [
       "context.lineTo",
       "context.arc",
     ],
+    display: {
+      status: "included",
+      observation: "miter/round/bevel 连接与 butt/round/square 端点外观",
+    },
     run(a) {
       const context = a.context;
       context.lineWidth = 8;
@@ -143,6 +155,10 @@ export const cases: CaseDefinition[] = [
       "context.lineCap",
       "context.lineWidth",
     ],
+    display: {
+      status: "included",
+      observation: "零长子路径按 round/square 端点绘制点状",
+    },
     run(a) {
       const context = a.context;
       context.lineWidth = 6;
@@ -181,6 +197,10 @@ export const cases: CaseDefinition[] = [
       "context.restore",
       "context.lineWidth",
     ],
+    display: {
+      status: "included",
+      observation: "路径按构建时变换记录；描边宽度用绘制时变换",
+    },
     run(a) {
       const context = a.context;
       // Built under rotation, stroked under identity: geometry keeps the
@@ -208,6 +228,10 @@ export const cases: CaseDefinition[] = [
     ...renderBase,
     id: "path.stroke.zero-width-line",
     requirements: ["context.stroke", "context.rect", "context.lineWidth"],
+    display: {
+      status: "included",
+      observation: "零高度记录矩形描出水平线段",
+    },
     kind: "combined",
     async run(a) {
       const context = a.context;

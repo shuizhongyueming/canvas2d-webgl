@@ -28,6 +28,10 @@ export const cases: CaseDefinition[] = [
       "context.closePath",
       "context.arc",
     ],
+    display: {
+      status: "included",
+      observation: "折线与圆形的填充形状与抗锯齿边缘",
+    },
     run(a) {
       const context = a.context;
       context.fillStyle = "#ff0000";
@@ -54,6 +58,10 @@ export const cases: CaseDefinition[] = [
       "context.lineTo",
       "context.closePath",
     ],
+    display: {
+      status: "included",
+      observation: "凹自交路径在 nonzero/evenodd 下的覆盖差异",
+    },
     run(a) {
       const context = a.context;
       // A concave arrow and a self-intersecting bowtie, nonzero winding.
@@ -80,6 +88,10 @@ export const cases: CaseDefinition[] = [
     ...renderBase,
     id: "path.fill.arc-anticlockwise",
     requirements: ["context.fill", "context.arc"],
+    display: {
+      status: "included",
+      observation: "逆时针圆弧填充的扇区方向",
+    },
     run(a) {
       const context = a.context;
       // The same endpoints swept both ways: direction decides the coverage.
@@ -113,6 +125,10 @@ export const cases: CaseDefinition[] = [
       "context.moveTo",
       "context.lineTo",
     ],
+    display: {
+      status: "included",
+      observation: "arcTo/ellipse/quadratic 曲线的填充轮廓",
+    },
     run(a) {
       const context = a.context;
       context.fillStyle = "#ff0000";
@@ -146,6 +162,10 @@ export const cases: CaseDefinition[] = [
       "context.closePath",
       "context.rect",
     ],
+    display: {
+      status: "included",
+      observation: "多子路径 closePath 后的合并填充结果",
+    },
     run(a) {
       const context = a.context;
       // One fill covers every subpath; an unclosed subpath closes implicitly,
@@ -184,6 +204,10 @@ export const cases: CaseDefinition[] = [
       "context.save",
       "context.restore",
     ],
+    display: {
+      status: "included",
+      observation: "路径按构建时变换记录；绘制时变换只影响落点",
+    },
     run(a) {
       const context = a.context;
       // Geometry bakes the construction-time transform; the fill-time
@@ -216,6 +240,10 @@ export const cases: CaseDefinition[] = [
     id: "path.fill.retained-after-draw",
     requirements: ["context.fill", "context.rect", "context.fillStyle"],
     kind: "combined",
+    display: {
+      status: "included",
+      observation: "fill 不清除当前路径：第二次 fill 用蓝色重画同一矩形",
+    },
     async run(a) {
       const context = a.context;
       context.fillStyle = "#ff0000";
@@ -246,6 +274,10 @@ export const cases: CaseDefinition[] = [
       "context.lineTo",
       "context.closePath",
     ],
+    display: {
+      status: "included",
+      observation: "空/点/零长路径不绘制；含 NaN 的路径只绘制有限剩余三角形",
+    },
     kind: "combined",
     async run(a) {
       const context = a.context;
@@ -287,6 +319,10 @@ export const cases: CaseDefinition[] = [
       id: `path.${mode}.empty-path`,
       kind: "combined",
       requirements: [`context.${mode}`],
+      display: {
+        status: "included",
+        observation: "空路径与画布外路径操作后原有红底保持",
+      },
       async run(a) {
         const context = a.context;
         context.fillStyle = "#ff0000";
@@ -318,6 +354,10 @@ export const cases: CaseDefinition[] = [
       "context.restore",
       "context.globalAlpha",
     ],
+    display: {
+      status: "included",
+      observation: "save/restore 恢复样式与透明度，但不清除当前路径",
+    },
     kind: "combined",
     async run(a) {
       const context = a.context;

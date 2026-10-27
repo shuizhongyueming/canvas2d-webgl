@@ -36,6 +36,10 @@ export const cases: CaseDefinition[] = [
     id: "context.strokeText.render",
     requirements: ["context.strokeText", "context.font", "context.lineWidth"],
     fonts: ["24px sans-serif"],
+    display: {
+      status: "included",
+      observation: "描边字形、线宽与描边颜色；边缘裁剪处描边被画布截断",
+    },
     run(a) {
       const context = a.context;
       context.font = "24px sans-serif";
@@ -63,6 +67,10 @@ export const cases: CaseDefinition[] = [
     width: 132,
     height: 132,
     fonts: ["16px sans-serif"],
+    display: {
+      status: "included",
+      observation: "各对齐/基线下字形相对红色十字锚点的位置",
+    },
     run(a) {
       const context = a.context;
       context.font = "16px sans-serif";
@@ -95,6 +103,10 @@ export const cases: CaseDefinition[] = [
     width: 128,
     height: 128,
     fonts: ["20px sans-serif"],
+    display: {
+      status: "included",
+      observation: "旋转、非等比缩放与镜像变换下的字形形状与位置",
+    },
     run(a) {
       const context = a.context;
       context.font = "20px sans-serif";
@@ -119,6 +131,10 @@ export const cases: CaseDefinition[] = [
     width: 128,
     height: 64,
     fonts: ["24px sans-serif"],
+    display: {
+      status: "included",
+      observation: "中文字形渲染与混排基线位置",
+    },
     run(a) {
       const context = a.context;
       context.font = "24px sans-serif";
@@ -140,6 +156,10 @@ export const cases: CaseDefinition[] = [
     width: 128,
     height: 64,
     fonts: ["24px sans-serif"],
+    display: {
+      status: "included",
+      observation: "渐变与半透明填充文字；globalAlpha 0 的文字完全不显示",
+    },
     run(a) {
       const context = a.context;
       context.font = "24px sans-serif";
@@ -173,6 +193,10 @@ export const cases: CaseDefinition[] = [
     width: 128,
     height: 64,
     fonts: ["28px sans-serif"],
+    display: {
+      status: "included",
+      observation: "渐变与图案描边文字的外观",
+    },
     async run(a) {
       const context = a.context;
       context.font = "28px sans-serif";
@@ -203,6 +227,10 @@ export const cases: CaseDefinition[] = [
     width: 128,
     height: 96,
     fonts: ["24px sans-serif"],
+    display: {
+      status: "included",
+      observation: "图案填充文字及旋转后图案的相位",
+    },
     async run(a) {
       const context = a.context;
       context.font = "24px sans-serif";
@@ -225,6 +253,10 @@ export const cases: CaseDefinition[] = [
     width: 128,
     height: 80,
     fonts: ["12px monospace", "24px sans-serif"],
+    display: {
+      status: "included",
+      observation: "字体来回切换后同一文字的字形与尺寸恢复一致",
+    },
     run(a) {
       const context = a.context;
       context.fillStyle = "#000000";

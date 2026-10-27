@@ -42,6 +42,10 @@ export const cases: CaseDefinition[] = [
     ...base,
     id: "context.clip.render",
     requirements: ["context.clip", "ACC-03"],
+    display: {
+      status: "included",
+      observation: "裁剪矩形内蓝色填充与白色内块；裁剪外保持红底",
+    },
     async run(a) {
       const context = a.context;
       // Resolve the hook before drawing: after the last draw there must be no
@@ -107,6 +111,10 @@ export const cases: CaseDefinition[] = [
     ...base,
     id: "ACC-03.evenodd-nested-clip",
     requirements: ["ACC-03", "context.clip"],
+    display: {
+      status: "included",
+      observation: "evenodd 环形与嵌套裁剪交集内的蓝色区域；孔洞保持白底",
+    },
     async run(a) {
       const context = a.context;
       context.fillStyle = "#ffffff";
@@ -144,6 +152,10 @@ export const cases: CaseDefinition[] = [
     ...base,
     id: "clip.nonzero-overlap",
     requirements: ["context.clip", "context.rect"],
+    display: {
+      status: "included",
+      observation: "两个重叠矩形并集裁剪内的绿色填充；并集外保持透明",
+    },
     async run(a) {
       const context = a.context;
       context.save();
@@ -166,6 +178,10 @@ export const cases: CaseDefinition[] = [
     ...base,
     id: "ACC-03.clear-clip-transform",
     requirements: ["ACC-03", "context.clip", "context.clearRect"],
+    display: {
+      status: "included",
+      observation: "平移裁剪限制下的 clearRect 只清除裁剪内红底",
+    },
     async run(a) {
       const context = a.context;
       // Resolve the hook before drawing: after the last draw there must be no
@@ -207,6 +223,10 @@ export const cases: CaseDefinition[] = [
     ...base,
     id: "clip.save-restore-stack",
     requirements: ["context.clip", "context.save", "context.restore"],
+    display: {
+      status: "included",
+      observation: "嵌套裁剪下红/蓝/绿依次受外内层裁剪约束；restore 后黑色充满",
+    },
     async run(a) {
       const context = a.context;
       context.save();
@@ -256,6 +276,10 @@ export const cases: CaseDefinition[] = [
     ...base,
     id: "clip.does-not-consume-current-path",
     requirements: ["context.clip", "context.beginPath", "context.fill"],
+    display: {
+      status: "included",
+      observation: "clip 后当前路径仍可填充；裁剪外的绘制被截断",
+    },
     async run(a) {
       const context = a.context;
       context.save();
@@ -306,6 +330,10 @@ export const cases: CaseDefinition[] = [
     ...base,
     id: "clip.empty-path",
     requirements: ["context.clip", "context.beginPath"],
+    display: {
+      status: "included",
+      observation: "空路径 clip 后红底保持不变",
+    },
     async run(a) {
       const context = a.context;
       // Resolve the hook before drawing: after the last draw there must be no
@@ -336,6 +364,10 @@ export const cases: CaseDefinition[] = [
       "context.scale",
       "context.setTransform",
     ],
+    display: {
+      status: "included",
+      observation: "按构建时变换定位的裁剪区域；后续变换只影响绘制位置",
+    },
     async run(a) {
       const context = a.context;
       context.save();
@@ -388,6 +420,10 @@ export const cases: CaseDefinition[] = [
     ...base,
     id: "clip.depth-nesting",
     requirements: ["context.clip", "context.save", "context.restore"],
+    display: {
+      status: "included",
+      observation: "十二层嵌套裁剪交集内的绿色填充；外层条带保持透明",
+    },
     async run(a) {
       const context = a.context;
       for (let level = 0; level < 12; level += 1) {
@@ -431,6 +467,10 @@ export const cases: CaseDefinition[] = [
     ...base,
     id: "clip.path-and-stroke-entries",
     requirements: ["context.clip", "context.fill", "context.strokeRect"],
+    display: {
+      status: "included",
+      observation: "路径填充与 strokeRect 都被同一裁剪截断",
+    },
     async run(a) {
       const context = a.context;
       context.save();
@@ -481,6 +521,11 @@ export const cases: CaseDefinition[] = [
       "context.globalCompositeOperation",
       "ACC-03",
     ],
+    display: {
+      status: "included",
+      observation:
+        "source-in 在裁剪内合成绿色并清空裁剪内其余区域；裁剪外红底不动",
+    },
     async run(a) {
       const context = a.context;
       // Resolve the hook before drawing: after the last draw there must be no
@@ -536,6 +581,10 @@ export const cases: CaseDefinition[] = [
     ...base,
     id: "clip.curves-subpixel-edges",
     requirements: ["context.clip", "context.arc", "ACC-03"],
+    display: {
+      status: "included",
+      observation: "圆形裁剪的柔和边缘与内部红色填充",
+    },
     async run(a) {
       const context = a.context;
       context.save();
@@ -563,6 +612,10 @@ export const cases: CaseDefinition[] = [
       "context.globalCompositeOperation",
       "context.filter",
     ],
+    display: {
+      status: "included",
+      observation: "半透明与 lighter/filter 绘制都限制在裁剪内",
+    },
     async run(a) {
       const context = a.context;
       context.fillStyle = "#ffffff";
@@ -601,6 +654,10 @@ export const cases: CaseDefinition[] = [
     ...base,
     id: "clip.reset-on-size",
     requirements: ["context.clip", "canvas.width", "CAN-04"],
+    display: {
+      status: "included",
+      observation: "同尺寸重设前裁剪限制红色区域；重设后蓝色充满整个画布",
+    },
     kind: "combined" as const,
     async run(a) {
       const context = a.context;

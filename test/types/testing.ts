@@ -18,6 +18,7 @@ import type {
   DisplayClassification,
   PreparedExecution,
 } from "../live/contracts/index.js";
+export type { DisplayClassification } from "../live/contracts/index.js";
 export type { CaseMetadata } from "../../src/contracts/support.js";
 export interface CaseDefinition extends CaseMetadata {
   readonly seed: number;

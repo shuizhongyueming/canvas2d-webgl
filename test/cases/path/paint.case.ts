@@ -27,6 +27,10 @@ export const cases: CaseDefinition[] = [
       "context.translate",
       "context.setTransform",
     ],
+    display: {
+      status: "included",
+      observation: "渐变填充路径；平移后渐变随几何移动",
+    },
     run(a) {
       const context = a.context;
       const ramp = context.createLinearGradient(0, 0, 32, 0);
@@ -60,6 +64,10 @@ export const cases: CaseDefinition[] = [
       "context.translate",
       "context.setTransform",
     ],
+    display: {
+      status: "included",
+      observation: "图案填充路径的形状与相位",
+    },
     async run(a) {
       const context = a.context;
       const pattern = context.createPattern(
@@ -95,6 +103,10 @@ export const cases: CaseDefinition[] = [
       "context.lineTo",
       "context.lineWidth",
     ],
+    display: {
+      status: "included",
+      observation: "渐变描边路径的外观",
+    },
     run(a) {
       const context = a.context;
       const ramp = context.createLinearGradient(0, 0, 64, 0);
@@ -125,6 +137,10 @@ export const cases: CaseDefinition[] = [
       "context.rect",
       "context.lineWidth",
     ],
+    display: {
+      status: "included",
+      observation: "图案描边路径的外观",
+    },
     async run(a) {
       const context = a.context;
       const pattern = context.createPattern(
@@ -156,6 +172,10 @@ export const cases: CaseDefinition[] = [
         "context.rect",
       ],
       kind: "combined",
+      display: {
+        status: "included",
+        observation: "渐变 stop 修改后同一记录路径的 fill/stroke 重栅格为蓝色",
+      },
       async run(a) {
         const context = a.context;
         const ramp = context.createLinearGradient(0, 0, 32, 0);
@@ -194,6 +214,10 @@ export const cases: CaseDefinition[] = [
         "context.createLinearGradient",
         "context.createPattern",
       ],
+      display: {
+        status: "included",
+        observation: "渐变/图案描边 strokeRect 及旋转变换下的接缝",
+      },
       async run(a) {
         const context = a.context;
         if (paint === "gradient") {
@@ -226,6 +250,10 @@ export const cases: CaseDefinition[] = [
       "context.createLinearGradient",
       "gradient.addColorStop",
     ],
+    display: {
+      status: "included",
+      observation: "渐变 stop 修改后 fillRect/strokeRect 重栅格为新色带",
+    },
     kind: "combined",
     async run(a) {
       const context = a.context;

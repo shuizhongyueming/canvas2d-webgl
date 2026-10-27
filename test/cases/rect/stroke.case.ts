@@ -19,6 +19,10 @@ export const cases: CaseDefinition[] = [
     ...renderBase,
     id: "context.strokeRect.render",
     requirements: ["context.strokeRect", "context.lineWidth"],
+    display: {
+      status: "included",
+      observation: "1px 半像素描边清晰、4px miter 角及多色矩形描边",
+    },
     run(a) {
       const context = a.context;
       // A 1px stroke at half-pixel origin lands crisp; the 4px stroke miters.
@@ -42,6 +46,10 @@ export const cases: CaseDefinition[] = [
       "context.setTransform",
       "context.lineWidth",
     ],
+    display: {
+      status: "included",
+      observation: "旋转变换描边与各向异性缩放下线宽拉伸",
+    },
     run(a) {
       const context = a.context;
       context.lineWidth = 2;
@@ -60,6 +68,10 @@ export const cases: CaseDefinition[] = [
     ...renderBase,
     id: "rect.strokeRect.negative-size",
     requirements: ["context.strokeRect", "context.lineWidth"],
+    display: {
+      status: "included",
+      observation: "负宽/高 strokeRect 的落点",
+    },
     run(a) {
       const context = a.context;
       context.lineWidth = 3;
@@ -75,6 +87,10 @@ export const cases: CaseDefinition[] = [
     ...renderBase,
     id: "rect.strokeRect.degenerate",
     requirements: ["context.strokeRect", "context.lineWidth"],
+    display: {
+      status: "included",
+      observation: "单零尺寸描出直线；双零尺寸不绘制",
+    },
     kind: "combined",
     async run(a) {
       const context = a.context;
@@ -115,6 +131,10 @@ export const cases: CaseDefinition[] = [
       "context.globalAlpha",
       "context.lineWidth",
     ],
+    display: {
+      status: "included",
+      observation: "蓝底上半透明描边的叠加混合",
+    },
     run(a) {
       const context = a.context;
       context.fillStyle = "#0000ff";

@@ -182,6 +182,10 @@ export const cases: CaseDefinition[] = [
     ...renderBase,
     id: "paint.gradient.degenerate",
     requirements: ["context.createLinearGradient", "context.fillRect"],
+    display: {
+      status: "included",
+      observation: "零长度与无 stop 渐变不绘制；原有绿色填充保持",
+    },
     run(a) {
       const context = asNative(a.context);
       const degenerate = context.createLinearGradient(10, 10, 10, 10);
@@ -200,6 +204,10 @@ export const cases: CaseDefinition[] = [
     ...renderBase,
     id: "paint.gradient.transform-after-create",
     requirements: ["context.createLinearGradient", "context.translate"],
+    display: {
+      status: "included",
+      observation: "渐变跟随绘制时变换，色带落在平移后的位置",
+    },
     run(a) {
       const context = asNative(a.context);
       const gradient = twoStopGradient(context);
@@ -218,6 +226,10 @@ export const cases: CaseDefinition[] = [
       "context.save",
       "context.restore",
     ],
+    display: {
+      status: "included",
+      observation: "创建时变换不烘入渐变；填充使用恒等绘制空间",
+    },
     run(a) {
       const context = asNative(a.context);
       context.save();
@@ -234,6 +246,10 @@ export const cases: CaseDefinition[] = [
     ...renderBase,
     id: "paint.gradient.stops-duplicate-order",
     requirements: ["gradient.addColorStop", "context.fillRect"],
+    display: {
+      status: "included",
+      observation: "乱序与同 offset 重复 stop 的最终色带（后者覆盖前者）",
+    },
     run(a) {
       const context = asNative(a.context);
       const gradient = context.createLinearGradient(0, 0, 64, 0);
@@ -249,6 +265,10 @@ export const cases: CaseDefinition[] = [
     ...renderBase,
     id: "paint.gradient.stops-duplicate-edge",
     requirements: ["gradient.addColorStop", "context.fillRect"],
+    display: {
+      status: "included",
+      observation: "边缘 offset 重复 stop 时后写者生效并向外平铺",
+    },
     run(a) {
       const context = asNative(a.context);
       // Native truth (Chromium probe, PR #34 review): at a duplicated edge
@@ -271,6 +291,10 @@ export const cases: CaseDefinition[] = [
     ...renderBase,
     id: "paint.gradient.addColorStop-after-assign",
     requirements: ["gradient.addColorStop", "context.fillStyle"],
+    display: {
+      status: "included",
+      observation: "已赋值的渐变被修改后，下一次填充使用新色带",
+    },
     run(a) {
       const context = asNative(a.context);
       const gradient = context.createLinearGradient(0, 0, 32, 0);

@@ -154,6 +154,10 @@ const clipped: CaseDefinition[] = ENTRIES.flatMap((entry) =>
         requirementOf(entry),
       ],
       kind: "render",
+      display: {
+        status: "included",
+        observation: "各绘制入口 x 合成模式在裁剪内的覆盖与清除结果",
+      },
       async run(a) {
         const context = a.context;
         context.fillStyle = "rgb(32, 64, 96)";
@@ -243,6 +247,11 @@ const withState: CaseDefinition[] = ENTRIES.flatMap((entry) =>
         requirementOf(entry),
       ],
       kind: "render",
+      display: {
+        status: "included",
+        observation:
+          "平移+半透明+亮度过滤下各入口 x 合成模式在裁剪内的合成结果",
+      },
       async run(a) {
         const context = a.context;
         context.fillStyle = "rgb(32, 64, 96)";

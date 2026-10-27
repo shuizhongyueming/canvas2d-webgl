@@ -80,6 +80,11 @@ export const cases: CaseDefinition[] = [
       "context.stroke",
       "context.fillText",
     ],
+    display: {
+      status: "included",
+      observation:
+        "渐变 addColorStop 后五种入口的旧红色资产全部重栅格为含蓝渐变",
+    },
     async run(a) {
       const context = a.context;
       // The ramp spans the whole canvas so every entry below lies inside it.
@@ -165,6 +170,10 @@ export const cases: CaseDefinition[] = [
       "context.fillRect",
       "context.fill",
     ],
+    display: {
+      status: "included",
+      observation: "同一渐变在不同变换下各自缓存；stop 变更后矩形与路径都更新",
+    },
     async run(a) {
       const context = a.context;
       const ramp = context.createLinearGradient(0, 0, 16, 0);
@@ -223,6 +232,10 @@ export const cases: CaseDefinition[] = [
       "context.fillRect",
       "context.fillText",
     ],
+    display: {
+      status: "included",
+      observation: "图案平铺相位随绘制时变换平移；图案同样用于文字填充",
+    },
     async run(a) {
       const context = a.context;
       const pattern = context.createPattern(

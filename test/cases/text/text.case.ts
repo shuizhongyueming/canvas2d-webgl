@@ -15,6 +15,10 @@ export const cases: CaseDefinition[] = [
     height: 32,
     seed: 1,
     fonts: ["24px sans-serif"],
+    display: {
+      status: "included",
+      observation: "空字符串不留下任何像素；随后的 Real 文字正常显示",
+    },
     async run(a) {
       const context = a.context;
       context.font = "24px sans-serif";

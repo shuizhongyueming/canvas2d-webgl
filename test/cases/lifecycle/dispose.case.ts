@@ -24,6 +24,11 @@ export const cases: CaseDefinition[] = [
     id: "LIFE-01.dispose-pending-present",
     kind: "combined",
     requirements: ["LIFE-01", "CAN-05"],
+    display: {
+      status: "excluded",
+      reason:
+        "主 target 仅统一 marker；实际断言针对辅助 compat 画布，reference 也运行兼容库（决策 #62 明确排除）",
+    },
     async run(a) {
       // The harness canvas keeps the captured render pair meaningful.
       drawHarnessMarker(a);

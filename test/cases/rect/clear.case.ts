@@ -20,6 +20,10 @@ export const cases: CaseDefinition[] = [
     ...renderBase,
     id: "context.clearRect.render",
     requirements: ["context.clearRect", "context.fillRect"],
+    display: {
+      status: "included",
+      observation: "红底上的清除孔及绿色块对部分孔洞的重填",
+    },
     run(a) {
       const context = a.context;
       context.fillStyle = "#ff0000";
@@ -39,6 +43,10 @@ export const cases: CaseDefinition[] = [
       "context.translate",
       "context.setTransform",
     ],
+    display: {
+      status: "included",
+      observation: "旋转后的清除区域（菱形孔）及复位后的清除",
+    },
     run(a) {
       const context = a.context;
       context.fillStyle = "#ff0000";
@@ -60,6 +68,10 @@ export const cases: CaseDefinition[] = [
       "context.globalAlpha",
       "context.fillStyle",
     ],
+    display: {
+      status: "included",
+      observation: "clearRect 忽略 alpha 与当前 paint 完全清除；清除后可重画",
+    },
     kind: "combined",
     async run(a) {
       const context = a.context;
@@ -93,6 +105,10 @@ export const cases: CaseDefinition[] = [
     ...renderBase,
     id: "rect.clearRect.full-canvas",
     requirements: ["context.clearRect", "context.fillRect", "canvas.width"],
+    display: {
+      status: "included",
+      observation: "整画布 clearRect 后全透明；随后重画蓝块",
+    },
     kind: "combined",
     width: 32,
     height: 32,
@@ -132,6 +148,10 @@ export const cases: CaseDefinition[] = [
       "context.rect",
       "context.fill",
     ],
+    display: {
+      status: "included",
+      observation: "三个 rect 入口不干扰当前路径；fill 重画记录的矩形",
+    },
     async run(a) {
       const context = a.context;
       // Record a current path, then run the three rect entries across it:
