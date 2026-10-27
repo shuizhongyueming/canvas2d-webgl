@@ -221,6 +221,19 @@ browserTest(
           coordinator.state.sides.native === "preparing",
         "old completed polluted latest session",
       );
+      coordinator.receive(
+        {
+          type: "completed",
+          sessionId: firstId,
+          side: "native",
+          pixels: { width: 1, height: 1, pixels: new Uint8Array(4) },
+        },
+        currentFrames().native.element.contentWindow,
+      );
+      assert(
+        coordinator.state.sides.native === "preparing",
+        "current source with old completed session polluted latest session",
+      );
       send("native", { type: "ready" });
       send("native", {
         type: "completed",
@@ -241,6 +254,16 @@ browserTest(
       assert(
         coordinator.state.stage === "completed",
         "both completed not measured",
+      );
+      let completedReattachError = null;
+      try {
+        coordinator.attachCanvas(document.createElement("div"), "native");
+      } catch (error) {
+        completedReattachError = error;
+      }
+      assert(
+        completedReattachError?.message === "active-runner-reattach",
+        "completed runner reattached",
       );
       assert(
         coordinator.feedback().difference.status === "measured",
@@ -273,6 +296,8 @@ browserTest("阶段超时、取样失败和清理诊断都终止整轮", async (
     };
     async function scenario(kind) {
       const root = document.createElement("div");
+      const slot = document.createElement("div");
+      root.append(slot);
       document.body.append(root);
       const frames = {};
       const coordinator = createCoordinator({
@@ -296,6 +321,7 @@ browserTest("阶段超时、取样失败和清理诊断都终止整轮", async (
           };
         },
       });
+      coordinator.attachCanvas(slot, "native");
       coordinator.dispatch({ type: "select-case", caseId: "case.a" });
       const send = (side, message) =>
         coordinator.receive(
@@ -353,8 +379,17 @@ browserTest("阶段超时、取样失败和清理诊断都终止整轮", async (
         stage: coordinator.state.stage,
         error: coordinator.state.error?.reason,
         frames: root.querySelectorAll("iframe").length,
+        hosts: root.querySelectorAll("div[data-session-id]").length,
         difference: coordinator.state.difference,
       };
+      if (kind === "cleanup") {
+        coordinator.attachCanvas(slot, "native");
+        assert(
+          root.querySelectorAll("iframe").length === 0 &&
+            root.querySelectorAll("div[data-session-id]").length === 0,
+          "disposed failure host reattached",
+        );
+      }
       await coordinator.dispose();
       root.remove();
       return result;
@@ -365,6 +400,7 @@ browserTest("阶段超时、取样失败和清理诊断都终止整轮", async (
     for (const result of results) {
       assert(result.stage === "failed", `${result.kind}: no failed state`);
       assert(result.frames === 0, `${result.kind}: iframe retained`);
+      assert(result.hosts === 0, `${result.kind}: host retained`);
       assert(result.difference === null, `${result.kind}: difference retained`);
     }
     assert(

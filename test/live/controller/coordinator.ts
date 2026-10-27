@@ -470,8 +470,8 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
       }
       slots[side] = slot;
       slot.replaceChildren();
-      // 只迁移当前已失效轮次。活跃轮次在上方拒绝重挂。
-      if (current?.sides[side]) slot.append(current.sides[side].host);
+      // 只迁移尚在限时清理中的失败轮次。已处置 host 不得复活。
+      if (current && !current.disposed) slot.append(current.sides[side].host);
     },
     feedback() {
       const run = current;
