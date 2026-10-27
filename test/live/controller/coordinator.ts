@@ -239,10 +239,15 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
   const start = (run: Run): void => {
     if (current !== run || run.failed || run.disposed) return;
     stopTimer(run);
-    for (const side of SIDES) {
-      const item = run.sides[side];
-      item.stage = "running";
-      item.frame.post({ type: "start", sessionId: run.id, side });
+    try {
+      for (const side of SIDES) {
+        const item = run.sides[side];
+        item.stage = "running";
+        item.frame.post({ type: "start", sessionId: run.id, side });
+      }
+    } catch (error) {
+      fail(run, null, "running", reasonOf(error));
+      return;
     }
     update(run);
     run.timer = setTimeout(() => {

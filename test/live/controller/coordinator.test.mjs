@@ -240,7 +240,17 @@ browserTest("阶段超时、取样失败和清理诊断都终止整轮", async (
           const element = document.createElement("iframe");
           root.append(element);
           frames[side] = element;
-          return { element, post() {} };
+          return {
+            element,
+            post(message) {
+              if (
+                kind === "start" &&
+                side === "compat" &&
+                message.type === "start"
+              )
+                throw new Error("start-post-failed");
+            },
+          };
         },
       });
       coordinator.dispatch({ type: "select-case", caseId: "case.a" });
@@ -275,7 +285,7 @@ browserTest("阶段超时、取样失败和清理诊断都终止整轮", async (
           reason: "cleanup-failure",
         });
       }
-      if (kind === "prepare" || kind === "run")
+      if (kind === "prepare" || kind === "run" || kind === "start")
         await new Promise((resolve) => {
           const deadline = Date.now() + 1000;
           const poll = () => {
@@ -307,7 +317,7 @@ browserTest("阶段超时、取样失败和清理诊断都终止整轮", async (
       return result;
     }
     const results = [];
-    for (const kind of ["prepare", "run", "sample", "cleanup"])
+    for (const kind of ["prepare", "run", "start", "sample", "cleanup"])
       results.push(await scenario(kind));
     for (const result of results) {
       assert(result.stage === "failed", `${result.kind}: no failed state`);
@@ -323,15 +333,19 @@ browserTest("阶段超时、取样失败和清理诊断都终止整轮", async (
       `run timeout missing: ${JSON.stringify(results)}`,
     );
     assert(
-      results[2].error.includes("incomplete-data"),
+      results[2].error.includes("start-post-failed"),
+      "start post failure missing",
+    );
+    assert(
+      results[3].error.includes("incomplete-data"),
       "sample failure missing",
     );
     assert(
-      results[3].error.includes("original-failure"),
+      results[4].error.includes("original-failure"),
       "original failure lost",
     );
     assert(
-      results[3].error.includes("cleanup-failure"),
+      results[4].error.includes("cleanup-failure"),
       "cleanup diagnostic lost",
     );
   });
