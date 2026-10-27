@@ -337,6 +337,56 @@ browserTest("阶段超时、取样失败和清理诊断都终止整轮", async (
   });
 });
 
+browserTest("第二侧创建失败时释放第一侧且不留下孤儿 frame", async (t) => {
+  const { page } = await launch(t);
+  await page.evaluate(async () => {
+    const { createCoordinator } = await import(
+      "/dist/live/controller/coordinator.js"
+    );
+    const root = document.createElement("div");
+    const slot = document.createElement("div");
+    root.append(slot);
+    document.body.append(root);
+    const first = document.createElement("iframe");
+    let disposeCount = 0;
+    const coordinator = createCoordinator({
+      cases: [{ id: "case.a" }],
+      timeouts: { prepare: 1000, run: 1000 },
+      cleanupTimeout: 5,
+      createFrame(sessionId, side) {
+        if (side === "compat") throw new Error("frame-creation-failed");
+        return {
+          element: first,
+          post(message) {
+            if (message.type === "dispose") disposeCount += 1;
+          },
+        };
+      },
+    });
+    coordinator.attachCanvas(slot, "native");
+    coordinator.attachCanvas(document.createElement("div"), "compat");
+    coordinator.dispatch({ type: "select-case", caseId: "case.a" });
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    const result = {
+      stage: coordinator.state.stage,
+      side: coordinator.state.error?.side,
+      disposeCount,
+      connected: first.isConnected,
+      feedback: coordinator.feedback()?.difference.status,
+    };
+    await coordinator.dispose();
+    root.remove();
+    if (
+      result.stage !== "failed" ||
+      result.side !== "compat" ||
+      result.disposeCount !== 1 ||
+      result.connected ||
+      result.feedback !== "failed"
+    )
+      throw new Error(JSON.stringify(result));
+  });
+});
+
 browserTest("真实 A→B→A 与连续重跑立即更换轮次并移除旧 iframe", async (t) => {
   const { page } = await launch(t);
   await page.waitForFunction(completed);

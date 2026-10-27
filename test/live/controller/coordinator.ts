@@ -123,13 +123,15 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     if (current !== run || disposed) return;
     const overall: SessionStage = run.failed
       ? "failed"
-      : SIDES.every((side) => run.sides[side].stage === "completed")
-        ? "completed"
-        : SIDES.some((side) => run.sides[side].stage === "running")
-          ? "running"
-          : SIDES.every((side) => run.sides[side].stage === "ready")
-            ? "ready"
-            : "preparing";
+      : SIDES.some((side) => run.sides[side].stage === "disposing")
+        ? "disposing"
+        : SIDES.every((side) => run.sides[side].stage === "completed")
+          ? "completed"
+          : SIDES.some((side) => run.sides[side].stage === "running")
+            ? "running"
+            : SIDES.every((side) => run.sides[side].stage === "ready")
+              ? "ready"
+              : "preparing";
     state = {
       ...state,
       sessionId: run.id,
@@ -145,21 +147,43 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     publish();
   };
 
-  const stopTimer = (run: Run): void => {
+  const updatePartial = (run: PartialRun): void => {
+    if (current !== run || disposed || !run.error) return;
+    state = {
+      ...state,
+      sessionId: run.id,
+      caseId: run.caseId,
+      stage: "failed",
+      sides: {
+        native: run.sides.native?.stage ?? "disposed",
+        compat: run.sides.compat?.stage ?? "disposed",
+      },
+      difference: null,
+      error: run.error,
+    };
+    publish();
+  };
+
+  interface PartialRun extends Omit<Run, "sides"> {
+    readonly sides: Partial<Record<Side, SideRun>>;
+  }
+
+  const stopTimer = (run: PartialRun): void => {
     if (run.timer !== null) clearTimeout(run.timer);
     run.timer = null;
   };
 
-  const cleanup = (run: Run): Promise<void> => {
+  const cleanup = (run: PartialRun): Promise<void> => {
     if (run.cleanup) return run.cleanup;
     run.disposed = true;
     stopTimer(run);
-    run.sides.native.pixels = null;
-    run.sides.compat.pixels = null;
+    if (run.sides.native) run.sides.native.pixels = null;
+    if (run.sides.compat) run.sides.compat.pixels = null;
     run.difference = null;
     // 先请求子执行器显式释放，再移除文档。此处不等待旧 run 收尾。
     for (const side of SIDES) {
       const item = run.sides[side];
+      if (!item) continue;
       item.stage = "disposing";
       // 不移动 iframe 的 DOM 祖先。移动可能重载文档并绕过显式清理。
       item.frame.element.style.visibility = "hidden";
@@ -172,8 +196,8 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     }
     cleanupDiagnostics.set(run.id, []);
     cleanupSources.set(run.id, {
-      native: run.sides.native.frame.element.contentWindow,
-      compat: run.sides.compat.frame.element.contentWindow,
+      native: run.sides.native?.frame.element.contentWindow,
+      compat: run.sides.compat?.frame.element.contentWindow,
     });
     run.cleanup = new Promise<void>((resolve) => {
       setTimeout(resolve, options.cleanupTimeout ?? 1000);
@@ -182,16 +206,18 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
       cleanupDiagnostics.delete(run.id);
       cleanupSources.delete(run.id);
       for (const side of SIDES) {
-        run.sides[side].stage = "disposed";
-        run.sides[side].frame.element.remove();
+        const item = run.sides[side];
+        if (!item) continue;
+        item.stage = "disposed";
+        item.frame.element.remove();
       }
       if (current === run && diagnostics?.length && run.error) {
         run.error = {
           ...run.error,
           reason: `${run.error.reason}; cleanup: ${diagnostics.join("; ")}`,
         };
-        update(run);
       }
+      updatePartial(run);
     });
     return run.cleanup;
   };
@@ -206,7 +232,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     run.failed = true;
     run.error = { side, stage, reason };
     run.difference = null;
-    update(run);
+    updatePartial(run);
     void cleanup(run);
   }
 
@@ -260,18 +286,23 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
       error: null,
     };
     for (const side of SIDES) {
-      const frame = options.createFrame(id, side, caseId);
-      frame.element.tabIndex = -1;
-      frame.element.style.pointerEvents = "none";
-      frame.element.style.border = "0";
-      frame.element.style.display = "block";
-      frame.element.setAttribute("aria-label", `${side} live runner`);
-      sides[side] = { frame, stage: "preparing", pixels: null };
-      const host = document.createElement("div");
-      host.dataset.sessionId = id;
-      host.style.display = "contents";
-      host.append(frame.element);
-      slots[side]?.append(host);
+      try {
+        const frame = options.createFrame(id, side, caseId);
+        frame.element.tabIndex = -1;
+        frame.element.style.pointerEvents = "none";
+        frame.element.style.border = "0";
+        frame.element.style.display = "block";
+        frame.element.setAttribute("aria-label", `${side} live runner`);
+        sides[side] = { frame, stage: "preparing", pixels: null };
+        const host = document.createElement("div");
+        host.dataset.sessionId = id;
+        host.style.display = "contents";
+        host.append(frame.element);
+        slots[side]?.append(host);
+      } catch (error) {
+        fail(run, side, "preparing", reasonOf(error));
+        return;
+      }
     }
     publish();
     try {
