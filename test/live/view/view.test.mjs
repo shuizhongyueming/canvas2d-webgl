@@ -677,6 +677,27 @@ test("选中用例展示观察重点", browserOptions, async (t) => {
 });
 
 test(
+  "视图 dispose 断开 ResizeObserver 与提示计时器",
+  browserOptions,
+  async (t) => {
+    const { page } = await launch(t);
+    const result = await page.evaluate(async () => {
+      let disconnects = 0;
+      const observer = window.__live.view.resizeObserver;
+      const disconnect = observer.disconnect.bind(observer);
+      observer.disconnect = () => {
+        disconnects += 1;
+        disconnect();
+      };
+      window.__live.view.dispose();
+      return { disconnects, observer: window.__live.view.resizeObserver };
+    });
+    assert.equal(result.disconnects, 1);
+    assert.equal(result.observer, null);
+  },
+);
+
+test(
   "指纹噪声提示可见；完成状态展示 bbox 与差异图占位",
   browserOptions,
   async (t) => {

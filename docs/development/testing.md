@@ -110,6 +110,10 @@ pnpm run test:acceptance --run <run.json> --reviews <reviews.json>
 
 `test/live/runner/` 提供 iframe 内子执行器与 prepare/run/cleanup 拆分。每个 iframe 文档只承载一侧一轮：外层发 `prepare`（含 caseId）→ 执行器加载用例定义、等待字体、装配目标 canvas 与 context、执行用例 `prepare` 扩展 → 回 `ready`；外层统一 `start` → 用例 `run` 保留原有 checkpoint/微任务/帧推进语义 → 等待最终呈现后取样 → 回 `completed`（携带最终原始像素）。任一阶段可收到 `dispose`；清理按登记逆序、幂等执行，目标 canvas 与自建兼容实例均登记释放。
 
+`test/live/controller/` 实现父协调器和真实双 iframe 承载。每轮只接受当前 `sessionId`、`side`、来源 `contentWindow` 和阶段匹配的消息。两侧 `ready` 后统一发送 `start`，两侧完成最终取样后才调用共享量测核心。切换/重跑先作废旧轮次并清空画面，再异步显式清理和移除 iframe；不等待旧 run 自行结束。清理诊断保留，普通晚到消息拒收。iframe 不主动获取焦点且不接收指针事件，父页面保留快捷键。
+
+本地开发命令为 `pnpm run test:live`。可用 `-- --port=0 --prepare-timeout=10000 --run-timeout=10000` 调整端口和阶段时限。服务仅绑定 `127.0.0.1`，目录端点 `/api/catalog` 直接来自完整 catalog 的 included 投影。服务不是通用静态服务器，仅暴露构建、用例和测试素材路径。完整产品接线和差异图展示由 #72 收尾；协调器只交付真实量测结果，不伪造差异图。
+
 iframe 属于可信本地测试的隔离边界，不是安全沙箱或独立线程：**不能强制中断同步死循环**；超时只标记本轮失败，不承诺底层任务停止。切换/重跑时移除旧 iframe 是环境兜底，不能替代已知资源的显式释放。
 
 使用 pnpm run test:unit / test:browser / test:report / test:acceptance / test:smoke 会先构建；直接调用底层 node 脚本前需自行 pnpm run build。采集和报告入口检查源快照及编译产物 hash，发现缺失、过期或被修改的编译产物立即失败，避免用旧 JS 验证新 TS。修改源码/用例/协作文档后应重新构建。

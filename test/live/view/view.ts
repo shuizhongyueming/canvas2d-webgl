@@ -14,6 +14,8 @@ import type {
 } from "../contracts/index.js";
 
 export interface View {
+  /** 释放父页面持有的 observer 与计时器；不销毁当前执行轮次。 */
+  dispose(): void;
   render(state: ControllerState): void;
   /**
    * 页面级快捷键在控件聚焦期间不得触发（issue #60 键盘冲突）。
@@ -114,6 +116,7 @@ class ComparisonView implements View {
   private showDiffImage = true;
   private noticeUntil = 0;
   private noticeTimer: ReturnType<typeof setTimeout> | null = null;
+  private resizeObserver: ResizeObserver | null = null;
 
   constructor(
     root: HTMLElement,
@@ -320,12 +323,19 @@ class ComparisonView implements View {
 
     // 舞台尺寸变化（窗口缩放、画布重挂）时重算 fit 因子。
     if (typeof ResizeObserver !== "undefined") {
-      const observer = new ResizeObserver(() => {
+      this.resizeObserver = new ResizeObserver(() => {
         if (this.state?.display.scale === "fit") this.updateFitScale("fit");
       });
-      observer.observe(stage);
-      observer.observe(overlayWrapper);
+      this.resizeObserver.observe(stage);
+      this.resizeObserver.observe(overlayWrapper);
     }
+  }
+
+  dispose(): void {
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = null;
+    if (this.noticeTimer) clearTimeout(this.noticeTimer);
+    this.noticeTimer = null;
   }
 
   render(state: ControllerState): void {
