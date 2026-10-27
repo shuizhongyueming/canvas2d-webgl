@@ -95,6 +95,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
   assertTimeout(options.cleanupTimeout ?? 1000, "cleanup");
   const caseIds = new Set(options.cases.map((entry) => entry.id));
   const slots: Partial<Record<Side, HTMLElement>> = {};
+  const hosts: Partial<Record<Side, HTMLElement>> = {};
   const cleanupDiagnostics = new Map<string, string[]>();
   const cleanupSources = new Map<string, Record<Side, unknown>>();
   let current: Run | null = null;
@@ -155,8 +156,14 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
       caseId: run.caseId,
       stage: "failed",
       sides: {
-        native: run.sides.native?.stage ?? "disposed",
-        compat: run.sides.compat?.stage ?? "disposed",
+        native:
+          run.error.side === "native"
+            ? "failed"
+            : (run.sides.native?.stage ?? "disposed"),
+        compat:
+          run.error.side === "compat"
+            ? "failed"
+            : (run.sides.compat?.stage ?? "disposed"),
       },
       difference: null,
       error: run.error,
@@ -302,6 +309,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
         const host = document.createElement("div");
         host.dataset.sessionId = id;
         host.style.display = "contents";
+        hosts[side] = host;
         host.append(frame.element);
         slots[side]?.append(host);
       } catch (error) {
@@ -457,10 +465,14 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
       return cleanup(run);
     },
     attachCanvas(slot, side) {
+      if (current && !current.failed && !current.disposed) {
+        if (slots[side] !== slot) throw new Error("active-runner-reattach");
+        return;
+      }
       slots[side] = slot;
       slot.replaceChildren();
-      if (current && !current.failed && !current.disposed)
-        slot.append(current.sides[side].frame.element);
+      // 只迁移已失效 host。活跃轮次在上方拒绝重挂。
+      if (hosts[side]) slot.append(hosts[side]);
     },
     feedback() {
       const run = current;

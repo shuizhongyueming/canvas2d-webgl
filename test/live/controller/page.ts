@@ -40,7 +40,7 @@ export async function startLivePage(root: HTMLElement): Promise<{
       if (event.type === "copy-case-id") void view.copyCaseId();
       if (event.type === "copy-feedback") {
         const report = coordinator.feedback();
-        if (report) void view.copyFeedback(report.difference);
+        if (report) void view.copyFeedback(report);
       }
     },
     {
@@ -114,4 +114,8 @@ export async function startLivePage(root: HTMLElement): Promise<{
 }
 
 const root = document.getElementById("app");
-if (root) void startLivePage(root);
+if (root) {
+  const live = startLivePage(root);
+  if (new URLSearchParams(location.search).has("testController"))
+    Object.defineProperty(window, "__liveTestPage", { value: live });
+}

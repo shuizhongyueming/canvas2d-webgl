@@ -7,7 +7,7 @@
 import type {
   ControllerState,
   DifferenceMetrics,
-  FeedbackDifference,
+  FeedbackReport,
   SessionStage,
   Side,
   ViewEvent,
@@ -27,10 +27,10 @@ export interface View {
   /**
    * 复制反馈上下文（issue #64 反馈协议）。
    * 调用协议：用户点击按钮只派发 copy-feedback 事件；controller 收到后
-   * 仅在终态（completed/failed）用当前轮次的 difference 调用本方法。
+   * 仅在终态（completed/failed）用协调器生成的完整报告调用本方法。
    * 本方法在非终态或无当前轮次时拒绝并返回 false，不复制旧数据。
    */
-  copyFeedback(difference: FeedbackDifference): Promise<boolean>;
+  copyFeedback(report: FeedbackReport): Promise<boolean>;
   /**
    * 复制当前用例 ID。调用协议同 copyFeedback：按钮派发 copy-case-id，
    * controller 收到后调用本方法；复制 ID 在任何有选中用例时可用。
@@ -375,7 +375,7 @@ class ComparisonView implements View {
     }, NOTICE_DURATION_MS + 20);
   }
 
-  async copyFeedback(difference: FeedbackDifference): Promise<boolean> {
+  async copyFeedback(report: FeedbackReport): Promise<boolean> {
     const state = this.state;
     // 防御：controller 误调用时拒绝，非终态不复制旧反馈（issue #64）。
     if (
@@ -384,17 +384,6 @@ class ComparisonView implements View {
     ) {
       return false;
     }
-    const info = this.options.host.browserInfo();
-    const report = {
-      caseId: state.caseId,
-      browser: {
-        userAgent: info.userAgent,
-        language: info.language,
-        devicePixelRatio: info.devicePixelRatio,
-        fingerprintingProtection: "not-tested" as const,
-      },
-      difference,
-    };
     try {
       await this.options.host.copyText(JSON.stringify(report, null, 2));
       this.showNotice("反馈上下文已复制");

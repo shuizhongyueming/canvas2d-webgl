@@ -38,7 +38,7 @@ const completed = () =>
     .stage === "completed";
 
 browserTest("真实双 iframe 准备屏障、共同起跑与最终量测", async (t) => {
-  const { page } = await launch(t);
+  const { page } = await launch(t, "/?testController=1");
   await page.waitForFunction(completed);
   const result = await page.evaluate(async () => {
     const frames = [...document.querySelectorAll(".live-canvas-slot iframe")];
@@ -63,6 +63,17 @@ browserTest("真实双 iframe 准备屏障、共同起跑与最终量测", async
   assert.equal(result.feedbackEnabled, true);
   assert.equal(result.noFocusSteal, true);
   assert.equal(result.parentRandomNative, true);
+  const origin = new URL(page.url()).origin;
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"], {
+    origin,
+  });
+  await page.click(".live-actions button:nth-of-type(3)");
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  const expected = await page.evaluate(async () => {
+    const { coordinator } = await window.__liveTestPage;
+    return JSON.stringify(coordinator.feedback(), null, 2);
+  });
+  assert.equal(copied, expected);
 });
 
 browserTest(
@@ -104,6 +115,8 @@ browserTest(
           return frame;
         },
       });
+      coordinator.attachCanvas(document.createElement("div"), "native");
+      coordinator.attachCanvas(document.createElement("div"), "compat");
       const currentFrames = () => ({
         native: frames.findLast(
           (item) =>
@@ -123,6 +136,22 @@ browserTest(
         );
       coordinator.dispatch({ type: "select-case", caseId: "case.a" });
       const firstId = coordinator.state.sessionId;
+      const nativeHost = currentFrames().native.element.parentElement;
+      const nativeWindow = currentFrames().native.element.contentWindow;
+      const movedSlot = document.createElement("div");
+      root.append(movedSlot);
+      let reattachError = null;
+      try {
+        coordinator.attachCanvas(movedSlot, "native");
+      } catch (error) {
+        reattachError = error;
+      }
+      assert(
+        reattachError?.message === "active-runner-reattach" &&
+          currentFrames().native.element.parentElement === nativeHost &&
+          currentFrames().native.element.contentWindow === nativeWindow,
+        "attachCanvas moved active iframe",
+      );
       send("native", { type: "ready" });
       assert(
         posts.every((post) => post.type !== "start"),
@@ -178,6 +207,20 @@ browserTest(
         "old message changed session",
       );
       assert(!coordinator.state.error, "late error polluted latest session");
+      coordinator.receive(
+        {
+          type: "completed",
+          sessionId: firstId,
+          side: "native",
+          pixels: { width: 1, height: 1, pixels: new Uint8Array(4) },
+        },
+        frames[0].frame.element.contentWindow,
+      );
+      assert(
+        coordinator.state.sessionId === latestId &&
+          coordinator.state.sides.native === "preparing",
+        "old completed polluted latest session",
+      );
       send("native", { type: "ready" });
       send("native", {
         type: "completed",
@@ -387,12 +430,15 @@ browserTest("第二侧创建失败时释放第一侧且不留下孤儿 frame", a
       disposeCount,
       connected: first.isConnected,
       feedback: coordinator.feedback()?.difference.status,
+      sides: { ...coordinator.state.sides },
     };
     await coordinator.dispose();
     root.remove();
     if (
       result.stage !== "failed" ||
       result.side !== "compat" ||
+      result.sides.compat !== "failed" ||
+      result.sides.native !== "disposed" ||
       result.disposeCount !== 1 ||
       result.connected ||
       result.feedback !== "failed"
@@ -451,26 +497,44 @@ browserTest("真实 iframe 的显式 dispose、跨 realm 执行与快捷键", as
   await page.waitForFunction(completed);
   const caseId = "image.offscreen-cross-realm";
   await page.selectOption(".live-case-select", caseId);
+  await page.waitForFunction(
+    () => document.querySelectorAll("iframe").length === 2,
+  );
   await page.waitForFunction(completed);
   // iframe 不可聚焦/点击，父页面仍拥有导航与模式快捷键。
   const before = await page.locator(".live-case-select").inputValue();
   await page.keyboard.press("v");
   await page.keyboard.press("ArrowDown");
   assert.notEqual(await page.locator(".live-case-select").inputValue(), before);
+  await page.selectOption(".live-case-select", caseId);
+  await page.waitForFunction(
+    () => document.querySelectorAll("iframe").length === 2,
+  );
+  await page.waitForFunction(completed);
 
   // 只包装真实 RunnerSession.prototype.dispose 计数，然后调用原实现。
   // 这直接证明父协调器触发了子执行器的显式清理，不引入私有资源接口假设。
   await page.evaluate(async () => {
     window.__liveDisposeCalls = [];
     for (const frame of document.querySelectorAll("iframe")) {
-      const { RunnerSession } = await frame.contentWindow.eval(
+      const child = frame.contentWindow;
+      const { RunnerSession } = await child.eval(
         'import("/dist/live/runner/executor.js")',
       );
       const original = RunnerSession.prototype.dispose;
       const sessionId = frame.dataset.sessionId;
       RunnerSession.prototype.dispose = function (...args) {
-        window.__liveDisposeCalls.push(sessionId);
-        return original.apply(this, args);
+        const promise = original.apply(this, args);
+        if (this.__liveDisposeObserved) return promise;
+        this.__liveDisposeObserved = true;
+        return promise.then(() => {
+          window.__liveDisposeCalls.push({
+            sessionId,
+            connected: frame.isConnected,
+            canvases: child.document.querySelectorAll("canvas").length,
+            frames: child.document.querySelectorAll("iframe").length,
+          });
+        });
       };
     }
   });
@@ -480,7 +544,12 @@ browserTest("真实 iframe 的显式 dispose、跨 realm 执行与快捷键", as
     .getAttribute("data-session-id");
   await page.click(".live-actions button:nth-of-type(1)");
   await page.waitForFunction(
-    (id) => window.__liveDisposeCalls.filter((item) => item === id).length >= 2,
+    (id) =>
+      window.__liveDisposeCalls.filter((item) => item.sessionId === id)
+        .length >= 2 &&
+      [...document.querySelectorAll("iframe")].every(
+        (frame) => frame.dataset.sessionId !== id,
+      ),
     oldId,
     { timeout: 5000 },
   );
@@ -488,6 +557,16 @@ browserTest("真实 iframe 的显式 dispose、跨 realm 执行与快捷键", as
     await page.locator("iframe").first().getAttribute("data-session-id"),
     oldId,
   );
+  const disposal = await page.evaluate(
+    (id) => window.__liveDisposeCalls.filter((item) => item.sessionId === id),
+    oldId,
+  );
+  assert.equal(disposal.length, 2);
+  for (const item of disposal) {
+    assert.equal(item.connected, true);
+    assert.equal(item.canvases, 0);
+    assert.equal(item.frames, 0);
+  }
 });
 
 browserTest("准备超时、失败终态与手动重试；不自动重跑", async (t) => {
