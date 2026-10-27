@@ -447,50 +447,56 @@ browserTest("第二侧创建失败时释放第一侧且不留下孤儿 frame", a
   });
 });
 
-browserTest("真实 A→B→A 与连续重跑立即更换轮次并移除旧 iframe", async (t) => {
-  const { page } = await launch(t);
-  await page.waitForFunction(completed);
-  const first = await page.evaluate(() => ({
-    id: document.querySelector("iframe").dataset.sessionId,
-    frames: [...document.querySelectorAll("iframe")],
-  }));
-  await page.selectOption(".live-case-select", "context.clearRect.render");
-  await page.waitForFunction(
-    (id) =>
-      document.querySelector("iframe")?.dataset.sessionId !== id &&
-      document.querySelectorAll("iframe").length === 2,
-    first.id,
-  );
-  const second = await page.evaluate(
-    () => document.querySelector("iframe").dataset.sessionId,
-  );
-  await page.selectOption(".live-case-select", "context.fillRect.render");
-  await page.waitForFunction(
-    (id) => document.querySelector("iframe")?.dataset.sessionId !== id,
-    second,
-  );
-  await page.waitForFunction(completed);
-  const third = await page.evaluate(
-    () => document.querySelector("iframe").dataset.sessionId,
-  );
-  await page.click(".live-actions button:nth-of-type(1)");
-  await page.waitForFunction(
-    (id) => document.querySelector("iframe")?.dataset.sessionId !== id,
-    third,
-  );
-  await page.click(".live-actions button:nth-of-type(1)");
-  await page.waitForFunction(completed);
-  await page.waitForFunction(
-    () => document.querySelectorAll("iframe").length === 2,
-  );
-  assert.equal(await page.locator("iframe").count(), 2);
-  assert.equal(
-    await page.evaluate(() => document.querySelector("iframe").isConnected),
-    true,
-  );
-  // 所有旧文档均已被移除；旧消息不再可能引用当前 session。
-  assert.ok(first.frames.every((frame) => !frame.isConnected));
-});
+browserTest(
+  "真实 A→B→A 与连续重跑立即更换轮次并移除旧 iframe 和 host",
+  async (t) => {
+    const { page } = await launch(t);
+    await page.waitForFunction(completed);
+    const first = await page.evaluate(() => ({
+      id: document.querySelector("iframe").dataset.sessionId,
+      frames: [...document.querySelectorAll("iframe")],
+    }));
+    await page.selectOption(".live-case-select", "context.clearRect.render");
+    await page.waitForFunction(
+      (id) =>
+        document.querySelector("iframe")?.dataset.sessionId !== id &&
+        document.querySelectorAll("iframe").length === 2,
+      first.id,
+    );
+    const second = await page.evaluate(
+      () => document.querySelector("iframe").dataset.sessionId,
+    );
+    await page.selectOption(".live-case-select", "context.fillRect.render");
+    await page.waitForFunction(
+      (id) => document.querySelector("iframe")?.dataset.sessionId !== id,
+      second,
+    );
+    await page.waitForFunction(completed);
+    const third = await page.evaluate(
+      () => document.querySelector("iframe").dataset.sessionId,
+    );
+    await page.click(".live-actions button:nth-of-type(1)");
+    await page.waitForFunction(
+      (id) => document.querySelector("iframe")?.dataset.sessionId !== id,
+      third,
+    );
+    await page.click(".live-actions button:nth-of-type(1)");
+    await page.waitForFunction(completed);
+    await page.waitForFunction(
+      () =>
+        document.querySelectorAll("iframe").length === 2 &&
+        document.querySelectorAll("div[data-session-id]").length === 2,
+    );
+    assert.equal(await page.locator("iframe").count(), 2);
+    assert.equal(await page.locator("div[data-session-id]").count(), 2);
+    assert.equal(
+      await page.evaluate(() => document.querySelector("iframe").isConnected),
+      true,
+    );
+    // 所有旧文档均已被移除；旧消息不再可能引用当前 session。
+    assert.ok(first.frames.every((frame) => !frame.isConnected));
+  },
+);
 
 browserTest("真实 iframe 的显式 dispose、跨 realm 执行与快捷键", async (t) => {
   const { page } = await launch(t);
@@ -606,11 +612,13 @@ browserTest("页面 dispose 断开父监听、observer 与 iframe", async (t) =>
     );
     return {
       frames: root.querySelectorAll("iframe").length,
+      hosts: root.querySelectorAll("div[data-session-id]").length,
       observer: app.view.resizeObserver,
       state: app.coordinator.state.stage,
     };
   });
   assert.equal(result.frames, 0);
+  assert.equal(result.hosts, 0);
   assert.equal(result.observer, null);
   assert.equal(result.state, "idle");
 });

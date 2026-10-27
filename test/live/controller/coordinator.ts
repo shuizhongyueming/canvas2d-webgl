@@ -53,6 +53,7 @@ export interface Coordinator {
 
 interface SideRun {
   readonly frame: RunnerFrame;
+  readonly host: HTMLElement;
   stage: SessionStage;
   pixels: PixelData | null;
 }
@@ -95,7 +96,6 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
   assertTimeout(options.cleanupTimeout ?? 1000, "cleanup");
   const caseIds = new Set(options.cases.map((entry) => entry.id));
   const slots: Partial<Record<Side, HTMLElement>> = {};
-  const hosts: Partial<Record<Side, HTMLElement>> = {};
   const cleanupDiagnostics = new Map<string, string[]>();
   const cleanupSources = new Map<string, Record<Side, unknown>>();
   let current: Run | null = null;
@@ -216,7 +216,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
         const item = run.sides[side];
         if (!item) continue;
         item.stage = "disposed";
-        item.frame.element.remove();
+        item.host.remove();
       }
       if (current === run && diagnostics?.length && run.error) {
         run.error = {
@@ -305,11 +305,10 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
         frame.element.style.border = "0";
         frame.element.style.display = "block";
         frame.element.setAttribute("aria-label", `${side} live runner`);
-        sides[side] = { frame, stage: "preparing", pixels: null };
         const host = document.createElement("div");
         host.dataset.sessionId = id;
         host.style.display = "contents";
-        hosts[side] = host;
+        sides[side] = { frame, host, stage: "preparing", pixels: null };
         host.append(frame.element);
         slots[side]?.append(host);
       } catch (error) {
@@ -471,8 +470,8 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
       }
       slots[side] = slot;
       slot.replaceChildren();
-      // 只迁移已失效 host。活跃轮次在上方拒绝重挂。
-      if (hosts[side]) slot.append(hosts[side]);
+      // 只迁移当前已失效轮次。活跃轮次在上方拒绝重挂。
+      if (current?.sides[side]) slot.append(current.sides[side].host);
     },
     feedback() {
       const run = current;
