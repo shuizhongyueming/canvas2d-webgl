@@ -432,6 +432,50 @@ browserTest("真实 A→B→A 与连续重跑立即更换轮次并移除旧 ifra
   assert.ok(first.frames.every((frame) => !frame.isConnected));
 });
 
+browserTest("真实 iframe 的显式 dispose、跨 realm 执行与快捷键", async (t) => {
+  const { page } = await launch(t);
+  await page.waitForFunction(completed);
+  const caseId = "image.offscreen-cross-realm";
+  await page.selectOption(".live-case-select", caseId);
+  await page.waitForFunction(completed);
+  // iframe 不可聚焦/点击，父页面仍拥有导航与模式快捷键。
+  const before = await page.locator(".live-case-select").inputValue();
+  await page.keyboard.press("v");
+  await page.keyboard.press("ArrowDown");
+  assert.notEqual(await page.locator(".live-case-select").inputValue(), before);
+
+  // 只包装真实 RunnerSession.prototype.dispose 计数，然后调用原实现。
+  // 这直接证明父协调器触发了子执行器的显式清理，不引入私有资源接口假设。
+  await page.evaluate(async () => {
+    window.__liveDisposeCalls = [];
+    for (const frame of document.querySelectorAll("iframe")) {
+      const { RunnerSession } = await frame.contentWindow.eval(
+        'import("/dist/live/runner/executor.js")',
+      );
+      const original = RunnerSession.prototype.dispose;
+      const sessionId = frame.dataset.sessionId;
+      RunnerSession.prototype.dispose = function (...args) {
+        window.__liveDisposeCalls.push(sessionId);
+        return original.apply(this, args);
+      };
+    }
+  });
+  const oldId = await page
+    .locator("iframe")
+    .first()
+    .getAttribute("data-session-id");
+  await page.click(".live-actions button:nth-of-type(1)");
+  await page.waitForFunction(
+    (id) => window.__liveDisposeCalls.filter((item) => item === id).length >= 2,
+    oldId,
+    { timeout: 5000 },
+  );
+  assert.notEqual(
+    await page.locator("iframe").first().getAttribute("data-session-id"),
+    oldId,
+  );
+});
+
 browserTest("准备超时、失败终态与手动重试；不自动重跑", async (t) => {
   const { page } = await launch(t, "/?prepare=1&run=8000");
   await page.waitForFunction(() =>
