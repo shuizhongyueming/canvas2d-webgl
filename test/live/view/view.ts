@@ -24,6 +24,7 @@ export interface View {
    * 不会被页面级快捷键拦截；集成票（#71）负责接线并在集成中验证。
    */
   handleKey(key: string): void;
+  shouldHandleKey(key: string): boolean;
   /**
    * 复制反馈上下文（issue #64 反馈协议）。
    * 调用协议：用户点击按钮只派发 copy-feedback 事件；controller 收到后
@@ -358,6 +359,13 @@ class ComparisonView implements View {
       const current = this.state?.display.mode ?? "overlay";
       this.setDisplay({ mode: current === "split" ? "overlay" : "split" });
     }
+  }
+
+  shouldHandleKey(key: string): boolean {
+    return (
+      ["ArrowUp", "ArrowDown", "v", "V"].includes(key) &&
+      !this.isControlFocused()
+    );
   }
 
   /** 反馈复制成功/失败（剪贴板异常）时由 controller 回调展示提示。 */

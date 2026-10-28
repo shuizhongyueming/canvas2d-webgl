@@ -1,7 +1,7 @@
 // #72 真实工具端到端。覆盖真实 iframe、Canvas2D/WebGL 与共享量测核心。
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readdir, unlink, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import { createLiveServer } from "../../../scripts/live-server.mjs";
@@ -9,6 +9,14 @@ import { createLiveServer } from "../../../scripts/live-server.mjs";
 const root = fileURLToPath(new URL("../../..", import.meta.url));
 const output = resolveOutput();
 await mkdir(output, { recursive: true });
+for (const name of await readdir(output)) {
+  if (
+    /^(?:report|catalog-results)\.json$|^(?:failure-\d+|narrow-.*)\.png$/.test(
+      name,
+    )
+  )
+    await unlink(`${output}/${name}`);
+}
 assert.ok(
   existsSync(chromium.executablePath()),
   "Playwright Chromium 未安装；请运行 pnpm exec playwright install chromium",
@@ -258,6 +266,16 @@ try {
       `${JSON.stringify({ compatibilityAccepted: false, results }, null, 2)}\n`,
     );
     assert.equal(results.length, server.catalog.length);
+    const caseFailures = results.filter((result) => result.status === "failed");
+    assert.deepEqual(
+      caseFailures.map((result) => result.id),
+      ["image.validity"],
+      "只允许已记录的 image.validity 执行失败；新增失败必须修复",
+    );
+    assert.match(
+      caseFailures[0]?.error?.reason ?? "",
+      /fixture is pending before loading yields/,
+    );
     assert.deepEqual(
       results.filter((result) => result.status === "infrastructure-failed"),
       [],
@@ -402,14 +420,29 @@ try {
     const focused = (await state()).caseId;
     await page.keyboard.press("ArrowDown");
     assert.equal((await state()).caseId, focused);
-    await page.locator(".live-case-select").blur();
+    await page.locator("input[type=range]").focus();
+    const opacity = await page.locator("input[type=range]").inputValue();
+    await page.keyboard.press("ArrowDown");
+    assert.notEqual(
+      await page.locator("input[type=range]").inputValue(),
+      opacity,
+      "滑杆保留原生键盘调整",
+    );
+    assert.equal((await state()).caseId, focused);
+    await page.evaluate(() => document.activeElement.blur());
+    await page.waitForFunction(
+      () => document.activeElement === document.body,
+    );
     await page.keyboard.press("ArrowDown");
     const moved = (await state()).caseId;
     assert.notEqual(moved, focused);
     await page.keyboard.press("v");
     assert.equal((await state()).display.mode, "split");
     await page.locator(".live-case-select").selectOption({ index: 0 });
-    await page.locator(".live-case-select").blur();
+    await page.evaluate(() => document.activeElement.blur());
+    await page.waitForFunction(
+      () => document.activeElement === document.body,
+    );
     await page.keyboard.press("ArrowUp");
     assert.equal((await state()).caseId, server.catalog[0].id);
     await waitTerminal();

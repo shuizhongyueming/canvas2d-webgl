@@ -337,12 +337,6 @@ export class RunnerSession {
       } catch (error) {
         if (cleanupError.value === undefined) cleanupError.value = error;
       }
-      this.#stage = "disposed";
-      this.#post({
-        type: "disposed",
-        sessionId: this.bootstrap.sessionId,
-        side: this.bootstrap.side,
-      });
       if (cleanupError.value !== undefined)
         this.#post({
           type: "error",
@@ -351,6 +345,12 @@ export class RunnerSession {
           stage: "disposing",
           reason: reasonOf(cleanupError.value),
         });
+      this.#stage = "disposed";
+      this.#post({
+        type: "disposed",
+        sessionId: this.bootstrap.sessionId,
+        side: this.bootstrap.side,
+      });
     })();
     return this.#disposePromise;
   }

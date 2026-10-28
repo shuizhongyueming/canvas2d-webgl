@@ -111,7 +111,7 @@ export async function startLivePage(root: HTMLElement): Promise<{
       (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey)
     )
       return;
-    if (["ArrowUp", "ArrowDown", "v", "V"].includes(key)) {
+    if (view.shouldHandleKey(key)) {
       if (typeof event !== "string") event.preventDefault();
       view.handleKey(key);
     }

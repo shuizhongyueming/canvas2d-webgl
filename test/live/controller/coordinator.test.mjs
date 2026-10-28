@@ -379,6 +379,8 @@ browserTest("阶段超时、取样失败和清理诊断都终止整轮", async (
           stage: "disposing",
           reason: "cleanup-failure",
         });
+        send("native", { type: "disposed" });
+        send("compat", { type: "disposed" });
       }
       if (kind === "prepare" || kind === "run" || kind === "start")
         await new Promise((resolve) => {
