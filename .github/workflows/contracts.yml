@@ -23,6 +23,13 @@ jobs:
       - name: Real Chromium infrastructure regressions
         # Explicit software WebGL environment, recorded in the evidence. No fallback retry.
         run: pnpm run test:smoke --software
+      - name: Live comparison tool browser regressions
+        run: pnpm run test:live:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: live-comparison-tool-evidence
+          path: test-results/live-tool/
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -102,6 +102,11 @@ export interface FeedbackReport {
  */
 export type RunnerMessage =
   | {
+      readonly type: "disposed";
+      readonly sessionId: SessionId;
+      readonly side: Side;
+    }
+  | {
       readonly type: "ready";
       readonly sessionId: SessionId;
       readonly side: Side;

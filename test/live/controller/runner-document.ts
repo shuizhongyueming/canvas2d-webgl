@@ -1,5 +1,5 @@
-import { installRunnerWindow } from "../runner/executor.js";
 import type { RunnerBootstrap, RunnerEnvironment } from "../runner/executor.js";
+import { installRunnerWindow } from "../runner/executor.js";
 
 /** 每份 runner 文档仅消费一次 URL 参数，不支持文档内重跑。 */
 export function startRunnerDocument(win: Window): void {
@@ -34,10 +34,23 @@ export function startRunnerDocument(win: Window): void {
     post: (message) => environment.postMessage(message),
   };
   const session = installRunnerWindow(win, bootstrap);
-  // 显式清理子文档监听；移除 iframe 仍作为不可响应环境的兜底。
-  win.addEventListener("pagehide", () => void session.dispose(), {
-    once: true,
+  win.addEventListener("keydown", (event) => {
+    if (
+      event.defaultPrevented ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      !["ArrowUp", "ArrowDown", "v", "V"].includes(event.key)
+    )
+      return;
+    event.preventDefault();
+    win.parent.postMessage(
+      { type: "live-shortcut", key: event.key, sessionId },
+      win.location.origin,
+    );
   });
+  // 显式清理子文档监听；移除 iframe 仍作为不可响应环境的兜底。
+  win.addEventListener("pagehide", () => void session.dispose());
 }
 
 function required(query: URLSearchParams, key: string): string {

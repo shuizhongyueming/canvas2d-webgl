@@ -114,7 +114,7 @@ browserTest(
         // 准备屏障：ready 在 start 之前，completed 携带最终像素。
         assert.deepEqual(
           result.messages.map((m) => m.type),
-          ["ready", "completed"],
+          ["ready", "completed", "disposed"],
         );
         assert.equal(result.messages[1].hasPixels, true);
         assert.ok(result.messages[1].width > 0);

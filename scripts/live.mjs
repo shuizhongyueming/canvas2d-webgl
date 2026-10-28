@@ -4,12 +4,13 @@ import { createLiveServer } from "./live-server.mjs";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const values = new Map();
 for (let index = 2; index < process.argv.length; index += 1) {
+  if (process.argv[index] === "--") continue;
   const match = /^--(port|prepare-timeout|run-timeout)=(.*)$/.exec(
     process.argv[index] ?? "",
   );
   if (!match) {
     console.error(
-      "Usage: pnpm run test:live [-- --port=0 --prepare-timeout=10000 --run-timeout=10000]",
+      "Usage: pnpm run test:live [--port=0 --prepare-timeout=10000 --run-timeout=10000]",
     );
     process.exit(2);
   }

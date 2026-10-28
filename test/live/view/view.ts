@@ -279,10 +279,8 @@ class ComparisonView implements View {
     const diffCanvas = document.createElement("canvas");
     diffCanvas.className = "live-diff-canvas";
     // 逐像素数据接入前的可见占位（不可见 dataset 不算占位）。
-    const diffPlaceholder = document.createElement("div");
-    diffPlaceholder.className = "live-diff-placeholder";
-    diffPlaceholder.textContent = "差异图等待逐像素数据（由量测票 #68 提供）。";
-    diffCanvasWrap.append(diffCanvas, diffPlaceholder);
+    diffCanvas.setAttribute("aria-label", "逐像素二值差异图");
+    diffCanvasWrap.append(diffCanvas);
     diffImageBox.append(diffCanvasWrap);
     diffBox.append(diffEmpty, diffStats, diffBounds, diffImageBox);
     layout.append(diffBox);
@@ -634,14 +632,12 @@ class ComparisonView implements View {
     this.renderDiffCanvas(diffCanvas);
   }
 
-  /**
-   * 逐像素二值定位图（品红/透明，issue #64）的数据由量测票（#68）提供；
-   * 本票只携带 bbox 指标，不能把 bbox 整块染成品红冒充差异图——
-   * bbox 内部不保证全部不同。逐像素数据接入前显示可见占位文本，不画伪图。
-   */
+  /** 真实逐像素图由协调器写入；无有效量测时保持零尺寸。 */
   private renderDiffCanvas(canvas: HTMLCanvasElement): void {
-    canvas.width = 0;
-    canvas.height = 0;
+    if (!this.state?.difference) {
+      canvas.width = 0;
+      canvas.height = 0;
+    }
   }
 
   private renderActions(state: ControllerState): void {

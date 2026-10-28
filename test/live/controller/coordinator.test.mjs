@@ -1,6 +1,6 @@
-import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
+import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import { createLiveServer } from "../../../scripts/live-server.mjs";
@@ -60,6 +60,24 @@ browserTest("真实双 iframe 准备屏障、共同起跑与最终量测", async
   assert.deepEqual(result.sides.sort(), ["compat", "native"]);
   assert.equal(result.uniqueWindows, 2);
   assert.match(result.stats, /差异像素 \d+ \/ 1024/);
+  const difference = await page.evaluate(() => {
+    const canvas = document.querySelector(".live-diff-canvas");
+    const pixels = canvas
+      .getContext("2d")
+      .getImageData(0, 0, canvas.width, canvas.height).data;
+    return {
+      width: canvas.width,
+      height: canvas.height,
+      opaque: [...pixels].filter(
+        (_, index) => index % 4 === 3 && pixels[index] === 255,
+      ).length,
+      placeholder: Boolean(document.querySelector(".live-diff-placeholder")),
+    };
+  });
+  assert.equal(difference.width, 32);
+  assert.equal(difference.height, 32);
+  assert.equal(difference.opaque, 0);
+  assert.equal(difference.placeholder, false);
   assert.equal(result.feedbackEnabled, true);
   assert.equal(result.noFocusSteal, true);
   assert.equal(result.parentRandomNative, true);
@@ -96,11 +114,14 @@ browserTest(
         timeouts: { prepare: 5000, run: 5000 },
         cleanupTimeout: 5,
         measure: () => ({
-          totalPixels: 1,
-          changedPixels: 0,
-          changedRatio: 0,
-          maxChannelDelta: 0,
-          differenceBounds: null,
+          image: new Uint8Array(4),
+          metrics: {
+            totalPixels: 1,
+            changedPixels: 0,
+            changedRatio: 0,
+            maxChannelDelta: 0,
+            differenceBounds: null,
+          },
         }),
         createFrame(sessionId, side) {
           const element = document.createElement("iframe");
@@ -117,18 +138,23 @@ browserTest(
       });
       coordinator.attachCanvas(document.createElement("div"), "native");
       coordinator.attachCanvas(document.createElement("div"), "compat");
-      const currentFrames = () => ({
-        native: frames.findLast(
+      const currentFrames = () => {
+        const native = frames.findLast(
           (item) =>
             item.sessionId === coordinator.state.sessionId &&
             item.side === "native",
-        ).frame,
-        compat: frames.findLast(
+        );
+        const compat = frames.findLast(
           (item) =>
             item.sessionId === coordinator.state.sessionId &&
             item.side === "compat",
-        ).frame,
-      });
+        );
+        assert(
+          native && compat,
+          `missing current frames: ${JSON.stringify({ state: coordinator.state, frames })}`,
+        );
+        return { native: native.frame, compat: compat.frame };
+      };
       const send = (side, message) =>
         coordinator.receive(
           { sessionId: coordinator.state.sessionId, side, ...message },
@@ -446,7 +472,7 @@ browserTest("第二侧创建失败时释放第一侧且不留下孤儿 frame", a
       cases: [{ id: "case.a" }],
       timeouts: { prepare: 1000, run: 1000 },
       cleanupTimeout: 5,
-      createFrame(sessionId, side) {
+      createFrame(_sessionId, side) {
         if (side === "compat") throw new Error("frame-creation-failed");
         return {
           element: first,
