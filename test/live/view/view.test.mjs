@@ -398,11 +398,15 @@ test("非终态拒绝复制反馈；无选中用例拒绝复制 ID", browserOpti
   const rejected = await page.evaluate(async () => {
     const before = window.__live.copies.length;
     const ok = await window.__live.view.copyFeedback({
-      protocolVersion: 1,
-      status: "failed",
-      side: null,
-      stage: "running",
-      reason: "stale",
+      caseId: "case.alpha",
+      browser: {},
+      difference: {
+        protocolVersion: 1,
+        status: "failed",
+        side: null,
+        stage: "running",
+        reason: "stale",
+      },
     });
     return { ok, wrote: window.__live.copies.length > before };
   });
@@ -497,11 +501,20 @@ test(
     const report = await page.evaluate(async () => {
       const view = window.__live.view;
       await view.copyFeedback({
-        protocolVersion: 1,
-        status: "failed",
-        side: null,
-        stage: "preparing",
-        reason: "prepare-timeout",
+        caseId: "case.alpha",
+        browser: {
+          userAgent: "report-ua",
+          language: "report-language",
+          devicePixelRatio: 3,
+          fingerprintingProtection: "not-tested",
+        },
+        difference: {
+          protocolVersion: 1,
+          status: "failed",
+          side: null,
+          stage: "preparing",
+          reason: "prepare-timeout",
+        },
       });
       return JSON.parse(window.__live.copies.at(-1));
     });
@@ -519,6 +532,7 @@ test(
     assert.equal(report.browser.fingerprintingProtection, "not-tested");
     assert.equal(report.difference.status, "failed");
     assert.equal(report.difference.changedPixels, undefined);
+    assert.equal(report.browser.userAgent, "report-ua");
   },
 );
 
@@ -675,6 +689,27 @@ test("选中用例展示观察重点", browserOptions, async (t) => {
   await setState(selected("case.beta"));
   assert.match(await page.textContent(".live-observation"), /观察重点 B/);
 });
+
+test(
+  "视图 dispose 断开 ResizeObserver 与提示计时器",
+  browserOptions,
+  async (t) => {
+    const { page } = await launch(t);
+    const result = await page.evaluate(async () => {
+      let disconnects = 0;
+      const observer = window.__live.view.resizeObserver;
+      const disconnect = observer.disconnect.bind(observer);
+      observer.disconnect = () => {
+        disconnects += 1;
+        disconnect();
+      };
+      window.__live.view.dispose();
+      return { disconnects, observer: window.__live.view.resizeObserver };
+    });
+    assert.equal(result.disconnects, 1);
+    assert.equal(result.observer, null);
+  },
+);
 
 test(
   "指纹噪声提示可见；完成状态展示 bbox 与差异图占位",
