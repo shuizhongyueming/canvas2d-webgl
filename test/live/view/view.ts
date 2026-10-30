@@ -19,9 +19,8 @@ export interface View {
   render(state: ControllerState): void;
   /**
    * 页面级快捷键在控件聚焦期间不得触发（issue #60 键盘冲突）。
-   * 焦点策略：由外层页面把 document 的 keydown 转交本方法；iframe 内的
-   * 键盘事件属于子执行环境，不经过外层 document，因此 iframe 内操作
-   * 不会被页面级快捷键拦截；集成票（#71）负责接线并在集成中验证。
+   * 焦点策略：外层页面把 document 的 keydown 转交本方法。
+   * runner-document 也会把 iframe 内快捷键转发到外层，由外层校验来源。
    */
   handleKey(key: string): void;
   shouldHandleKey(key: string): boolean;

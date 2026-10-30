@@ -16,7 +16,7 @@ function timeout(value: string | null, fallback: number): number {
   return parsed;
 }
 
-/** #71 仅提供协调器与真实 iframe 页面；完整端到端产品接线由 #72 收尾。 */
+/** #72 接通真实目录、双 iframe 执行、量测结果与交互视图。 */
 export async function startLivePage(root: HTMLElement): Promise<{
   coordinator: Coordinator;
   view: View;
