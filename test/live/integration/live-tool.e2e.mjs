@@ -443,12 +443,12 @@ try {
       opacity,
       "滑杆保留原生键盘调整",
     );
-    assert.equal((await state()).caseId, focused);
+    assert.equal((await state()).caseId, selected);
     await page.evaluate(() => document.activeElement.blur());
     await page.waitForFunction(() => document.activeElement === document.body);
     await page.keyboard.press("ArrowDown");
     const moved = (await state()).caseId;
-    assert.notEqual(moved, focused);
+    assert.notEqual(moved, selected);
     await page.keyboard.press("v");
     assert.equal((await state()).display.mode, "split");
     await page.locator(".live-case-select").selectOption({ index: 0 });
