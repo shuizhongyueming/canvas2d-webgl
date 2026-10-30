@@ -266,15 +266,10 @@ try {
       `${JSON.stringify({ compatibilityAccepted: false, results }, null, 2)}\n`,
     );
     assert.equal(results.length, server.catalog.length);
-    const caseFailures = results.filter((result) => result.status === "failed");
     assert.deepEqual(
-      caseFailures.map((result) => result.id),
-      ["image.validity"],
-      "只允许已记录的 image.validity 执行失败；新增失败必须修复",
-    );
-    assert.match(
-      caseFailures[0]?.error?.reason ?? "",
-      /fixture is pending before loading yields/,
+      results.filter((result) => result.status !== "completed"),
+      [],
+      "全部展示条目都应完成；执行失败必须修复",
     );
     assert.deepEqual(
       results.filter((result) => result.status === "infrastructure-failed"),

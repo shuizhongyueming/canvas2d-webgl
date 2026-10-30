@@ -1,7 +1,7 @@
 import type { CaseDefinition } from "../../types/testing.js";
-import { isCompat, outcome } from "../shared.js";
 import { callRaw, loadImage, STRIPES_3x5 } from "../paint/fixtures.js";
 import { dumpScene, pixelsEqual } from "../rect/helpers.js";
+import { isCompat, outcome } from "../shared.js";
 import {
   bandCanvas,
   cornerCanvas,
@@ -74,7 +74,9 @@ export const cases: CaseDefinition[] = [
         outcome(() => drawImage(a.context, empty, 0, 0)),
       );
       const pending = new Image();
-      pending.src = STRIPES_3x5;
+      // data URL 在重复执行的浏览器中可同步命中缓存。
+      // 每个用例实例使用独立 URL，保持此处在加载让出前的 pending 前提。
+      pending.src = `${STRIPES_3x5}#pending-${crypto.randomUUID()}`;
       a.assert(!pending.complete, "fixture is pending before loading yields");
       a.observe(
         "pending",
