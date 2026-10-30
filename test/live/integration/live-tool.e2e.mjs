@@ -422,17 +422,13 @@ try {
     await page.keyboard.press("ArrowDown");
     await page.waitForTimeout(50);
     const selected = (await state()).caseId;
-    const allowed = server.catalog[server.catalog.indexOf(focused) + 1]?.id;
+    const focusedIndex = server.catalog.findIndex(
+      (entry) => entry.id === focused,
+    );
+    const allowed = server.catalog[focusedIndex + 1]?.id;
     assert.ok(
       selected === focused || selected === allowed,
-      `select 只能保留当前值或执行原生相邻选择: ${JSON.stringify({
-        focused,
-        allowed,
-        selected,
-        beforeSession: session,
-        afterSession: (await state()).sessionId,
-        focus: await page.evaluate(() => document.activeElement.tagName),
-      })}`,
+      "select 只能保留当前值或执行原生相邻选择",
     );
     assert.equal(
       (await state()).sessionId === session,
