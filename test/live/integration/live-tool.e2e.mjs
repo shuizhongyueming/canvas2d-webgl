@@ -11,7 +11,7 @@ const output = resolveOutput();
 await mkdir(output, { recursive: true });
 for (const name of await readdir(output)) {
   if (
-    /^(?:report|catalog-results)\.json$|^(?:failure-\d+|narrow-.*)\.png$/.test(
+    /^(?:report|catalog-results)\.json$|^(?:failure-\d+|narrow-.*|overlay-aligned)\.png$/.test(
       name,
     )
   )
@@ -430,9 +430,7 @@ try {
     );
     assert.equal((await state()).caseId, focused);
     await page.evaluate(() => document.activeElement.blur());
-    await page.waitForFunction(
-      () => document.activeElement === document.body,
-    );
+    await page.waitForFunction(() => document.activeElement === document.body);
     await page.keyboard.press("ArrowDown");
     const moved = (await state()).caseId;
     assert.notEqual(moved, focused);
@@ -440,9 +438,7 @@ try {
     assert.equal((await state()).display.mode, "split");
     await page.locator(".live-case-select").selectOption({ index: 0 });
     await page.evaluate(() => document.activeElement.blur());
-    await page.waitForFunction(
-      () => document.activeElement === document.body,
-    );
+    await page.waitForFunction(() => document.activeElement === document.body);
     await page.keyboard.press("ArrowUp");
     assert.equal((await state()).caseId, server.catalog[0].id);
     await waitTerminal();
@@ -554,6 +550,8 @@ try {
     );
     assert.deepEqual(Object.keys(copied), ["caseId", "browser", "difference"]);
     assert.equal(copied.difference.status, "measured");
+    assert.deepEqual(copied.difference.nativeSize, { width: 64, height: 64 });
+    assert.deepEqual(copied.difference.compatSize, { width: 64, height: 64 });
     assert.equal(copied.browser.fingerprintingProtection, "not-tested");
     await page.evaluate(() => {
       navigator.clipboard.writeText = () =>

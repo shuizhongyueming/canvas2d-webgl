@@ -1,8 +1,8 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 import {
-  MeasurementError,
   diffPixels,
+  MeasurementError,
   measurePixelDifference,
   normalizePixels,
 } from "../../../dist/live/measure/diff-core.js";
@@ -210,8 +210,8 @@ test("measured feedback contains exactly the frozen whitelist", () => {
       maxChannelDelta: 1,
       differenceBounds: { x: 2, y: 3, width: 1, height: 1 },
     },
-    nativeSize: { width: 10, height: 10 },
-    compatSize: { width: 10, height: 10 },
+    nativeSize: { width: 10, height: 10, pixels: new Uint8Array(400) },
+    compatSize: { width: 10, height: 10, pixels: new Uint8Array(400) },
   });
   assert.deepEqual(Object.keys(report).sort(), [
     "browser",
@@ -237,6 +237,8 @@ test("measured feedback contains exactly the frozen whitelist", () => {
     "totalPixels",
   ]);
   assert.equal(report.difference.status, "measured");
+  assert.deepEqual(report.difference.nativeSize, { width: 10, height: 10 });
+  assert.deepEqual(report.difference.compatSize, { width: 10, height: 10 });
   const serialized = JSON.parse(JSON.stringify(report));
   assert.equal(serialized.difference.changedRatio, 0.01);
 });

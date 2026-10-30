@@ -279,7 +279,7 @@ class ComparisonView implements View {
     diffCanvasWrap.className = "live-diff-canvas-wrap";
     const diffCanvas = document.createElement("canvas");
     diffCanvas.className = "live-diff-canvas";
-    // 逐像素数据接入前的可见占位（不可见 dataset 不算占位）。
+    // 协调器在量测完成后写入真实逐像素数据。
     diffCanvas.setAttribute("aria-label", "逐像素二值差异图");
     diffCanvasWrap.append(diffCanvas);
     diffImageBox.append(diffCanvasWrap);
@@ -860,12 +860,6 @@ const VIEW_CSS = `
 .live-diff-active { display: flex; }
 .live-diff-empty { color: #666; }
 .live-diff-canvas-wrap { margin-top: 4px; position: relative; }
-.live-diff-placeholder {
-  padding: 8px;
-  border: 1px dashed #999;
-  color: #666;
-  font-size: 12px;
-}
 .live-diff-canvas {
   border: 1px dashed #999;
   background:

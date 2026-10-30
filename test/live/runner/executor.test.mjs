@@ -5,13 +5,14 @@
 // 浏览器二进制由 `playwright install chromium` 提供；CI 在 pnpm run verify
 // 之后才安装 Chromium（见 .github/workflows/contracts.yml）。缺二进制时明确
 // skip，不把设施缺口伪装成通过；本地与 smoke/采集路径已安装浏览器时照常执行。
-import test from "node:test";
+
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
+import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { chromium } from "playwright";
 import { launchDriver } from "../../harness/driver.mjs";
 import { serve } from "../../harness/server.mjs";
-import { chromium } from "playwright";
 
 const root = fileURLToPath(new URL("../../..", import.meta.url));
 
@@ -578,6 +579,11 @@ browserTest(
         );
         assert.ok(error, "cleanup error must be reported");
         assert.match(error.reason, /cleanup-boom/);
+        assert.deepEqual(
+          outcome.messages.map((message) => message.type),
+          ["ready", "completed", "error", "disposed"],
+          "cleanup diagnostics must arrive before completion",
+        );
       } finally {
         await page.close();
       }
