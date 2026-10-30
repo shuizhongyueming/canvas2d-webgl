@@ -425,7 +425,14 @@ try {
     const allowed = server.catalog[server.catalog.indexOf(focused) + 1]?.id;
     assert.ok(
       selected === focused || selected === allowed,
-      "select 只能保留当前值或执行原生相邻选择",
+      `select 只能保留当前值或执行原生相邻选择: ${JSON.stringify({
+        focused,
+        allowed,
+        selected,
+        beforeSession: session,
+        afterSession: (await state()).sessionId,
+        focus: await page.evaluate(() => document.activeElement.tagName),
+      })}`,
     );
     assert.equal(
       (await state()).sessionId === session,
