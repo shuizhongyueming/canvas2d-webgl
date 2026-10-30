@@ -418,8 +418,20 @@ try {
   await check("控件焦点、首尾与 iframe 快捷键", async () => {
     await page.locator(".live-case-select").focus();
     const focused = (await state()).caseId;
+    const session = (await state()).sessionId;
     await page.keyboard.press("ArrowDown");
-    assert.equal((await state()).caseId, focused);
+    await page.waitForTimeout(50);
+    const selected = (await state()).caseId;
+    const allowed = server.catalog[server.catalog.indexOf(focused) + 1]?.id;
+    assert.ok(
+      selected === focused || selected === allowed,
+      "select 只能保留当前值或执行原生相邻选择",
+    );
+    assert.equal(
+      (await state()).sessionId === session,
+      selected === focused,
+      "控件原生 change 可以重跑，但页面快捷键不得额外步进",
+    );
     await page.locator("input[type=range]").focus();
     const opacity = await page.locator("input[type=range]").inputValue();
     await page.keyboard.press("ArrowDown");
