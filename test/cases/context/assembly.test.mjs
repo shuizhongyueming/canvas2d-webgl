@@ -58,11 +58,22 @@ function setup(overrides = {}) {
   };
   const ops = [];
   const pathCalls = [];
+  const rectCalls = [];
   const textCalls = [];
   const clipCalls = [];
   const measureCalls = [];
   const fontCalls = [];
   const raster = {
+    rect(x, y, width, height, drawState, mode) {
+      const source = stubRasterSource(overrides.rasterBounds);
+      rectCalls.push({
+        rect: [x, y, width, height],
+        state: drawState,
+        mode,
+        source,
+      });
+      return source;
+    },
     path(path, drawState, mode) {
       const source = stubRasterSource(overrides.rasterBounds);
       pathCalls.push({ path, state: drawState, mode, source });
@@ -118,6 +129,7 @@ function setup(overrides = {}) {
     gpu,
     ops,
     pathCalls,
+    rectCalls,
     textCalls,
     clipCalls,
     measureCalls,
@@ -199,26 +211,23 @@ test("fillStyle assignment flows through the state store into rect draw operatio
 });
 
 test("a gradient fill reaches the draw op with the draw-time transform preserved", () => {
-  const { context, ops, pathCalls } = setup();
+  const { context, ops, rectCalls } = setup();
   const gradient = context.createLinearGradient(0, 0, 10, 0);
   gradient.addColorStop(0, "#ff0000");
   gradient.addColorStop(1, "#0000ff");
   context.fillStyle = gradient;
   context.translate(5, 5);
   context.fillRect(0, 0, 8, 8);
-  assert.equal(pathCalls.length, 1);
-  assert.equal(pathCalls[0].mode, "fill");
-  assert.deepEqual([...pathCalls[0].path.commands[0].args], [0, 0, 8, 8]);
-  assert.deepEqual(
-    [...pathCalls[0].path.commands[0].transform],
-    [1, 0, 0, 1, 5, 5],
-  );
-  assert.equal(ops[0].source, pathCalls[0].source);
+  assert.equal(rectCalls.length, 1);
+  assert.equal(rectCalls[0].mode, "fill");
+  assert.deepEqual(rectCalls[0].rect, [0, 0, 8, 8]);
+  assert.deepEqual([...rectCalls[0].state.transform], [1, 0, 0, 1, 5, 5]);
+  assert.equal(ops[0].source, rectCalls[0].source);
   assert.equal(ops[0].state.fill.kind, "linear-gradient");
   assert.deepEqual(ops[0].state.fill.from, [0, 0]);
   assert.deepEqual(ops[0].state.fill.to, [10, 0]);
   assert.deepEqual([...ops[0].state.transform], [1, 0, 0, 1, 5, 5]);
-  assert.equal(pathCalls[0].source.releases, 1);
+  assert.equal(rectCalls[0].source.releases, 1);
 });
 
 test("clearRect submits a clear op that never consults the fill paint", () => {
@@ -424,17 +433,17 @@ test("unsupported-api routing holds for the excluded read-back and legacy overlo
   assert.throws(() => context.measureText(), TypeError);
 });
 
-test("strokeRect with a non-solid stroke rasterizes through the shared path service", () => {
-  const { context, ops, pathCalls } = setup();
+test("strokeRect with a non-solid stroke rasterizes through the native rect service", () => {
+  const { context, ops, rectCalls } = setup();
   const gradient = context.createLinearGradient(0, 0, 10, 0);
   gradient.addColorStop(0, "#ffffff");
   context.strokeStyle = gradient;
   context.strokeRect(1, 2, 3, 4);
-  assert.equal(pathCalls.length, 1);
-  assert.equal(pathCalls[0].mode, "stroke");
-  assert.equal(pathCalls[0].path.commands[0].op, "rect");
-  assert.equal(ops[0].source, pathCalls[0].source);
-  assert.equal(pathCalls[0].source.releases, 1);
+  assert.equal(rectCalls.length, 1);
+  assert.equal(rectCalls[0].mode, "stroke");
+  assert.deepEqual(rectCalls[0].rect, [1, 2, 3, 4]);
+  assert.equal(ops[0].source, rectCalls[0].source);
+  assert.equal(rectCalls[0].source.releases, 1);
 });
 
 test("disposed is reported before argument conversion or a no-op decision", () => {

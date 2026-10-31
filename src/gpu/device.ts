@@ -62,15 +62,42 @@ void main() {
   gl_Position = vec4(clip, 0.0, 1.0);
 }
 `;
-const SOLID_FRAGMENT = `
+// Native mask rows start at the top; a copied GL scene starts at the bottom.
+// Keep those two sample coordinates explicit, independently of source UVs.
+const COVERAGE_FRAGMENT = `
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
 precision mediump float;
+#endif
+uniform vec2 u_resolution;
+uniform sampler2D u_clip;
+uniform sampler2D u_destination;
+uniform float u_has_clip;
+uniform float u_has_destination;
+vec4 covered(vec4 source) {
+  vec2 uv = gl_FragCoord.xy / u_resolution;
+  float clip = 1.0;
+  if (u_has_clip > 0.5) clip = texture2D(u_clip, vec2(uv.x, 1.0 - uv.y)).a;
+  if (u_has_destination > 1.5) {
+    // The default native GPU canvas covers the saturated lighter result.
+    // Read the original destination from a separate texture, never the FBO
+    // being written. Software Skia can differ here; public pairs stay native.
+    vec4 destination = texture2D(u_destination, uv);
+    return mix(destination, min(source + destination, vec4(1.0)), clip);
+  }
+  if (u_has_destination > 0.5) source *= texture2D(u_destination, uv).a;
+  return source * clip;
+}
+`;
+const SOLID_FRAGMENT = `${COVERAGE_FRAGMENT}
 uniform vec4 u_color;
 uniform float u_brightness;
 void main() {
   // The incoming color is premultiplied; brightness transfers the straight
   // channels and clamps at 1, which in premultiplied space is a scale clamped
   // at alpha. u_brightness = 1 is the exact identity (rgb <= a always holds).
-  gl_FragColor = vec4(min(u_color.rgb * u_brightness, vec3(u_color.a)), u_color.a);
+  gl_FragColor = covered(vec4(min(u_color.rgb * u_brightness, vec3(u_color.a)), u_color.a));
 }
 `;
 const TEXTURED_VERTEX = `
@@ -86,35 +113,55 @@ void main() {
   v_uv = a_uv;
 }
 `;
-const TEXTURED_FRAGMENT = `
-precision mediump float;
+const TEXTURED_FRAGMENT = `${COVERAGE_FRAGMENT}
 varying vec2 v_uv;
 uniform sampler2D u_texture;
 uniform float u_alpha;
 uniform float u_brightness;
-uniform float u_alpha_threshold;
 void main() {
   vec4 color = texture2D(u_texture, v_uv);
-  // Coverage threshold for stencil masks. Discarding skips stencil writes,
-  // which is exactly how a mask level rejects a pixel at the stencil step.
-  if (color.a < u_alpha_threshold) discard;
   // The filter applies to the source before the global alpha multiply; in
   // premultiplied space the brightness transfer is a scale clamped at alpha.
   vec3 filtered = min(color.rgb * u_brightness, vec3(color.a));
-  gl_FragColor = vec4(filtered * u_alpha, color.a * u_alpha);
+  gl_FragColor = covered(vec4(filtered * u_alpha, color.a * u_alpha));
 }
 `;
 
 const TRANSPARENT = [0, 0, 0, 0] as const;
 
-interface SolidProgram {
+type BlendMode = CompositeMode | "replace" | "erase";
+
+interface CoverageProgram {
+  readonly uClip: WebGLUniformLocation;
+  readonly uHasClip: WebGLUniformLocation;
+  readonly uDestination: WebGLUniformLocation;
+  readonly uHasDestination: WebGLUniformLocation;
+}
+
+function coverageUniforms(
+  gl: WebGLRenderingContext,
+  program: WebGLProgram,
+): CoverageProgram {
+  const uClip = gl.getUniformLocation(program, "u_clip");
+  const uHasClip = gl.getUniformLocation(program, "u_has_clip");
+  const uDestination = gl.getUniformLocation(program, "u_destination");
+  const uHasDestination = gl.getUniformLocation(program, "u_has_destination");
+  if (!uClip || !uHasClip || !uDestination || !uHasDestination)
+    throw createCompatError(
+      ERROR_CODES.INITIALIZATION,
+      "coverage program interface is incomplete",
+    );
+  return { uClip, uHasClip, uDestination, uHasDestination };
+}
+
+interface SolidProgram extends CoverageProgram {
   readonly program: WebGLProgram;
   readonly aPosition: number;
   readonly uResolution: WebGLUniformLocation;
   readonly uColor: WebGLUniformLocation;
   readonly uBrightness: WebGLUniformLocation;
 }
-interface TexturedProgram {
+interface TexturedProgram extends CoverageProgram {
   readonly program: WebGLProgram;
   readonly aPosition: number;
   readonly aUv: number;
@@ -122,7 +169,6 @@ interface TexturedProgram {
   readonly uTexture: WebGLUniformLocation;
   readonly uAlpha: WebGLUniformLocation;
   readonly uBrightness: WebGLUniformLocation;
-  readonly uAlphaThreshold: WebGLUniformLocation;
 }
 
 function makeSolidProgram(gl: WebGLRenderingContext): SolidProgram {
@@ -137,7 +183,14 @@ function makeSolidProgram(gl: WebGLRenderingContext): SolidProgram {
         ERROR_CODES.INITIALIZATION,
         "solid program interface is incomplete",
       );
-    return { program, aPosition, uResolution, uColor, uBrightness };
+    return {
+      program,
+      aPosition,
+      uResolution,
+      uColor,
+      uBrightness,
+      ...coverageUniforms(gl, program),
+    };
   } catch (failure) {
     gl.deleteProgram(program);
     throw failure;
@@ -153,15 +206,13 @@ function makeTexturedProgram(gl: WebGLRenderingContext): TexturedProgram {
     const uTexture = gl.getUniformLocation(program, "u_texture");
     const uAlpha = gl.getUniformLocation(program, "u_alpha");
     const uBrightness = gl.getUniformLocation(program, "u_brightness");
-    const uAlphaThreshold = gl.getUniformLocation(program, "u_alpha_threshold");
     if (
       aPosition < 0 ||
       aUv < 0 ||
       !uResolution ||
       !uTexture ||
       !uAlpha ||
-      !uBrightness ||
-      !uAlphaThreshold
+      !uBrightness
     )
       throw createCompatError(
         ERROR_CODES.INITIALIZATION,
@@ -175,7 +226,7 @@ function makeTexturedProgram(gl: WebGLRenderingContext): TexturedProgram {
       uTexture,
       uAlpha,
       uBrightness,
-      uAlphaThreshold,
+      ...coverageUniforms(gl, program),
     };
   } catch (failure) {
     gl.deleteProgram(program);
@@ -201,13 +252,7 @@ function rectCorners(bounds: Bounds, transform: Matrix): number[] {
 
 type ImageDrawSource = Extract<DrawOperation["source"], { kind: "image" }>;
 
-/** Half coverage is the binary cut for a 1-bit stencil level. */
-const MASK_ALPHA_THRESHOLD = 0.5;
-
-/**
- * The scene renderbuffer is STENCIL_INDEX8: eight bits, where 0 marks
- * "outside every clip", leaving 255 nested levels.
- */
+/** Preserve the established public nesting limit after the soft-mask upgrade. */
 const MAX_CLIP_DEPTH = 255;
 
 class SceneDevice implements GPUDevice {
@@ -224,6 +269,10 @@ class SceneDevice implements GPUDevice {
   private positionBuffer: WebGLBuffer | null = null;
   private uvBuffer: WebGLBuffer | null = null;
   private presentCount = 0;
+  private clipTexture: WebGLTexture | null = null;
+  private clipLease: ResourceLease | null = null;
+  private destinationTexture: WebGLTexture | null = null;
+  private destinationMode: 0 | 1 | 2 = 0;
   generation = 0;
   status: "active" | "lost" | "disposed" = "active";
   width: number;
@@ -381,14 +430,17 @@ class SceneDevice implements GPUDevice {
     gl.activeTexture(gl.TEXTURE0);
   }
 
-  private applyBlend(composite: CompositeMode | "replace"): void {
+  private applyBlend(composite: BlendMode): void {
     const gl = this.gl;
     if (composite === "replace") {
       gl.disable(gl.BLEND);
       return;
     }
     gl.enable(gl.BLEND);
-    const [sourceFactor, destinationFactor] = this.blendFactors[composite];
+    const [sourceFactor, destinationFactor] =
+      composite === "erase"
+        ? [gl.ZERO, gl.ONE_MINUS_SRC_ALPHA]
+        : this.blendFactors[composite];
     gl.blendFuncSeparate(
       sourceFactor,
       destinationFactor,
@@ -418,108 +470,125 @@ class SceneDevice implements GPUDevice {
     gl.clear(gl.STENCIL_BUFFER_BIT);
   }
 
-  /**
-   * Build the effective clip into the scene stencil and return its depth.
-   *
-   * Each ClipSnapshot level is a native rasterized coverage mask. Level i is
-   * drawn only where the stencil still holds i-1 (EQUAL) and increments to i
-   * on fragments that survive the mask's alpha threshold; discarded fragments
-   * leave the previous value untouched, so a later level can only shrink the
-   * region. Content then tests EQUAL depth. A level with empty coverage never
-   * advances the counter, which makes an empty path an empty clip region
-   * without special-casing. Masks are resolved before the stencil is touched,
-   * and every resolved source is released before returning.
-   */
+  /** Upload the native effective clip once, preserving fractional coverage. */
   private beginClip(clip: ClipSnapshot | null): number {
     if (!clip) return 0;
-    const chain: ClipSnapshot[] = [];
-    for (let level: ClipSnapshot | null = clip; level; level = level.parent)
-      chain.push(level);
-    chain.reverse();
-    if (chain.length > MAX_CLIP_DEPTH)
-      throw createCompatError(
-        ERROR_CODES.RESOURCE_LIMIT,
-        `clip nesting depth ${chain.length} exceeds ${MAX_CLIP_DEPTH} stencil values`,
-      );
-    const masks: RasterSource[] = [];
-    try {
-      for (const level of chain) {
-        if (typeof level.mask !== "function")
-          throw createCompatError(
-            ERROR_CODES.CONTRACT,
-            `clip ${level.id} has no mask provider`,
-          );
-        masks.push(level.mask(this.sceneBounds()));
-      }
-    } catch (failure) {
-      for (const mask of masks) mask.release();
-      throw failure;
+    let depth = 0;
+    for (let level: ClipSnapshot | null = clip; level; level = level.parent) {
+      depth += 1;
+      if (depth > MAX_CLIP_DEPTH)
+        throw createCompatError(
+          ERROR_CODES.RESOURCE_LIMIT,
+          `clip nesting depth exceeds ${MAX_CLIP_DEPTH}`,
+        );
+      if (typeof level.mask !== "function")
+        throw createCompatError(
+          ERROR_CODES.CONTRACT,
+          `clip ${level.id} has no mask provider`,
+        );
     }
+    const mask = clip.mask!(this.sceneBounds());
+    try {
+      // Providers return scene-sized effective coverage, including empty clips.
+      if (
+        mask.bounds.x !== 0 ||
+        mask.bounds.y !== 0 ||
+        mask.bounds.width !== this.width ||
+        mask.bounds.height !== this.height
+      )
+        throw createCompatError(
+          ERROR_CODES.CONTRACT,
+          "effective clip mask must span the scene",
+        );
+      const lease = this.acquireTexture(mask);
+      const texture = this.registry.payload(lease.handle);
+      if (!texture) {
+        lease.release();
+        throw createCompatError(
+          ERROR_CODES.CONTRACT,
+          "clip mask texture is missing",
+        );
+      }
+      this.clipLease = lease;
+      this.clipTexture = texture;
+    } finally {
+      mask.release();
+    }
+    return depth;
+  }
+
+  private bindCoverage(program: CoverageProgram, enabled = true): void {
     const gl = this.gl;
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, enabled ? this.clipTexture : null);
+    gl.uniform1i(program.uClip, 1);
+    gl.uniform1f(program.uHasClip, enabled && this.clipTexture ? 1 : 0);
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, enabled ? this.destinationTexture : null);
+    gl.uniform1i(program.uDestination, 2);
+    gl.uniform1f(
+      program.uHasDestination,
+      enabled && this.destinationTexture ? this.destinationMode : 0,
+    );
+    gl.activeTexture(gl.TEXTURE0);
+  }
+
+  /** Allocate/copy before mutating the scene; the snapshot lives for one draw. */
+  private withDestinationSnapshot(mode: 1 | 2, drawSource: () => void): void {
+    const gl = this.gl;
+    const texture = gl.createTexture();
+    if (!texture)
+      throw createCompatError(
+        ERROR_CODES.INITIALIZATION,
+        "destination snapshot allocation failed",
+      );
     try {
       this.bindSceneState();
-      gl.enable(gl.STENCIL_TEST);
-      gl.stencilMask(0xff);
-      gl.stencilOp(gl.KEEP, gl.KEEP, gl.INCR);
-      gl.colorMask(false, false, false, false);
-      gl.clearStencil(0);
-      gl.clear(gl.STENCIL_BUFFER_BIT);
-      for (let index = 0; index < masks.length; index += 1) {
-        const mask = masks[index]!;
-        if (mask.bounds.width <= 0 || mask.bounds.height <= 0) continue;
-        const lease = this.acquireTexture(mask);
-        try {
-          const texture = this.registry.payload(lease.handle);
-          if (!texture)
-            throw createCompatError(
-              ERROR_CODES.CONTRACT,
-              "clip mask texture is missing",
-            );
-          const { corners, uvs } = this.texturedGeometry(mask);
-          gl.stencilFunc(gl.EQUAL, index, 0xff);
-          this.drawTexturedQuad(
-            texture,
-            corners,
-            uvs,
-            1,
-            "replace",
-            "scene",
-            1,
-            true,
-            MASK_ALPHA_THRESHOLD,
-          );
-        } finally {
-          lease.release();
-        }
+      gl.activeTexture(gl.TEXTURE2);
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.copyTexImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA,
+        0,
+        0,
+        this.width,
+        this.height,
+        0,
+      );
+      const error = gl.getError();
+      if (error !== gl.NO_ERROR)
+        throw createCompatError(
+          ERROR_CODES.INITIALIZATION,
+          `destination snapshot failed: GL error 0x${error.toString(16)}`,
+        );
+      if (mode === 1) {
+        // source-in: D*(1-C) + S*Da*C. Capture Da before attenuating D.
+        this.drawSolidQuad(this.fullscreen(), [1, 1, 1, 1], "erase", 1);
       }
-      gl.colorMask(true, true, true, true);
-      gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);
-      gl.stencilFunc(gl.EQUAL, chain.length, 0xff);
-      return chain.length;
-    } catch (failure) {
-      this.resetStencil();
-      throw failure;
+      this.destinationTexture = texture;
+      this.destinationMode = mode;
+      drawSource();
     } finally {
-      for (const mask of masks) mask.release();
+      this.destinationTexture = null;
+      this.destinationMode = 0;
+      gl.activeTexture(gl.TEXTURE2);
+      gl.bindTexture(gl.TEXTURE_2D, null);
+      gl.deleteTexture(texture);
+      gl.activeTexture(gl.TEXTURE0);
     }
   }
 
   /**
-   * source-in spans the whole effective clip, not just the source geometry:
-   * destination pixels inside the clip but outside the source coverage become
-   * transparent. The source coverage is marked at stencil depth + 1, the
-   * depth-equal pixels outside it are cleared, then the source composites with
-   * (DST_ALPHA, ZERO) through the depth + 1 test. When a clip is active its
-   * levels occupy 0..depth, so all three passes stay inside the clip: pass 1
-   * tests EQUAL depth, pass 2 tests EQUAL depth, and pass 3 tests EQUAL
-   * depth + 1.
-   *
-   * That extra level does not exist at the maximum clip depth: depth + 1 would
-   * be 256 and the reference would clamp to 255, so pass 1 could not separate
-   * source coverage from the clip and pass 2 would erase the whole clip. The
-   * operation reports resource-limit instead of silently producing transparent
-   * pixels; plain drawing at the same depth remains supported. Canonical
-   * stencil state is restored through every exit path.
+   * source-in spans the clip, including transparent source exterior. Soft
+   * clips use the original-alpha snapshot path. Without a clip, stencil only
+   * distinguishes the source asset's quad from its exterior before blending.
+   * Keep the existing 254-level source-in limit; changing resource contracts
+   * is outside the coverage repair. Every path restores canonical GL state.
    */
   private compositeSourceIn(
     corners: number[],
@@ -531,6 +600,10 @@ class SceneDevice implements GPUDevice {
         ERROR_CODES.RESOURCE_LIMIT,
         `source-in needs one stencil level beyond clip depth ${clipDepth}`,
       );
+    if (clipDepth > 0) {
+      this.withDestinationSnapshot(1, () => drawSource(false));
+      return;
+    }
     const gl = this.gl;
     try {
       if (clipDepth === 0) {
@@ -570,7 +643,7 @@ class SceneDevice implements GPUDevice {
   private drawSolidQuad(
     corners: number[],
     color: readonly [number, number, number, number],
-    composite: CompositeMode | "replace",
+    composite: BlendMode,
     brightness: number,
     stencil = false,
   ): void {
@@ -582,6 +655,7 @@ class SceneDevice implements GPUDevice {
     gl.uniform2f(solid.uResolution, this.width, this.height);
     gl.uniform4f(solid.uColor, color[0], color[1], color[2], color[3]);
     gl.uniform1f(solid.uBrightness, brightness);
+    this.bindCoverage(solid);
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(corners), gl.DYNAMIC_DRAW);
     gl.enableVertexAttribArray(solid.aPosition);
@@ -596,11 +670,10 @@ class SceneDevice implements GPUDevice {
     corners: number[],
     uvs: number[],
     alpha: number,
-    composite: CompositeMode | "replace",
+    composite: BlendMode,
     target: "scene" | "display",
     brightness: number,
     stencil = false,
-    alphaThreshold = 0,
   ): void {
     const { scene, textured, positionBuffer, uvBuffer } = this.requireObjects();
     const gl = this.gl;
@@ -618,7 +691,7 @@ class SceneDevice implements GPUDevice {
     gl.uniform2f(textured.uResolution, this.width, this.height);
     gl.uniform1f(textured.uAlpha, alpha);
     gl.uniform1f(textured.uBrightness, brightness);
-    gl.uniform1f(textured.uAlphaThreshold, alphaThreshold);
+    this.bindCoverage(textured, target === "scene");
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(
       gl.TEXTURE_2D,
@@ -687,21 +760,43 @@ class SceneDevice implements GPUDevice {
         if (source.kind === "rect")
           this.drawSolidQuad(
             rectCorners(source.bounds, source.transform),
-            TRANSPARENT,
-            "replace",
+            [1, 1, 1, 1],
+            "erase",
             1,
-            clipDepth > 0,
+            false,
           );
+        else if (source.kind === "raster") {
+          const lease = this.acquireTexture(source);
+          try {
+            const texture = this.registry.payload(lease.handle);
+            if (!texture)
+              throw createCompatError(
+                ERROR_CODES.CONTRACT,
+                "clear mask texture is missing",
+              );
+            const { corners, uvs } = this.texturedGeometry(source);
+            this.drawTexturedQuad(
+              texture,
+              corners,
+              uvs,
+              1,
+              "erase",
+              "scene",
+              1,
+            );
+          } finally {
+            lease.release();
+          }
+        }
       } else if (source.kind === "empty") {
         // An empty source still composites: source-in erases the effective
         // clip, the other modes are observable no-ops.
         if (operation.state.composite === "source-in")
           this.drawSolidQuad(
             this.fullscreen(),
-            TRANSPARENT,
-            "replace",
+            clipDepth > 0 ? [1, 1, 1, 1] : TRANSPARENT,
+            clipDepth > 0 ? "erase" : "replace",
             1,
-            clipDepth > 0,
           );
       } else if (source.kind === "rect") {
         if (source.paint.kind !== "solid")
@@ -718,10 +813,9 @@ class SceneDevice implements GPUDevice {
           b * alpha,
           alpha,
         ];
-        // Stencil coverage on this solid path is binary. AA-sensitive source-in
-        // sources (transforms, fractional edges) are rasterized by the feature
-        // layer into a native asset before reaching the device; this path is
-        // for device-level seams whose caller accepts hard coverage.
+        // Public AA-sensitive rects arrive as native raster assets. Device
+        // rect sources retain hard geometry for internal seams/integer quads;
+        // any effective clip is still sampled with its fractional coverage.
         if (operation.state.composite === "source-in")
           this.compositeSourceIn(
             corners,
@@ -729,11 +823,15 @@ class SceneDevice implements GPUDevice {
               this.drawSolidQuad(
                 corners,
                 color,
-                "source-in",
+                clipDepth > 0 ? "lighter" : "source-in",
                 brightness,
                 stencil,
               ),
             clipDepth,
+          );
+        else if (clipDepth > 0 && operation.state.composite === "lighter")
+          this.withDestinationSnapshot(2, () =>
+            this.drawSolidQuad(corners, color, "replace", brightness),
           );
         else
           this.drawSolidQuad(
@@ -741,7 +839,6 @@ class SceneDevice implements GPUDevice {
             color,
             operation.state.composite,
             brightness,
-            clipDepth > 0,
           );
       } else {
         const upload = source.kind === "raster" ? source : source.image;
@@ -763,12 +860,24 @@ class SceneDevice implements GPUDevice {
                   corners,
                   uvs,
                   operation.state.alpha,
-                  "source-in",
+                  clipDepth > 0 ? "lighter" : "source-in",
                   "scene",
                   brightness,
                   stencil,
                 ),
               clipDepth,
+            );
+          else if (clipDepth > 0 && operation.state.composite === "lighter")
+            this.withDestinationSnapshot(2, () =>
+              this.drawTexturedQuad(
+                texture,
+                corners,
+                uvs,
+                operation.state.alpha,
+                "replace",
+                "scene",
+                brightness,
+              ),
             );
           else
             this.drawTexturedQuad(
@@ -779,13 +888,15 @@ class SceneDevice implements GPUDevice {
               operation.state.composite,
               "scene",
               brightness,
-              clipDepth > 0,
             );
         } finally {
           lease.release();
         }
       }
     } finally {
+      this.clipTexture = null;
+      this.clipLease?.release();
+      this.clipLease = null;
       if (clipDepth > 0) this.resetStencil();
     }
     this.presenterQueue.request(this.generation);

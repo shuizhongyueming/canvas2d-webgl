@@ -182,6 +182,17 @@ export const cases: CaseDefinition[] = [
         pixelsEqual(scene.pixel(14, 14), TRANSPARENT),
         "nothing leaks beyond the recorded geometry",
       );
+      for (const [x, y] of [
+        [12, 7],
+        [7, 12],
+        [12, 12],
+      ] as const) {
+        const blue = scene.pixel(x, y);
+        a.assert(
+          blue[2] > 0 && blue[3] > 0,
+          `strokeRect keeps the unoccluded blue corner at (${x},${y}) after fill()`,
+        );
+      }
       a.observe("pathSurvives", true);
     },
   },

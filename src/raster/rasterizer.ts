@@ -1,6 +1,7 @@
 import type { NativeCanvas } from "../api.js";
 import type {
   Bounds,
+  ClipSnapshot,
   DrawState,
   Paint,
   PathSnapshot,
@@ -81,6 +82,103 @@ class NativeRasterizer implements Rasterizer {
     });
   }
 
+  rect(
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    state: DrawState,
+    mode: "fill" | "stroke" | "clear",
+  ): RasterSource {
+    this.#assertLive();
+    const key = [
+      "rect",
+      this.#epoch,
+      this.#sceneKey(),
+      mode,
+      x,
+      y,
+      width,
+      height,
+      state.transform.join(","),
+      mode === "clear"
+        ? "white"
+        : paintKey(mode === "stroke" ? state.stroke : state.fill),
+      mode === "stroke" ? strokeKey(state) : "",
+    ].join("|");
+    const hit = this.#cache.acquire(key);
+    if (hit) return this.#toSource(hit);
+    const corners = [
+      [x, y],
+      [x + width, y],
+      [x, y + height],
+      [x + width, y + height],
+    ] as const;
+    const transformed = corners.map(([cx, cy]) =>
+      applyPoint(state.transform, cx, cy),
+    );
+    const xs = transformed.map((p) => p[0]),
+      ys = transformed.map((p) => p[1]);
+    const bounds = alignOutset(
+      {
+        x: Math.min(...xs),
+        y: Math.min(...ys),
+        width: Math.max(...xs) - Math.min(...xs),
+        height: Math.max(...ys) - Math.min(...ys),
+      },
+      mode === "stroke"
+        ? scaleBound(state.transform) * state.lineWidth * (MITER_LIMIT + 0.5) +
+            2
+        : 1,
+      this.#scene(),
+    );
+    if (!bounds)
+      return this.#toSource(
+        this.#ownLease(emptyAsset(this.#options.createCanvas)),
+      );
+    const { canvas, ctx } = this.#createAsset(bounds);
+    try {
+      const scene = this.#scene();
+      const stage = this.#stageContext(scene.width, scene.height);
+      stage.ctx.setTransform(...state.transform);
+      if (mode === "clear") stage.ctx.fillStyle = "#ffffff";
+      else
+        applyPaint(
+          stage.ctx,
+          mode === "stroke" ? state.stroke : state.fill,
+          mode === "stroke" ? "stroke" : "fill",
+          this.#patternSource,
+        );
+      if (mode === "stroke") {
+        // strokeRect is a native primitive, not rect()+stroke(). Software
+        // Skia's path stroke can drop outer corners of a small thin rect.
+        stage.ctx.lineWidth = state.lineWidth;
+        stage.ctx.lineCap = state.lineCap;
+        stage.ctx.lineJoin = state.lineJoin;
+        stage.ctx.strokeRect(x, y, width, height);
+      } else stage.ctx.fillRect(x, y, width, height);
+      ctx.putImageData(
+        stage.ctx.getImageData(bounds.x, bounds.y, bounds.width, bounds.height),
+        0,
+        0,
+      );
+    } catch (error) {
+      destroyCanvas(canvas);
+      throw error;
+    }
+    const asset = {
+      canvas,
+      bounds,
+      pixelWidth: bounds.width,
+      pixelHeight: bounds.height,
+    };
+    return this.#toSource(
+      this.#cache.store(key, asset, bounds.width * bounds.height, (a) =>
+        destroyCanvas(a.canvas),
+      ) ?? this.#ownLease(asset),
+    );
+  }
+
   path(
     path: PathSnapshot,
     state: DrawState,
@@ -144,6 +242,7 @@ class NativeRasterizer implements Rasterizer {
     path: PathSnapshot,
     rule: "nonzero" | "evenodd",
     bounds: Bounds,
+    parent: ClipSnapshot | null = null,
   ): RasterSource {
     this.#assertLive();
     const key = [
@@ -152,6 +251,9 @@ class NativeRasterizer implements Rasterizer {
       this.#sceneKey(),
       rule,
       path.id,
+      ...this.#clipChain(parent).map(
+        (level) => `${level.path.id}:${level.rule}`,
+      ),
       bounds.x,
       bounds.y,
       bounds.width,
@@ -159,7 +261,7 @@ class NativeRasterizer implements Rasterizer {
     ].join("|");
     const hit = this.#cache.acquire(key);
     if (hit) return this.#toSource(hit);
-    const asset = this.#renderClip(path, rule, bounds);
+    const asset = this.#renderClip(path, rule, bounds, parent);
     const lease =
       this.#cache.store(key, asset, asset.pixelWidth * asset.pixelHeight, (a) =>
         destroyCanvas(a.canvas),
@@ -540,6 +642,7 @@ class NativeRasterizer implements Rasterizer {
     path: PathSnapshot,
     rule: "nonzero" | "evenodd",
     bounds: Bounds,
+    parent: ClipSnapshot | null,
   ): Asset {
     const aligned = alignOutset(bounds, 0, this.#scene());
     if (!aligned) return emptyAsset(this.#options.createCanvas);
@@ -552,10 +655,28 @@ class NativeRasterizer implements Rasterizer {
         aligned.x + aligned.width,
         aligned.y + aligned.height,
       );
-      replayPath(stage.ctx, path, 0, 0);
-      stage.ctx.setTransform(1, 0, 0, 1, 0, 0);
-      stage.ctx.fillStyle = "#ffffff";
-      stage.ctx.fill(rule);
+      stage.ctx.save();
+      try {
+        // Replaying the native clip chain preserves intersections and repeated
+        // edges. Multiplying independently antialiased levels would not.
+        const seen = new Set<string>();
+        for (const level of [...this.#clipChain(parent), { path, rule }]) {
+          // Intersection with the same immutable path/rule is idempotent.
+          // Software Skia can repeatedly attenuate the mask; the default GPU
+          // canvas recognizes the redundant clip instead. Do not bake that
+          // software-only attenuation into our effective coverage texture.
+          const key = `${level.path.id}:${level.rule}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          replayPath(stage.ctx, level.path, 0, 0);
+          stage.ctx.clip(level.rule);
+        }
+        stage.ctx.setTransform(1, 0, 0, 1, 0, 0);
+        stage.ctx.fillStyle = "#ffffff";
+        stage.ctx.fillRect(0, 0, stage.canvas.width, stage.canvas.height);
+      } finally {
+        stage.ctx.restore();
+      }
       ctx.putImageData(
         stage.ctx.getImageData(
           aligned.x,
@@ -576,6 +697,12 @@ class NativeRasterizer implements Rasterizer {
       pixelWidth: aligned.width,
       pixelHeight: aligned.height,
     };
+  }
+
+  #clipChain(parent: ClipSnapshot | null): ClipSnapshot[] {
+    const levels: ClipSnapshot[] = [];
+    for (let level = parent; level; level = level.parent) levels.push(level);
+    return levels.reverse();
   }
 }
 
