@@ -74,19 +74,19 @@ uniform vec2 u_resolution;
 uniform sampler2D u_clip;
 uniform sampler2D u_destination;
 uniform float u_has_clip;
-uniform float u_has_destination;
+uniform float u_destination_mode;
 vec4 covered(vec4 source) {
   vec2 uv = gl_FragCoord.xy / u_resolution;
   float clip = 1.0;
   if (u_has_clip > 0.5) clip = texture2D(u_clip, vec2(uv.x, 1.0 - uv.y)).a;
-  if (u_has_destination > 1.5) {
+  if (u_destination_mode > 1.5) {
     // The default native GPU canvas covers the saturated lighter result.
     // Read the original destination from a separate texture, never the FBO
     // being written. Software Skia can differ here; public pairs stay native.
     vec4 destination = texture2D(u_destination, uv);
     return mix(destination, min(source + destination, vec4(1.0)), clip);
   }
-  if (u_has_destination > 0.5) source *= texture2D(u_destination, uv).a;
+  if (u_destination_mode > 0.5) source *= texture2D(u_destination, uv).a;
   return source * clip;
 }
 `;
@@ -135,7 +135,7 @@ interface CoverageProgram {
   readonly uClip: WebGLUniformLocation;
   readonly uHasClip: WebGLUniformLocation;
   readonly uDestination: WebGLUniformLocation;
-  readonly uHasDestination: WebGLUniformLocation;
+  readonly uDestinationMode: WebGLUniformLocation;
 }
 
 function coverageUniforms(
@@ -145,13 +145,13 @@ function coverageUniforms(
   const uClip = gl.getUniformLocation(program, "u_clip");
   const uHasClip = gl.getUniformLocation(program, "u_has_clip");
   const uDestination = gl.getUniformLocation(program, "u_destination");
-  const uHasDestination = gl.getUniformLocation(program, "u_has_destination");
-  if (!uClip || !uHasClip || !uDestination || !uHasDestination)
+  const uDestinationMode = gl.getUniformLocation(program, "u_destination_mode");
+  if (!uClip || !uHasClip || !uDestination || !uDestinationMode)
     throw createCompatError(
       ERROR_CODES.INITIALIZATION,
       "coverage program interface is incomplete",
     );
-  return { uClip, uHasClip, uDestination, uHasDestination };
+  return { uClip, uHasClip, uDestination, uDestinationMode };
 }
 
 interface SolidProgram extends CoverageProgram {
@@ -527,7 +527,7 @@ class SceneDevice implements GPUDevice {
     gl.bindTexture(gl.TEXTURE_2D, enabled ? this.destinationTexture : null);
     gl.uniform1i(program.uDestination, 2);
     gl.uniform1f(
-      program.uHasDestination,
+      program.uDestinationMode,
       enabled && this.destinationTexture ? this.destinationMode : 0,
     );
     gl.activeTexture(gl.TEXTURE0);

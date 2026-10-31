@@ -71,6 +71,8 @@ class NativeRasterizer implements Rasterizer {
   #disposed = false;
   #measure: { canvas: NativeCanvas; context: Native2DContext } | null = null;
   #stage: { canvas: NativeCanvas; context: Native2DContext } | null = null;
+  #drawingStage: { canvas: NativeCanvas; context: Native2DContext } | null =
+    null;
   #patternScratch: { canvas: NativeCanvas; context: Native2DContext } | null =
     null;
 
@@ -139,7 +141,11 @@ class NativeRasterizer implements Rasterizer {
     const { canvas, ctx } = this.#createAsset(bounds);
     try {
       const scene = this.#scene();
-      const stage = this.#stageContext(scene.width, scene.height);
+      const stage = this.#stageContext(
+        scene.width,
+        scene.height,
+        mode === "stroke" ? "drawing" : "readback",
+      );
       stage.ctx.setTransform(...state.transform);
       if (mode === "clear") stage.ctx.fillStyle = "#ffffff";
       else
@@ -306,6 +312,8 @@ class NativeRasterizer implements Rasterizer {
     this.#measure = null;
     if (this.#stage) destroyCanvas(this.#stage.canvas);
     this.#stage = null;
+    if (this.#drawingStage) destroyCanvas(this.#drawingStage.canvas);
+    this.#drawingStage = null;
     if (this.#patternScratch) destroyCanvas(this.#patternScratch.canvas);
     this.#patternScratch = null;
   }
@@ -327,19 +335,34 @@ class NativeRasterizer implements Rasterizer {
   #stageContext(
     width: number,
     height: number,
+    usage: "readback" | "drawing" = "readback",
   ): { canvas: NativeCanvas; ctx: Native2DContext } {
-    if (!this.#stage) {
+    let stage = usage === "drawing" ? this.#drawingStage : this.#stage;
+    if (!stage) {
       const canvas = this.#options.createCanvas(width, height);
-      this.#stage = {
-        canvas,
-        context: context2d(canvas, { willReadFrequently: true }),
-      };
+      try {
+        // strokeRect's draw-oriented native coverage differs from software
+        // readback coverage. An explicit false also prevents the tested
+        // Chromium path from switching after repeated getImageData calls.
+        // Keep this context separate from the software path/text/clip stage.
+        stage = {
+          canvas,
+          context: context2d(canvas, {
+            willReadFrequently: usage === "readback",
+          }),
+        };
+      } catch (error) {
+        destroyCanvas(canvas);
+        throw error;
+      }
+      if (usage === "drawing") this.#drawingStage = stage;
+      else this.#stage = stage;
     } else {
-      const canvas = this.#stage.canvas;
+      const canvas = stage.canvas;
       if (width !== canvas.width) canvas.width = width;
       if (height !== canvas.height) canvas.height = height;
     }
-    const { canvas, context } = this.#stage;
+    const { canvas, context } = stage;
     context.setTransform(1, 0, 0, 1, 0, 0);
     context.clearRect(0, 0, canvas.width, canvas.height);
     return { canvas, ctx: context };

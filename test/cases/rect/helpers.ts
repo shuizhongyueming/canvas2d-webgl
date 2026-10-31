@@ -30,6 +30,18 @@ export interface SceneDump {
   count(predicate: (pixel: Pixel) => boolean): number;
 }
 
+/** Per-pixel blue coverage for exact native/compat semantic comparisons. */
+export function blueAlphaPixels(scene: SceneDump): number[][] {
+  const pixels: number[][] = [];
+  for (let y = 0; y < scene.height; y += 1)
+    for (let x = 0; x < scene.width; x += 1) {
+      const pixel = scene.pixel(x, y);
+      if (pixel[0] === 0 && pixel[1] === 0 && pixel[2] === 255 && pixel[3] > 0)
+        pixels.push([x, y, pixel[3]]);
+    }
+  return pixels;
+}
+
 /**
  * Read the current scene on either side: the GPU test hook on compat, native
  * getImageData on the reference. Observation only; never drives a present.

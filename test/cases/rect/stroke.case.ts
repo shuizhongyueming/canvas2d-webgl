@@ -1,5 +1,10 @@
 import type { CaseDefinition } from "../../types/testing.js";
-import { TRANSPARENT, dumpScene, pixelsEqual } from "./helpers.js";
+import {
+  TRANSPARENT,
+  blueAlphaPixels,
+  dumpScene,
+  pixelsEqual,
+} from "./helpers.js";
 
 const renderBase = {
   kind: "render" as const,
@@ -41,7 +46,29 @@ export const cases: CaseDefinition[] = [
         scene.pixel(10, 10)[3] === 0,
         "small strokeRect keeps its interior hollow",
       );
+      a.observe("blueCoverage", blueAlphaPixels(scene));
       a.observe("all-corners-present", true);
+    },
+  },
+  {
+    ...renderBase,
+    kind: "semantic",
+    id: "rect.strokeRect.readback-stability",
+    requirements: ["context.strokeRect", "context.lineWidth"],
+    async run(a) {
+      a.context.strokeStyle = "#0000ff";
+      // Distinct assets exercise repeated internal readbacks. The public
+      // native canvas is sampled only once, after drawing like a real caller.
+      for (let row = 0; row < 3; row += 1)
+        for (let column = 0; column < 4; column += 1)
+          a.context.strokeRect(8 + column * 16, 8 + row * 16, 4, 4);
+      a.context.strokeRect(8, 8, 4, 4); // reuse the first cached asset as well
+      const scene = await dumpScene(a);
+      a.assert(
+        scene.pixel(10, 10)[3] === 0,
+        "repeated stroke assets keep hollow interiors",
+      );
+      a.observe("blueCoverage", blueAlphaPixels(scene));
     },
   },
   {

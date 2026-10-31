@@ -26,3 +26,5 @@ Status: accepted（2026-10-31），[决策：正式验收拒绝硬边后的矩�
 修复提交从干净工作区重新采集完整矩阵。旧提交的人工或 AI 记录不得迁移到新 commit/sourceHash/artifactHash。此决定只批准方案，不签署验收。
 
 实测补充：同一半像素 clip 和半透明 lighter，默认 GPU 原生边缘为 `[229,27,0,223]`，`willReadFrequently` 软件画布为 `[216,24,0,255]`。这修正了方案初稿将软件实验外推为默认画布行为的假设。公开差分保留默认原生配置，按实际 GPU 参考验证，不更换参考以消除差异。
+
+2026-10-31 人工复核补充：仅恢复矩形外角仍不足以匹配均匀半透明描边。软件 readback 光栅会产生 64/127/128/191 等不同覆盖，而本次默认原生画布均为 128。矩形描边改用独立的原生 drawing stage，明确设置 `willReadFrequently: false`，与原软件 path/text/clip stage 分开。DOM 与 OffscreenCanvas 各 32 次读回实验中，drawing stage 均保持 128；默认未显式声明的 DOM context 从第三次读回开始可能切换覆盖行为。资产画布只保存已取得的像素，不重新描边。额外 stage 按现有规则复用、调整尺寸和 dispose；不更改公开 reference。蓝框逐像素观测与连续 12 份素材加缓存复用的回归必须原生/兼容一致。
