@@ -6,19 +6,16 @@ import type {
   FeatureFactory,
   Matrix,
   Paint,
-  RasterSource,
 } from "../../internal/contracts.js";
 import { createCompatError, ERROR_CODES } from "../../contracts/errors.js";
-import { PathRecorder } from "../../path/recorder.js";
 
 /**
  * Rectangle drawing: fillRect/clearRect/strokeRect.
  *
  * Integer-aligned solid fills and clears use GPU quads. Other fills/clears
- * use native fillRect coverage; strokes use a recorded rect path. These
+ * use native fillRect coverage; strokes use native strokeRect coverage. These
  * members share the native rasterizer's paint evaluation and none of them
- * touch the current path: the recorder below is feature-private and never
- * aliases environment.path. Clear operations ignore paint, alpha and filter by
+ * touch the current path. Clear operations ignore paint, alpha and filter by
  * contract while still honoring the draw-time transform and the effective clip.
  */
 
@@ -108,8 +105,6 @@ export const rectFeature: FeatureFactory = (environment): FeatureDefinition => {
       ERROR_CODES.CONTRACT,
       "rect feature requires environment.state, gpu and raster",
     );
-  // Feature-private; the public current path is never read or mutated here.
-  const recorder = new PathRecorder();
 
   /** While lost, drawing is silently ineffective and never queued (LIFE-02). */
   function assertUsable(): boolean {
@@ -127,12 +122,7 @@ export const rectFeature: FeatureFactory = (environment): FeatureDefinition => {
     snapshot: DrawState,
     mode: "fill" | "stroke" | "clear",
   ): void {
-    let source: RasterSource;
-    if (mode === "stroke") {
-      recorder.begin();
-      recorder.rect(x, y, width, height, snapshot.transform);
-      source = raster.path(recorder.snapshot(), snapshot, mode);
-    } else source = raster.rect(x, y, width, height, snapshot, mode);
+    const source = raster.rect(x, y, width, height, snapshot, mode);
     try {
       // Empty coverage still becomes an operation: source-in erases the
       // effective clip, the other modes are no-ops in the device.

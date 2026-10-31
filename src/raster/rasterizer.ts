@@ -88,7 +88,7 @@ class NativeRasterizer implements Rasterizer {
     width: number,
     height: number,
     state: DrawState,
-    mode: "fill" | "clear",
+    mode: "fill" | "stroke" | "clear",
   ): RasterSource {
     this.#assertLive();
     const key = [
@@ -101,7 +101,10 @@ class NativeRasterizer implements Rasterizer {
       width,
       height,
       state.transform.join(","),
-      mode === "fill" ? paintKey(state.fill) : "white",
+      mode === "clear"
+        ? "white"
+        : paintKey(mode === "stroke" ? state.stroke : state.fill),
+      mode === "stroke" ? strokeKey(state) : "",
     ].join("|");
     const hit = this.#cache.acquire(key);
     if (hit) return this.#toSource(hit);
@@ -123,7 +126,10 @@ class NativeRasterizer implements Rasterizer {
         width: Math.max(...xs) - Math.min(...xs),
         height: Math.max(...ys) - Math.min(...ys),
       },
-      1,
+      mode === "stroke"
+        ? scaleBound(state.transform) * state.lineWidth * (MITER_LIMIT + 0.5) +
+            2
+        : 1,
       this.#scene(),
     );
     if (!bounds)
@@ -136,8 +142,21 @@ class NativeRasterizer implements Rasterizer {
       const stage = this.#stageContext(scene.width, scene.height);
       stage.ctx.setTransform(...state.transform);
       if (mode === "clear") stage.ctx.fillStyle = "#ffffff";
-      else applyPaint(stage.ctx, state.fill, "fill", this.#patternSource);
-      stage.ctx.fillRect(x, y, width, height);
+      else
+        applyPaint(
+          stage.ctx,
+          mode === "stroke" ? state.stroke : state.fill,
+          mode === "stroke" ? "stroke" : "fill",
+          this.#patternSource,
+        );
+      if (mode === "stroke") {
+        // strokeRect is a native primitive, not rect()+stroke(). Software
+        // Skia's path stroke can drop outer corners of a small thin rect.
+        stage.ctx.lineWidth = state.lineWidth;
+        stage.ctx.lineCap = state.lineCap;
+        stage.ctx.lineJoin = state.lineJoin;
+        stage.ctx.strokeRect(x, y, width, height);
+      } else stage.ctx.fillRect(x, y, width, height);
       ctx.putImageData(
         stage.ctx.getImageData(bounds.x, bounds.y, bounds.width, bounds.height),
         0,

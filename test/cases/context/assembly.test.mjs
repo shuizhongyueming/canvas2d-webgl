@@ -433,17 +433,17 @@ test("unsupported-api routing holds for the excluded read-back and legacy overlo
   assert.throws(() => context.measureText(), TypeError);
 });
 
-test("strokeRect with a non-solid stroke rasterizes through the shared path service", () => {
-  const { context, ops, pathCalls } = setup();
+test("strokeRect with a non-solid stroke rasterizes through the native rect service", () => {
+  const { context, ops, rectCalls } = setup();
   const gradient = context.createLinearGradient(0, 0, 10, 0);
   gradient.addColorStop(0, "#ffffff");
   context.strokeStyle = gradient;
   context.strokeRect(1, 2, 3, 4);
-  assert.equal(pathCalls.length, 1);
-  assert.equal(pathCalls[0].mode, "stroke");
-  assert.equal(pathCalls[0].path.commands[0].op, "rect");
-  assert.equal(ops[0].source, pathCalls[0].source);
-  assert.equal(pathCalls[0].source.releases, 1);
+  assert.equal(rectCalls.length, 1);
+  assert.equal(rectCalls[0].mode, "stroke");
+  assert.deepEqual(rectCalls[0].rect, [1, 2, 3, 4]);
+  assert.equal(ops[0].source, rectCalls[0].source);
+  assert.equal(rectCalls[0].source.releases, 1);
 });
 
 test("disposed is reported before argument conversion or a no-op decision", () => {

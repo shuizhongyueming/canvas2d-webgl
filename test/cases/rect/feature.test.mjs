@@ -221,11 +221,11 @@ test("strokeRect uses the stroke asset service with the draw-time transform", ()
   state.set("lineWidth", 4);
   members.strokeRect.value(10, 20, 30, -40);
   assert.equal(rasterCalls.length, 1);
-  const [{ path, state: drawState, mode }] = rasterCalls;
+  const [{ rect, state: drawState, mode }] = rasterCalls;
   assert.equal(mode, "stroke");
   assert.equal(drawState.lineWidth, 4);
-  assert.deepEqual([...path.commands[0].args], [10, 20, 30, -40]);
-  assert.deepEqual([...path.commands[0].transform], [2, 0, 0, 2, 5, 6]);
+  assert.deepEqual(rect, [10, 20, 30, -40]);
+  assert.deepEqual([...drawState.transform], [2, 0, 0, 2, 5, 6]);
   assert.equal(ops[0].source, rasterCalls[0].source);
   assert.equal(rasterCalls[0].source.releases, 1);
 });

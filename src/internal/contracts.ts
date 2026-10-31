@@ -197,14 +197,14 @@ export interface Presenter {
   invalidate(generation: number): void;
 }
 export interface Rasterizer {
-  /** Native fillRect coverage, or an opaque white mask for partial clears. */
+  /** Native fillRect/strokeRect coverage, or a white mask for partial clears. */
   rect(
     x: number,
     y: number,
     width: number,
     height: number,
     state: DrawState,
-    mode: "fill" | "clear",
+    mode: "fill" | "stroke" | "clear",
   ): RasterSource;
   path(
     path: PathSnapshot,
