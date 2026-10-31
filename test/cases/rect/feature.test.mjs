@@ -45,6 +45,16 @@ function setup(overrides = {}) {
   };
   const rasterCalls = [];
   const raster = {
+    rect(x, y, width, height, drawState, mode) {
+      const source = stubRasterSource(overrides.rasterBounds);
+      rasterCalls.push({
+        rect: [x, y, width, height],
+        state: drawState,
+        mode,
+        source,
+      });
+      return source;
+    },
     path(path, drawState, mode) {
       const source = stubRasterSource(overrides.rasterBounds);
       rasterCalls.push({ path, state: drawState, mode, source });
@@ -177,7 +187,7 @@ test("clearRect submits a clear operation that never consults the fill paint", (
   assert.deepEqual([...op.source.paint.color], [0, 0, 0, 1]);
 });
 
-test("non-solid fillRect rasterizes the rect path and releases the asset after draw", () => {
+test("non-solid fillRect uses native rect coverage and releases the asset after draw", () => {
   const gradientPaint = {
     kind: "linear-gradient",
     id: 9,
@@ -193,13 +203,11 @@ test("non-solid fillRect rasterizes the rect path and releases the asset after d
   const { members, ops, rasterCalls } = setup({ env: { state } });
   members.fillRect.value(2, 3, 8, 5);
   assert.equal(rasterCalls.length, 1);
-  const [{ path, state: drawState, mode, source }] = rasterCalls;
+  const [{ rect, state: drawState, mode, source }] = rasterCalls;
   assert.equal(mode, "fill");
   assert.equal(drawState.fill.kind, "linear-gradient");
-  assert.equal(path.commands.length, 1);
-  assert.equal(path.commands[0].op, "rect");
-  assert.deepEqual([...path.commands[0].args], [2, 3, 8, 5]);
-  assert.deepEqual([...path.commands[0].transform], [1, 0, 0, 1, 0, 0]);
+  assert.deepEqual(rect, [2, 3, 8, 5]);
+  assert.deepEqual([...drawState.transform], [1, 0, 0, 1, 0, 0]);
   assert.equal(ops.length, 1);
   assert.equal(ops[0].kind, "draw");
   assert.equal(ops[0].source, source);

@@ -115,9 +115,9 @@ export interface ClipSnapshot {
   readonly path: PathSnapshot;
   readonly rule: "nonzero" | "evenodd";
   /**
-   * Internal native coverage provider for this level. The clip feature closes
-   * over the rasterizer; the device resolves the mask at draw time and
-   * consumes it as one stencil level. Logical snapshots without a provider
+   * Native soft coverage of the entire chain ending at this snapshot, in
+   * device space. The clip feature closes over the rasterizer; the device
+   * consumes the mask synchronously. Logical snapshots without a provider
    * (state-unit stubs) are invalid to draw with, not silently unclipped.
    */
   readonly mask?: (bounds: Bounds) => RasterSource;
@@ -197,6 +197,15 @@ export interface Presenter {
   invalidate(generation: number): void;
 }
 export interface Rasterizer {
+  /** Native fillRect coverage, or an opaque white mask for partial clears. */
+  rect(
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    state: DrawState,
+    mode: "fill" | "clear",
+  ): RasterSource;
   path(
     path: PathSnapshot,
     state: DrawState,
@@ -213,6 +222,7 @@ export interface Rasterizer {
     path: PathSnapshot,
     rule: "nonzero" | "evenodd",
     bounds: Bounds,
+    parent?: ClipSnapshot | null,
   ): RasterSource;
   measureWidth(text: string, state: DrawState): number;
   /**

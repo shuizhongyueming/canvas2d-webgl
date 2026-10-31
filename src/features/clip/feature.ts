@@ -13,8 +13,8 @@ import { PathRecorder } from "../../path/recorder.js";
  * The call records an immutable ClipSnapshot whose parent is the previous
  * effective clip; the current path is never consumed or reset. Coverage is
  * not computed here: each snapshot carries a mask provider that resolves the
- * level's native rasterized coverage at draw time, and the GPU device turns
- * the chain into stencil levels. The Path2D overloads are outside the
+ * entire chain's native soft coverage at draw time. The GPU applies this
+ * coverage during compositing. The Path2D overloads are outside the
  * approved matrix and report unsupported-api.
  */
 
@@ -136,8 +136,9 @@ export const clipFeature: FeatureFactory = (environment): FeatureDefinition => {
             rule,
             // Resolve through the shared native rasterizer with the scene
             // bounds the device supplies. The raster cache owns the canvas;
-            // the device releases its lease after building the stencil.
-            mask: (bounds: Bounds) => raster.clip(snapshot, rule, bounds),
+            // the device releases its lease after the operation.
+            mask: (bounds: Bounds) =>
+              raster.clip(snapshot, rule, bounds, parent),
           });
           state.set("clip", level);
         },

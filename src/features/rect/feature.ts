@@ -6,6 +6,7 @@ import type {
   FeatureFactory,
   Matrix,
   Paint,
+  RasterSource,
 } from "../../internal/contracts.js";
 import { createCompatError, ERROR_CODES } from "../../contracts/errors.js";
 import { PathRecorder } from "../../path/recorder.js";
@@ -13,10 +14,9 @@ import { PathRecorder } from "../../path/recorder.js";
 /**
  * Rectangle drawing: fillRect/clearRect/strokeRect.
  *
- * Solid fills and clears reach the GPU as plain transformed quads; source-in
- * fills, gradient/pattern fills and every strokeRect use the native asset
- * service (a recorded rect path rasterized by the rasterizer), so those share
- * the native rasterizer's coverage and paint evaluation. None of these members
+ * Integer-aligned solid fills and clears use GPU quads. Other fills/clears
+ * use native fillRect coverage; strokes use a recorded rect path. These
+ * members share the native rasterizer's paint evaluation and none of them
  * touch the current path: the recorder below is feature-private and never
  * aliases environment.path. Clear operations ignore paint, alpha and filter by
  * contract while still honoring the draw-time transform and the effective clip.
@@ -74,6 +74,25 @@ function deviceBounds(
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 }
 
+/** A quad has exact native coverage only for axis-aligned integer edges. */
+function integerEdges(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  transform: Matrix,
+): boolean {
+  const [a, b, c, d] = transform;
+  if (!((b === 0 && c === 0) || (a === 0 && d === 0))) return false;
+  const bounds = deviceBounds(x, y, width, height, transform);
+  return [
+    bounds.x,
+    bounds.y,
+    bounds.x + bounds.width,
+    bounds.y + bounds.height,
+  ].every(Number.isInteger);
+}
+
 /** Placeholder for the unused paint slot of a clear operation's rect source. */
 const CLEAR_PAINT: Paint = Object.freeze({
   kind: "solid",
@@ -106,17 +125,20 @@ export const rectFeature: FeatureFactory = (environment): FeatureDefinition => {
     width: number,
     height: number,
     snapshot: DrawState,
-    mode: "fill" | "stroke",
+    mode: "fill" | "stroke" | "clear",
   ): void {
-    recorder.begin();
-    recorder.rect(x, y, width, height, snapshot.transform);
-    const source = raster.path(recorder.snapshot(), snapshot, mode);
+    let source: RasterSource;
+    if (mode === "stroke") {
+      recorder.begin();
+      recorder.rect(x, y, width, height, snapshot.transform);
+      source = raster.path(recorder.snapshot(), snapshot, mode);
+    } else source = raster.rect(x, y, width, height, snapshot, mode);
     try {
       // Empty coverage still becomes an operation: source-in erases the
       // effective clip, the other modes are no-ops in the device.
       gpu.draw({
         generation: gpu.generation,
-        kind: "draw",
+        kind: mode === "clear" ? "clear" : "draw",
         state: snapshot,
         source:
           source.bounds.width <= 0 || source.bounds.height <= 0
@@ -149,7 +171,11 @@ export const rectFeature: FeatureFactory = (environment): FeatureDefinition => {
         });
       return;
     }
-    if (snapshot.fill.kind !== "solid" || snapshot.composite === "source-in") {
+    if (
+      snapshot.fill.kind !== "solid" ||
+      snapshot.composite === "source-in" ||
+      !integerEdges(x, y, width, height, snapshot.transform)
+    ) {
       drawRasterRect(x, y, width, height, snapshot, "fill");
       return;
     }
@@ -174,6 +200,10 @@ export const rectFeature: FeatureFactory = (environment): FeatureDefinition => {
     const [x, y, width, height] = rect;
     if (width === 0 || height === 0) return;
     const snapshot = state.snapshot();
+    if (!integerEdges(x, y, width, height, snapshot.transform)) {
+      drawRasterRect(x, y, width, height, snapshot, "clear");
+      return;
+    }
     gpu.draw({
       generation: gpu.generation,
       kind: "clear",
