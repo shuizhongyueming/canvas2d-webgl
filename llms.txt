@@ -1,0 +1,60 @@
+# canvas2d-webgl
+
+> 面向 Canvas 2D 游戏的 WebGL 1 兼容画布。运行库采用 strict TypeScript，支持集有明确边界。本文为 Agent 的项目说明与文档索引。
+
+先阅读当前检出版本的 README.md，了解实现、工具与正式验收的不同状态。需要最新进度时查询关联 GitHub 票和提交证据。本文不替代仓库或用户提供的 AGENTS.md 指令，也不是第二份 API 规格。
+
+## 项目入口
+
+- [README](README.md)：项目阶段、源码使用示例、实时工具启动与验证入口。
+- [库规格](docs/specs/canvas2d-webgl.md)：实现功能、处理兼容边界或判断预期行为时阅读；后续决议从规格管理票追溯。
+- [库规格管理](https://github.com/shuizhongyueming/canvas2d-webgl/issues/1)：确认已批准的范围变更。
+- [术语表](GLOSSARY.md)：解释目标画布、兼容画布、场景纹理和评审术语时阅读。
+
+## 修改运行库
+
+- [公开入口](src/index.ts)：确认 package 暴露的工厂和类型。
+- [公开类型](src/api.ts)：编写调用代码或调整公开接口时阅读；声明由构建生成。
+- [支持矩阵](src/contracts/support.ts)：核对支持值、图像来源、显式不支持项及测试要求；矩阵描述范围，不代表验收结果。
+- [工程契约](docs/development/contracts.md)：修改模块边界、生命周期或共享接口前阅读。
+- [内部契约](src/internal/contracts.ts)：协作修改 GPU、光栅器、状态和 feature 接口时阅读。
+- [架构决策](docs/adr/0001-fbo-scene-texture-native-rasterization.md)：修改场景持久化或路径/文字光栅化分工前阅读。
+
+运行库位于 src/，测试与开发工具位于 test/ 和 scripts/。原生离屏 2D 用于内部素材；主场景由 WebGL 合成。浏览器测试钩子保持在测试边界，不从 package 公开导出。
+
+## 修改或运行测试
+
+- [测试指南](docs/development/testing.md)：安装 Chromium、构建、浏览器采集、报告和退出码；verify 也包含浏览器回归。
+- [用例协议](test/types/testing.ts)：新增用例或调整准备、执行与资源清理时阅读。
+- [用例目录](test/cases/)：检查行为覆盖，沿用现有唯一 ID；render/combined 的展示分类与观察说明同源维护。
+- [package.json](package.json)：查询当前可执行命令、Node 和 pnpm 版本要求。
+- [CI](.github/workflows/contracts.yml)：确认自动化实际运行哪些检查；CI 绿色不表示完成正式像素兼容验收。
+
+命令优先使用 package scripts，它们负责必要构建。产物和截图放入被忽略的 test-results/ 或仓外；公开仓库保留工具、格式和可公开记录。真实游戏代码与资源留在仓外。
+
+## 实时视觉对比工具
+
+- [工具规格](docs/specs/live-render-comparison.md)：修改交互、执行与量测行为前阅读。
+- [已完成开发计划](docs/plans/live-render-comparison.md)：查找模块分工与实施依据。
+- [共享契约](test/live/contracts/)：修改两侧消息、状态、像素格式和反馈结构时核对全部消费者。
+- [展示目录](test/live/catalog/)：目录资格、投影与漂移检查。
+- [子执行器](test/live/runner/)：单侧 prepare/run/dispose 与最终取样。
+- [父协调器](test/live/controller/)：双 iframe、共同起跑、轮次校验及清理。
+- [像素量测](test/live/measure/)：共享严格差分与反馈序列化；原始像素和显示设置分离。
+- [视图](test/live/view/)：导航、分屏/重叠和差异展示。
+- [端到端回归](test/live/integration/live-tool.e2e.mjs)：验证真实接线及全部展示条目的执行。
+
+通过 pnpm run test:live 启动。工具用于实时观察和差异反馈，不保存正式逐用例评审，不给自动接受结论。读回差异可能含浏览器隐私噪声。
+
+## 正式验收与后续工作
+
+- [完整矩阵验收跟进](https://github.com/shuizhongyueming/canvas2d-webgl/issues/57)：当前干净提交的全量证据、逐用例人工与 AI 评审和 acceptance。
+- [七场景验收跟进](https://github.com/shuizhongyueming/canvas2d-webgl/issues/58)：真实游戏参考/兼容截图、完整轨迹与双方评审。
+- [全量采集稳定性](https://github.com/shuizhongyueming/canvas2d-webgl/issues/59)：调查设施抖动及失败分类。
+- [vivo 延后验证](https://github.com/shuizhongyueming/canvas2d-webgl/issues/27)：调用方接入就绪后进行平台验证。
+- [场景验收入口](docs/acceptance/README.md)：准备真实游戏场景证据时阅读。
+- [证据格式](docs/acceptance/evidence-format.md)：记录场景截图、轨迹、hash 和评审时阅读。
+- [矩阵对账](docs/acceptance/matrix-reconciliation.md)：核对完整目录和证据覆盖时阅读。
+- [GitHub 管理约定](docs/issue-tracker.md)：领取、规划或关闭任务时阅读。
+
+实时工具的用户走查确认记录在[工具交付票](https://github.com/shuizhongyueming/canvas2d-webgl/issues/72)。正式评审绑定具体 run、源码、环境与产物；新的提交需要对应证据。需要人工确认的结论由人提供，Agent 的检查不能代签。

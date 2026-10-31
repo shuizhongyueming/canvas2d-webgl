@@ -1,6 +1,6 @@
 # 真实浏览器测试与评审设施
 
-对应 [实施：真实浏览器语义与差分测试设施](https://github.com/shuizhongyueming/canvas2d-webgl/issues/11)。设施可独立运行；原生对原生自检不是兼容库验收。公开工厂和 GPU 钩子尚未实现时，compat 分支明确 blocked，不切换为 native。
+对应 [实施：真实浏览器语义与差分测试设施](https://github.com/shuizhongyueming/canvas2d-webgl/issues/11)。公开工厂与 GPU 测试钩子已接入真实兼容渲染。原生对原生自检仍只验证设施；compat 初始化失败时明确报告，不切换为 native。正式验收状态由完整采集及绑定产物的评审决定。
 
 ## 安装及命令
 
@@ -22,7 +22,7 @@ pnpm run test:review-index <run.json> --out <run目录>/review-index.md
 pnpm run test:smoke
 # CI 明确选择 SwiftShader WebGL；环境字段记录实际 renderer，绝不重试降级。
 pnpm run test:smoke --software
-# 后续特性实现后，自动发现 test/cases/**/*.case.ts。
+# 自动发现当前 test/cases/**/*.case.ts。
 pnpm run test:browser --output test-results/compat
 pnpm run test:browser --output test-results/compat --case context.fillRect.render
 ```
@@ -42,6 +42,7 @@ import type { CaseDefinition } from '../../types/testing.js';
 export const cases: CaseDefinition[] = [{
   id: 'context.fillRect.render', requirements: ['context.fillRect'],
   kind: 'render', width: 64, height: 64, seed: 1, fonts: [],
+  display: { status: 'included', observation: '观察矩形的位置、范围与颜色。' },
   run({context}) { context.fillStyle = '#123456'; context.fillRect(4, 4, 40, 40); },
 }];
 ```
@@ -57,7 +58,7 @@ export const cases: CaseDefinition[] = [{
 
 ## GPU / facade agent 接线
 
-`test/harness/bridge.js` 的 `hooksFor(compatCanvas)` 是唯一测试侧接线点。GPU/facade owner 将其替换成私有实例映射 lookup 的 import；不修改公开 canvas/context/options，不在 package exports 新增测试 API。当前明确抛 test-hooks-unavailable。工厂从真实 `src/index.ts` 的编译产物 `dist/index.js` 导入，不能以 fixture 工厂或全原生实现冒充兼容库。
+`test/harness/bridge.js` 的 `hooksFor(compatCanvas)` 是唯一测试侧接线点。它通过私有实例映射 lookup 获取真实 hooks；公开工厂在创建实例时注册。查找失败时抛 test-hooks-unavailable。修改接线时保持公开 canvas/context/options 与 package exports 边界。工厂从真实 `src/index.ts` 的编译产物 `dist/index.js` 导入，不能以 fixture 工厂或全原生实现冒充兼容库。
 
 钩子 readScene 返回直通 RGBA8 sRGB、左上行优先、alpha=0 RGB=0；whenPresented 只等待已排队提交，不触发提交。generation 变化/lost/dispose 应 reject。测试模块读取 scene，浏览器 driver 另用合成器截图读取目标元素显示，两类证据互不替代。截图有白色页面背景，场景 PNG 保留透明度；reference/actual 使用同一背景，不把两种不同表面直接做差分。
 
@@ -74,13 +75,13 @@ pnpm run test:acceptance --run <run.json> --reviews <reviews.json>
 
 评审逐 case 绑定 runId、commit、sourceHash、environmentHash 与包含全部六张图的 artifactHash。验收重新读文件计算 hash、验证 PNG 和路径；检查当前源码及当前必需目录，忽略 run 里声称的 render: accepted，重新推导状态。重复记录、旧评审、缺任何一张图、skip、missing 都不放行。评审导入不修改原始 run，重新生成报告即可关联。记录是本地评审声明，不提供身份认证或防恶意篡改签名。
 
-设施自检始终保持 infrastructure-self-test 范围，即使所有图片获评审也不能成为兼容验收。当前没有实际 compat 渲染对，因此没有提交人工像素通过记录，也不宣称七场景或 vivo 验证。
+设施自检始终保持 infrastructure-self-test 范围，即使所有图片获评审也不能成为兼容验收。当前可采集真实 compat 渲染对；实时对比工具也已交付并完成人工走查。正式矩阵评审、七场景与 vivo 验证的完成情况分别见 GitHub 跟进票 #57、#58 与 #27，不能从工具走查推导。
 
 ## 审查后明确的验收边界
 
 `--reviews` 为可选参数；省略时按空评审集合处理，像素用例 pending-review，验收退出 2。开发中允许采集 dirty run 以调试和查看报告，但正式 acceptance 要求 `dirty === false`，缺少 dirty 字段也不会放行；提交后须重新采集，不能用旧 run 或旧评审作为新提交证据。
 
-环境中的 GL attributes 当前来自独立探针，证明浏览器基础能力，不能视为被测 compat target 的配置证据。GPU/facade 接线时须补充真实 target 的属性、尺寸和 stencil 核验。当前没有真实 compat 渲染验收。
+环境中的 GL attributes 来自独立探针，描述浏览器基础能力，不能视为被测 compat target 的属性证据。实际目标的属性、尺寸与 stencil 要求需结合 GPU 能力检查和对应回归核对。正式兼容验收仍要求完整产物及有效评审，不能仅凭探针或目标创建成功判定通过。
 
 `execution: executed` 表示已经尝试执行，并不代表运行成功；当前协议没有 failed execution 枚举。产物解码或尺寸不符沿用 `semantic: fail` + error，退出 1；这是测试失败，不是像素评审 rejected。未知初始化错误也保持失败，不能默认当成环境不足来跳过。
 
