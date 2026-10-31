@@ -7,6 +7,8 @@
  * 并发纪律：消息事件可并发到达，本类的每个 await 之后都重新核对阶段；
  * prepare 入口立即占用 preparing 标记，重复 prepare 一律报错。
  */
+
+import type { CaseDefinition } from "../../types/testing.js";
 import type {
   CleanupCallback,
   CleanupRegistry,
@@ -17,11 +19,10 @@ import type {
   SessionStage,
   Side,
 } from "../contracts/index.js";
-import type { CaseDefinition } from "../../types/testing.js";
 import {
+  type ExecutionEnvironment,
   prepareCaseExecution,
   seededRandomFrom,
-  type ExecutionEnvironment,
 } from "./execution.js";
 
 export interface RunnerEnvironment {
@@ -116,7 +117,7 @@ export class RunnerSession {
 
   constructor(
     private readonly bootstrap: RunnerBootstrap,
-    private readonly registryFactory: () => CleanupRegistry,
+    registryFactory: () => CleanupRegistry,
   ) {
     this.#registry = registryFactory();
     this.#caseId = bootstrap.caseId;
@@ -336,7 +337,6 @@ export class RunnerSession {
       } catch (error) {
         if (cleanupError.value === undefined) cleanupError.value = error;
       }
-      this.#stage = "disposed";
       if (cleanupError.value !== undefined)
         this.#post({
           type: "error",
@@ -345,6 +345,12 @@ export class RunnerSession {
           stage: "disposing",
           reason: reasonOf(cleanupError.value),
         });
+      this.#stage = "disposed";
+      this.#post({
+        type: "disposed",
+        sessionId: this.bootstrap.sessionId,
+        side: this.bootstrap.side,
+      });
     })();
     return this.#disposePromise;
   }

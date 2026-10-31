@@ -10,11 +10,12 @@ import type {
   Side,
   ViewEvent,
 } from "../contracts/index.js";
-import { measurePixelDifference } from "../measure/diff-core.js";
+import type { PixelDifference } from "../measure/diff-core.js";
+import { diffPixels, normalizePixels } from "../measure/diff-core.js";
 import {
+  type BrowserInfo,
   serializeFailedFeedback,
   serializeMeasuredFeedback,
-  type BrowserInfo,
 } from "../measure/feedback.js";
 
 const SIDES = ["native", "compat"] as const;
@@ -32,10 +33,7 @@ export interface CoordinatorOptions {
     side: Side,
     caseId: string,
   ) => RunnerFrame;
-  readonly measure?: (
-    native: PixelData,
-    compat: PixelData,
-  ) => DifferenceMetrics;
+  readonly measure?: (native: PixelData, compat: PixelData) => PixelDifference;
   readonly browserInfo?: () => BrowserInfo;
   readonly onChange?: (state: ControllerState) => void;
   readonly cleanupTimeout?: number;
@@ -47,6 +45,7 @@ export interface Coordinator {
   receive(message: RunnerMessage, source: unknown): void;
   invalidate(sessionId: SessionId): Promise<void>;
   attachCanvas(slot: HTMLElement, side: Side): void;
+  attachDifferenceCanvas(canvas: HTMLCanvasElement): void;
   feedback(): FeedbackReport | null;
   dispose(): Promise<void>;
 }
@@ -64,6 +63,7 @@ interface Run {
   readonly sides: Record<Side, SideRun>;
   timer: ReturnType<typeof setTimeout> | null;
   difference: DifferenceMetrics | null;
+  differenceImage: Uint8Array | null;
   error: ControllerState["error"];
   failed: boolean;
   disposed: boolean;
@@ -71,17 +71,9 @@ interface Run {
 }
 
 function reasonOf(error: unknown): string {
-  return String((error as { stack?: unknown })?.stack || error);
-}
-
-function defaultMeasure(
-  native: PixelData,
-  compat: PixelData,
-): DifferenceMetrics {
-  const result = measurePixelDifference(native, compat);
-  if (result.status === "invalid")
-    throw new Error(`measurement-failed: ${result.reason}`);
-  return result.metrics;
+  const reason = (error as { reason?: unknown })?.reason;
+  const stack = String((error as { stack?: unknown })?.stack || error);
+  return typeof reason === "string" ? `${reason}: ${stack}` : stack;
 }
 
 function assertTimeout(value: number, name: string): void {
@@ -96,8 +88,11 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
   assertTimeout(options.cleanupTimeout ?? 1000, "cleanup");
   const caseIds = new Set(options.cases.map((entry) => entry.id));
   const slots: Partial<Record<Side, HTMLElement>> = {};
+  let differenceCanvas: HTMLCanvasElement | null = null;
   const cleanupDiagnostics = new Map<string, string[]>();
   const cleanupSources = new Map<string, Record<Side, unknown>>();
+  const cleanupPending = new Map<string, Set<Side>>();
+  const cleanupFinished = new Map<string, () => void>();
   let current: Run | null = null;
   let disposed = false;
   let nextId = 0;
@@ -117,7 +112,33 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
   };
 
   const publish = (): void => {
+    renderDifference();
     options.onChange?.(state);
+  };
+
+  const renderDifference = (): void => {
+    const canvas = differenceCanvas;
+    if (!canvas) return;
+    const run = current;
+    const image = run?.differenceImage;
+    if (!run || run.disposed || state.stage !== "completed" || !image) {
+      canvas.width = 0;
+      canvas.height = 0;
+      return;
+    }
+    const { width, height } = run.sides.native.pixels ?? {
+      width: 0,
+      height: 0,
+    };
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("difference-canvas-unavailable");
+    context.putImageData(
+      new ImageData(new Uint8ClampedArray(image), width, height),
+      0,
+      0,
+    );
   };
 
   const update = (run: Run): void => {
@@ -159,11 +180,11 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
         native:
           run.error.side === "native"
             ? "failed"
-            : (run.sides.native?.stage ?? "disposed"),
+            : (run.sides.native?.stage ?? "preparing"),
         compat:
           run.error.side === "compat"
             ? "failed"
-            : (run.sides.compat?.stage ?? "disposed"),
+            : (run.sides.compat?.stage ?? "preparing"),
       },
       difference: null,
       error: run.error,
@@ -187,6 +208,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     if (run.sides.native) run.sides.native.pixels = null;
     if (run.sides.compat) run.sides.compat.pixels = null;
     run.difference = null;
+    run.differenceImage = null;
     // 先请求子执行器显式释放，再移除文档。此处不等待旧 run 收尾。
     for (const side of SIDES) {
       const item = run.sides[side];
@@ -206,9 +228,17 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
       native: run.sides.native?.frame.element.contentWindow,
       compat: run.sides.compat?.frame.element.contentWindow,
     });
+    const pending = new Set(
+      SIDES.filter((side) => run.sides[side] !== undefined),
+    );
+    cleanupPending.set(run.id, pending);
     run.cleanup = new Promise<void>((resolve) => {
+      cleanupFinished.set(run.id, resolve);
+      if (pending.size === 0) resolve();
       setTimeout(resolve, options.cleanupTimeout ?? 1000);
     }).finally(() => {
+      cleanupFinished.delete(run.id);
+      cleanupPending.delete(run.id);
       const diagnostics = cleanupDiagnostics.get(run.id);
       cleanupDiagnostics.delete(run.id);
       cleanupSources.delete(run.id);
@@ -281,6 +311,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
       sides,
       timer: null,
       difference: null,
+      differenceImage: null,
       error: null,
       failed: false,
       disposed: false,
@@ -339,6 +370,18 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     if (!message || typeof message !== "object") return;
     // 清理诊断可来自已失效轮次；其余晚到消息一律拒收。
     if (
+      message.type === "disposed" &&
+      (message.side === "native" || message.side === "compat")
+    ) {
+      if (
+        cleanupSources.get(message.sessionId)?.[message.side] === source &&
+        cleanupPending.get(message.sessionId)?.delete(message.side) &&
+        cleanupPending.get(message.sessionId)?.size === 0
+      )
+        cleanupFinished.get(message.sessionId)?.();
+      return;
+    }
+    if (
       message.type === "error" &&
       message.stage === "disposing" &&
       cleanupDiagnostics.has(message.sessionId) &&
@@ -380,13 +423,17 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
       }
       stopTimer(run);
       try {
-        run.difference = (options.measure ?? defaultMeasure)(
-          run.sides.native.pixels as PixelData,
-          run.sides.compat.pixels as PixelData,
-        );
+        const native = run.sides.native.pixels as PixelData;
+        const compat = run.sides.compat.pixels as PixelData;
+        const measured = options.measure
+          ? options.measure(native, compat)
+          : diffPixels(normalizePixels(native), normalizePixels(compat));
+        run.difference = measured.metrics;
+        run.differenceImage = measured.image;
         update(run);
       } catch (error) {
         fail(run, null, "running", reasonOf(error));
+        update(run);
       }
     }
   }
@@ -472,6 +519,10 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
       slot.replaceChildren();
       // 只迁移尚在限时清理中的失败轮次。已处置 host 不得复活。
       if (current && !current.disposed) slot.append(current.sides[side].host);
+    },
+    attachDifferenceCanvas(canvas) {
+      differenceCanvas = canvas;
+      renderDifference();
     },
     feedback() {
       const run = current;

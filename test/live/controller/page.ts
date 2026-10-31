@@ -1,7 +1,7 @@
-import type { RunnerMessage } from "../contracts/index.js";
 import type { LiveDisplayEntry } from "../catalog/display-catalog.js";
-import { createView, createBrowserHost, type View } from "../view/view.js";
-import { createCoordinator, type Coordinator } from "./coordinator.js";
+import type { RunnerMessage } from "../contracts/index.js";
+import { createBrowserHost, createView, type View } from "../view/view.js";
+import { type Coordinator, createCoordinator } from "./coordinator.js";
 import { createRunnerFrame } from "./frames.js";
 
 interface CatalogEntry extends LiveDisplayEntry {
@@ -16,7 +16,7 @@ function timeout(value: string | null, fallback: number): number {
   return parsed;
 }
 
-/** #71 仅提供协调器与真实 iframe 页面；完整端到端产品接线由 #72 收尾。 */
+/** #72 接通真实目录、双 iframe 执行、量测结果与交互视图。 */
 export async function startLivePage(root: HTMLElement): Promise<{
   coordinator: Coordinator;
   view: View;
@@ -80,21 +80,40 @@ export async function startLivePage(root: HTMLElement): Promise<{
   });
   coordinator.attachCanvas(slots.get("native") as HTMLElement, "native");
   coordinator.attachCanvas(slots.get("compat") as HTMLElement, "compat");
+  const differenceCanvas = root.querySelector(".live-diff-canvas");
+  if (!(differenceCanvas instanceof HTMLCanvasElement))
+    throw new Error("live-page: missing difference canvas");
+  coordinator.attachDifferenceCanvas(differenceCanvas);
   const onMessage = (event: MessageEvent): void => {
     if (event.origin !== location.origin) return;
+    const shortcut = event.data as {
+      type?: string;
+      key?: string;
+      sessionId?: string;
+    } | null;
+    if (shortcut?.type === "live-shortcut") {
+      if (shortcut.sessionId !== coordinator.state.sessionId) return;
+      const sourceFrame = [...document.querySelectorAll("iframe")].find(
+        (frame) =>
+          frame.dataset.sessionId === shortcut.sessionId &&
+          frame.contentWindow === event.source,
+      );
+      if (!sourceFrame || typeof shortcut.key !== "string") return;
+      onKey(shortcut.key);
+      return;
+    }
     coordinator.receive(event.data as RunnerMessage, event.source);
   };
-  const onKey = (event: KeyboardEvent): void => {
+  const onKey = (event: KeyboardEvent | string): void => {
+    const key = typeof event === "string" ? event : event.key;
     if (
-      event.defaultPrevented ||
-      event.altKey ||
-      event.ctrlKey ||
-      event.metaKey
+      typeof event !== "string" &&
+      (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey)
     )
       return;
-    if (["ArrowUp", "ArrowDown", "v", "V"].includes(event.key)) {
-      event.preventDefault();
-      view.handleKey(event.key);
+    if (view.shouldHandleKey(key)) {
+      if (typeof event !== "string") event.preventDefault();
+      view.handleKey(key);
     }
   };
   window.addEventListener("message", onMessage);
@@ -109,6 +128,7 @@ export async function startLivePage(root: HTMLElement): Promise<{
       document.removeEventListener("keydown", onKey);
       view.dispose();
       await coordinator.dispose();
+      root.replaceChildren();
     },
   };
 }

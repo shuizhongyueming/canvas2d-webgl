@@ -112,7 +112,9 @@ pnpm run test:acceptance --run <run.json> --reviews <reviews.json>
 
 `test/live/controller/` 实现父协调器和真实双 iframe 承载。每轮只接受当前 `sessionId`、`side`、来源 `contentWindow` 和阶段匹配的消息。两侧 `ready` 后统一发送 `start`，两侧完成最终取样后才调用共享量测核心。切换/重跑先作废旧轮次并清空画面，再异步显式清理和移除 iframe；不等待旧 run 自行结束。清理诊断保留，普通晚到消息拒收。iframe 不主动获取焦点且不接收指针事件，父页面保留快捷键。
 
-本地开发命令为 `pnpm run test:live`。可用 `-- --port=0 --prepare-timeout=10000 --run-timeout=10000` 调整端口和阶段时限。服务仅绑定 `127.0.0.1`，目录端点 `/api/catalog` 直接来自完整 catalog 的 included 投影。服务不是通用静态服务器，仅暴露构建、用例和测试素材路径。完整产品接线和差异图展示由 #72 收尾；协调器只交付真实量测结果，不伪造差异图。
+本地开发命令为 `pnpm run test:live`。命令先构建，再启动工具。按 `Ctrl+C` 停止服务。可用 `--port=0 --prepare-timeout=10000 --run-timeout=10000` 调整端口和阶段时限。`--port=0` 自动选择空闲端口，终端会打印实际地址。服务仅绑定 `127.0.0.1`，目录端点 `/api/catalog` 直接来自完整 catalog 的 included 投影。服务不是通用静态服务器，仅暴露构建、用例和测试素材路径。
+
+运行 `pnpm run test:live:e2e` 执行真实 Chromium 工具回归。报告、失败截图和窄窗口截图写入 `test-results/live-tool/`。该回归验证工具接线、取样、生命周期和交互，不是兼容性验收。非零像素差异会记录为实测结果，不等于工具测试失败。运行失败不会记成零差异。
 
 iframe 属于可信本地测试的隔离边界，不是安全沙箱或独立线程：**不能强制中断同步死循环**；超时只标记本轮失败，不承诺底层任务停止。切换/重跑时移除旧 iframe 是环境兜底，不能替代已知资源的显式释放。
 

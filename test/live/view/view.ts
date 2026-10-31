@@ -19,11 +19,11 @@ export interface View {
   render(state: ControllerState): void;
   /**
    * 页面级快捷键在控件聚焦期间不得触发（issue #60 键盘冲突）。
-   * 焦点策略：由外层页面把 document 的 keydown 转交本方法；iframe 内的
-   * 键盘事件属于子执行环境，不经过外层 document，因此 iframe 内操作
-   * 不会被页面级快捷键拦截；集成票（#71）负责接线并在集成中验证。
+   * 焦点策略：外层页面把 document 的 keydown 转交本方法。
+   * runner-document 也会把 iframe 内快捷键转发到外层，由外层校验来源。
    */
   handleKey(key: string): void;
+  shouldHandleKey(key: string): boolean;
   /**
    * 复制反馈上下文（issue #64 反馈协议）。
    * 调用协议：用户点击按钮只派发 copy-feedback 事件；controller 收到后
@@ -278,11 +278,9 @@ class ComparisonView implements View {
     diffCanvasWrap.className = "live-diff-canvas-wrap";
     const diffCanvas = document.createElement("canvas");
     diffCanvas.className = "live-diff-canvas";
-    // 逐像素数据接入前的可见占位（不可见 dataset 不算占位）。
-    const diffPlaceholder = document.createElement("div");
-    diffPlaceholder.className = "live-diff-placeholder";
-    diffPlaceholder.textContent = "差异图等待逐像素数据（由量测票 #68 提供）。";
-    diffCanvasWrap.append(diffCanvas, diffPlaceholder);
+    // 协调器在量测完成后写入真实逐像素数据。
+    diffCanvas.setAttribute("aria-label", "逐像素二值差异图");
+    diffCanvasWrap.append(diffCanvas);
     diffImageBox.append(diffCanvasWrap);
     diffBox.append(diffEmpty, diffStats, diffBounds, diffImageBox);
     layout.append(diffBox);
@@ -360,6 +358,13 @@ class ComparisonView implements View {
       const current = this.state?.display.mode ?? "overlay";
       this.setDisplay({ mode: current === "split" ? "overlay" : "split" });
     }
+  }
+
+  shouldHandleKey(key: string): boolean {
+    return (
+      ["ArrowUp", "ArrowDown", "v", "V"].includes(key) &&
+      !this.isControlFocused()
+    );
   }
 
   /** 反馈复制成功/失败（剪贴板异常）时由 controller 回调展示提示。 */
@@ -634,14 +639,12 @@ class ComparisonView implements View {
     this.renderDiffCanvas(diffCanvas);
   }
 
-  /**
-   * 逐像素二值定位图（品红/透明，issue #64）的数据由量测票（#68）提供；
-   * 本票只携带 bbox 指标，不能把 bbox 整块染成品红冒充差异图——
-   * bbox 内部不保证全部不同。逐像素数据接入前显示可见占位文本，不画伪图。
-   */
+  /** 真实逐像素图由协调器写入；无有效量测时保持零尺寸。 */
   private renderDiffCanvas(canvas: HTMLCanvasElement): void {
-    canvas.width = 0;
-    canvas.height = 0;
+    if (!this.state?.difference) {
+      canvas.width = 0;
+      canvas.height = 0;
+    }
   }
 
   private renderActions(state: ControllerState): void {
@@ -856,12 +859,6 @@ const VIEW_CSS = `
 .live-diff-active { display: flex; }
 .live-diff-empty { color: #666; }
 .live-diff-canvas-wrap { margin-top: 4px; position: relative; }
-.live-diff-placeholder {
-  padding: 8px;
-  border: 1px dashed #999;
-  color: #666;
-  font-size: 12px;
-}
 .live-diff-canvas {
   border: 1px dashed #999;
   background:

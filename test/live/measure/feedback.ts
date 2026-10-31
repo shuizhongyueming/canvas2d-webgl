@@ -44,8 +44,14 @@ export function serializeMeasuredFeedback(
   const difference: FeedbackDifference = {
     protocolVersion: 1,
     status: "measured",
-    nativeSize: input.nativeSize,
-    compatSize: input.compatSize,
+    nativeSize: {
+      width: input.nativeSize.width,
+      height: input.nativeSize.height,
+    },
+    compatSize: {
+      width: input.compatSize.width,
+      height: input.compatSize.height,
+    },
     changedPixels: input.metrics.changedPixels,
     totalPixels: input.metrics.totalPixels,
     changedRatio: input.metrics.changedRatio,

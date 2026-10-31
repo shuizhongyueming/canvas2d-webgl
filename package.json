@@ -37,7 +37,9 @@
     "test:smoke": "node scripts/harness-smoke.mjs",
     "pretest:smoke": "pnpm run build",
     "test:live": "node scripts/live.mjs",
-    "pretest:live": "pnpm run build"
+    "pretest:live": "pnpm run build",
+    "test:live:e2e": "node test/live/integration/live-tool.e2e.mjs",
+    "pretest:live:e2e": "pnpm run build"
   },
   "engines": {
     "node": ">=22"

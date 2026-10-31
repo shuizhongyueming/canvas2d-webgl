@@ -1,11 +1,12 @@
 // 视图层真实浏览器交互回归（issue #70）。
 // 桩驱动：宿主与 dispatch 均为测试替身；不声称证明完整执行链路。
-import test from "node:test";
+
 import assert from "node:assert/strict";
 import { access } from "node:fs/promises";
+import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import { serve } from "../../harness/server.mjs";
-import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../../..", import.meta.url));
 
@@ -712,7 +713,7 @@ test(
 );
 
 test(
-  "指纹噪声提示可见；完成状态展示 bbox 与差异图占位",
+  "指纹噪声提示可见；完成状态展示 bbox 与真实逐像素图",
   browserOptions,
   async (t) => {
     const { page, setState } = await launch(t);
@@ -735,22 +736,34 @@ test(
     const bounds = await page.textContent(".live-diff-bounds");
     assert.match(bounds, /x=1, y=1/);
     assert.match(bounds, /内部不保证全部不同/);
-    // 逐像素图数据接入前不画伪图：画布保持空，占位文本可见。
     const diffInfo = await page.evaluate(() => {
       const canvas = document.querySelector(".live-diff-canvas");
-      const placeholder = document.querySelector(".live-diff-placeholder");
+      const context = canvas.getContext("2d");
+      canvas.width = 3;
+      canvas.height = 1;
+      context.putImageData(
+        new ImageData(
+          new Uint8ClampedArray([
+            255, 0, 180, 255, 0, 0, 0, 0, 255, 0, 180, 255,
+          ]),
+          3,
+          1,
+        ),
+        0,
+        0,
+      );
       return [
         canvas.width,
         canvas.height,
-        placeholder.textContent,
-        placeholder.offsetParent !== null,
+        [...context.getImageData(0, 0, 3, 1).data],
+        document.querySelector(".live-diff-placeholder"),
       ];
     });
     assert.deepEqual(diffInfo, [
-      0,
-      0,
-      "差异图等待逐像素数据（由量测票 #68 提供）。",
-      true,
+      3,
+      1,
+      [255, 0, 180, 255, 0, 0, 0, 0, 255, 0, 180, 255],
+      null,
     ]);
   },
 );
