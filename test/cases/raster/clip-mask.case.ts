@@ -1,5 +1,5 @@
 // Raster-module self-test (native-assisted): drives src/raster directly with its
-// own native canvases, not the compat context. Stencil clip consumption belongs
+// own native canvases, not the compat context. GPU clip consumption belongs
 // to the clip feature ticket (#21); these cases stay module regressions on
 // both sides.
 import type { CaseAdapter, CaseDefinition } from "../../types/testing.js";
@@ -32,13 +32,14 @@ function run(a: CaseAdapter): void {
   const lab = makeLab();
   const bounds = { x: 0, y: 0, width: SCENE.width, height: SCENE.height };
 
-  // The clip asset is the path's fill coverage under the requested rule; the
-  // stencil consumption belongs to the clip feature ticket.
+  // The asset is effective native clip coverage, sampled by drawing white
+  // through the requested clip. fill(rule) can use different edge coverage.
   for (const rule of ["nonzero", "evenodd"] as const) {
     const reference = referenceContext();
     buildNative(reference);
     reference.fillStyle = "#ffffff";
-    reference.fill(rule);
+    reference.clip(rule);
+    reference.fillRect(0, 0, SCENE.width, SCENE.height);
 
     const recorder = new PathRecorder();
     recorder.begin();

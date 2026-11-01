@@ -1,6 +1,7 @@
 import type { NativeCanvas } from "../api.js";
 import type {
   Bounds,
+  ClipSnapshot,
   DrawState,
   Paint,
   PathSnapshot,
@@ -70,6 +71,8 @@ class NativeRasterizer implements Rasterizer {
   #disposed = false;
   #measure: { canvas: NativeCanvas; context: Native2DContext } | null = null;
   #stage: { canvas: NativeCanvas; context: Native2DContext } | null = null;
+  #drawingStage: { canvas: NativeCanvas; context: Native2DContext } | null =
+    null;
   #patternScratch: { canvas: NativeCanvas; context: Native2DContext } | null =
     null;
 
@@ -79,6 +82,107 @@ class NativeRasterizer implements Rasterizer {
       maxEntries: options.maxEntries,
       maxPixels: options.maxPixels,
     });
+  }
+
+  rect(
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    state: DrawState,
+    mode: "fill" | "stroke" | "clear",
+  ): RasterSource {
+    this.#assertLive();
+    const key = [
+      "rect",
+      this.#epoch,
+      this.#sceneKey(),
+      mode,
+      x,
+      y,
+      width,
+      height,
+      state.transform.join(","),
+      mode === "clear"
+        ? "white"
+        : paintKey(mode === "stroke" ? state.stroke : state.fill),
+      mode === "stroke" ? strokeKey(state) : "",
+    ].join("|");
+    const hit = this.#cache.acquire(key);
+    if (hit) return this.#toSource(hit);
+    const corners = [
+      [x, y],
+      [x + width, y],
+      [x, y + height],
+      [x + width, y + height],
+    ] as const;
+    const transformed = corners.map(([cx, cy]) =>
+      applyPoint(state.transform, cx, cy),
+    );
+    const xs = transformed.map((p) => p[0]),
+      ys = transformed.map((p) => p[1]);
+    const bounds = alignOutset(
+      {
+        x: Math.min(...xs),
+        y: Math.min(...ys),
+        width: Math.max(...xs) - Math.min(...xs),
+        height: Math.max(...ys) - Math.min(...ys),
+      },
+      mode === "stroke"
+        ? scaleBound(state.transform) * state.lineWidth * (MITER_LIMIT + 0.5) +
+            2
+        : 1,
+      this.#scene(),
+    );
+    if (!bounds)
+      return this.#toSource(
+        this.#ownLease(emptyAsset(this.#options.createCanvas)),
+      );
+    const { canvas, ctx } = this.#createAsset(bounds);
+    try {
+      const scene = this.#scene();
+      const stage = this.#stageContext(
+        scene.width,
+        scene.height,
+        mode === "stroke" ? "drawing" : "readback",
+      );
+      stage.ctx.setTransform(...state.transform);
+      if (mode === "clear") stage.ctx.fillStyle = "#ffffff";
+      else
+        applyPaint(
+          stage.ctx,
+          mode === "stroke" ? state.stroke : state.fill,
+          mode === "stroke" ? "stroke" : "fill",
+          this.#patternSource,
+        );
+      if (mode === "stroke") {
+        // strokeRect is a native primitive, not rect()+stroke(). Software
+        // Skia's path stroke can drop outer corners of a small thin rect.
+        stage.ctx.lineWidth = state.lineWidth;
+        stage.ctx.lineCap = state.lineCap;
+        stage.ctx.lineJoin = state.lineJoin;
+        stage.ctx.strokeRect(x, y, width, height);
+      } else stage.ctx.fillRect(x, y, width, height);
+      ctx.putImageData(
+        stage.ctx.getImageData(bounds.x, bounds.y, bounds.width, bounds.height),
+        0,
+        0,
+      );
+    } catch (error) {
+      destroyCanvas(canvas);
+      throw error;
+    }
+    const asset = {
+      canvas,
+      bounds,
+      pixelWidth: bounds.width,
+      pixelHeight: bounds.height,
+    };
+    return this.#toSource(
+      this.#cache.store(key, asset, bounds.width * bounds.height, (a) =>
+        destroyCanvas(a.canvas),
+      ) ?? this.#ownLease(asset),
+    );
   }
 
   path(
@@ -144,6 +248,7 @@ class NativeRasterizer implements Rasterizer {
     path: PathSnapshot,
     rule: "nonzero" | "evenodd",
     bounds: Bounds,
+    parent: ClipSnapshot | null = null,
   ): RasterSource {
     this.#assertLive();
     const key = [
@@ -152,6 +257,9 @@ class NativeRasterizer implements Rasterizer {
       this.#sceneKey(),
       rule,
       path.id,
+      ...this.#clipChain(parent).map(
+        (level) => `${level.path.id}:${level.rule}`,
+      ),
       bounds.x,
       bounds.y,
       bounds.width,
@@ -159,7 +267,7 @@ class NativeRasterizer implements Rasterizer {
     ].join("|");
     const hit = this.#cache.acquire(key);
     if (hit) return this.#toSource(hit);
-    const asset = this.#renderClip(path, rule, bounds);
+    const asset = this.#renderClip(path, rule, bounds, parent);
     const lease =
       this.#cache.store(key, asset, asset.pixelWidth * asset.pixelHeight, (a) =>
         destroyCanvas(a.canvas),
@@ -204,6 +312,8 @@ class NativeRasterizer implements Rasterizer {
     this.#measure = null;
     if (this.#stage) destroyCanvas(this.#stage.canvas);
     this.#stage = null;
+    if (this.#drawingStage) destroyCanvas(this.#drawingStage.canvas);
+    this.#drawingStage = null;
     if (this.#patternScratch) destroyCanvas(this.#patternScratch.canvas);
     this.#patternScratch = null;
   }
@@ -225,19 +335,34 @@ class NativeRasterizer implements Rasterizer {
   #stageContext(
     width: number,
     height: number,
+    usage: "readback" | "drawing" = "readback",
   ): { canvas: NativeCanvas; ctx: Native2DContext } {
-    if (!this.#stage) {
+    let stage = usage === "drawing" ? this.#drawingStage : this.#stage;
+    if (!stage) {
       const canvas = this.#options.createCanvas(width, height);
-      this.#stage = {
-        canvas,
-        context: context2d(canvas, { willReadFrequently: true }),
-      };
+      try {
+        // strokeRect's draw-oriented native coverage differs from software
+        // readback coverage. An explicit false also prevents the tested
+        // Chromium path from switching after repeated getImageData calls.
+        // Keep this context separate from the software path/text/clip stage.
+        stage = {
+          canvas,
+          context: context2d(canvas, {
+            willReadFrequently: usage === "readback",
+          }),
+        };
+      } catch (error) {
+        destroyCanvas(canvas);
+        throw error;
+      }
+      if (usage === "drawing") this.#drawingStage = stage;
+      else this.#stage = stage;
     } else {
-      const canvas = this.#stage.canvas;
+      const canvas = stage.canvas;
       if (width !== canvas.width) canvas.width = width;
       if (height !== canvas.height) canvas.height = height;
     }
-    const { canvas, context } = this.#stage;
+    const { canvas, context } = stage;
     context.setTransform(1, 0, 0, 1, 0, 0);
     context.clearRect(0, 0, canvas.width, canvas.height);
     return { canvas, ctx: context };
@@ -540,6 +665,7 @@ class NativeRasterizer implements Rasterizer {
     path: PathSnapshot,
     rule: "nonzero" | "evenodd",
     bounds: Bounds,
+    parent: ClipSnapshot | null,
   ): Asset {
     const aligned = alignOutset(bounds, 0, this.#scene());
     if (!aligned) return emptyAsset(this.#options.createCanvas);
@@ -552,10 +678,28 @@ class NativeRasterizer implements Rasterizer {
         aligned.x + aligned.width,
         aligned.y + aligned.height,
       );
-      replayPath(stage.ctx, path, 0, 0);
-      stage.ctx.setTransform(1, 0, 0, 1, 0, 0);
-      stage.ctx.fillStyle = "#ffffff";
-      stage.ctx.fill(rule);
+      stage.ctx.save();
+      try {
+        // Replaying the native clip chain preserves intersections and repeated
+        // edges. Multiplying independently antialiased levels would not.
+        const seen = new Set<string>();
+        for (const level of [...this.#clipChain(parent), { path, rule }]) {
+          // Intersection with the same immutable path/rule is idempotent.
+          // Software Skia can repeatedly attenuate the mask; the default GPU
+          // canvas recognizes the redundant clip instead. Do not bake that
+          // software-only attenuation into our effective coverage texture.
+          const key = `${level.path.id}:${level.rule}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          replayPath(stage.ctx, level.path, 0, 0);
+          stage.ctx.clip(level.rule);
+        }
+        stage.ctx.setTransform(1, 0, 0, 1, 0, 0);
+        stage.ctx.fillStyle = "#ffffff";
+        stage.ctx.fillRect(0, 0, stage.canvas.width, stage.canvas.height);
+      } finally {
+        stage.ctx.restore();
+      }
       ctx.putImageData(
         stage.ctx.getImageData(
           aligned.x,
@@ -576,6 +720,12 @@ class NativeRasterizer implements Rasterizer {
       pixelWidth: aligned.width,
       pixelHeight: aligned.height,
     };
+  }
+
+  #clipChain(parent: ClipSnapshot | null): ClipSnapshot[] {
+    const levels: ClipSnapshot[] = [];
+    for (let level = parent; level; level = level.parent) levels.push(level);
+    return levels.reverse();
   }
 }
 

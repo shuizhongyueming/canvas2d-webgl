@@ -1,5 +1,10 @@
 import type { CaseDefinition } from "../../types/testing.js";
-import { TRANSPARENT, dumpScene, pixelsEqual } from "./helpers.js";
+import {
+  TRANSPARENT,
+  blueAlphaPixels,
+  dumpScene,
+  pixelsEqual,
+} from "./helpers.js";
 
 const renderBase = {
   kind: "render" as const,
@@ -10,11 +15,62 @@ const renderBase = {
 };
 
 /**
- * strokeRect rendering through the approved stroke asset service: the rect is
- * recorded as a path and rasterized natively, so coverage, joins and the
+ * strokeRect rendering through its native primitive asset service; joins and
  * line-width scaling of the draw-time transform match the reference rasterizer.
  */
 export const cases: CaseDefinition[] = [
+  {
+    ...renderBase,
+    kind: "semantic",
+    width: 16,
+    height: 16,
+    id: "rect.strokeRect.small-corners",
+    requirements: ["context.strokeRect", "context.lineWidth"],
+    async run(a) {
+      a.context.strokeStyle = "#0000ff";
+      a.context.strokeRect(8, 8, 4, 4);
+      const scene = await dumpScene(a);
+      for (const [x, y] of [
+        [7, 7],
+        [12, 7],
+        [7, 12],
+        [12, 12],
+      ] as const) {
+        const pixel = scene.pixel(x, y);
+        a.assert(
+          pixel[2] > 0 && pixel[3] > 0,
+          `small strokeRect preserves corner (${x},${y})`,
+        );
+      }
+      a.assert(
+        scene.pixel(10, 10)[3] === 0,
+        "small strokeRect keeps its interior hollow",
+      );
+      a.observe("blueCoverage", blueAlphaPixels(scene));
+      a.observe("all-corners-present", true);
+    },
+  },
+  {
+    ...renderBase,
+    kind: "semantic",
+    id: "rect.strokeRect.readback-stability",
+    requirements: ["context.strokeRect", "context.lineWidth"],
+    async run(a) {
+      a.context.strokeStyle = "#0000ff";
+      // Distinct assets exercise repeated internal readbacks. The public
+      // native canvas is sampled only once, after drawing like a real caller.
+      for (let row = 0; row < 3; row += 1)
+        for (let column = 0; column < 4; column += 1)
+          a.context.strokeRect(8 + column * 16, 8 + row * 16, 4, 4);
+      a.context.strokeRect(8, 8, 4, 4); // reuse the first cached asset as well
+      const scene = await dumpScene(a);
+      a.assert(
+        scene.pixel(10, 10)[3] === 0,
+        "repeated stroke assets keep hollow interiors",
+      );
+      a.observe("blueCoverage", blueAlphaPixels(scene));
+    },
+  },
   {
     ...renderBase,
     id: "context.strokeRect.render",

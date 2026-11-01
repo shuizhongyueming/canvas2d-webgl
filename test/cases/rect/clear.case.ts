@@ -1,5 +1,10 @@
 import type { CaseDefinition } from "../../types/testing.js";
-import { TRANSPARENT, dumpScene, pixelsEqual } from "./helpers.js";
+import {
+  TRANSPARENT,
+  blueAlphaPixels,
+  dumpScene,
+  pixelsEqual,
+} from "./helpers.js";
 
 const renderBase = {
   kind: "render" as const,
@@ -182,6 +187,20 @@ export const cases: CaseDefinition[] = [
         pixelsEqual(scene.pixel(14, 14), TRANSPARENT),
         "nothing leaks beyond the recorded geometry",
       );
+      for (const [x, y] of [
+        [12, 7],
+        [7, 12],
+        [12, 12],
+      ] as const) {
+        const blue = scene.pixel(x, y);
+        a.assert(
+          blue[2] > 0 && blue[3] > 0,
+          `strokeRect keeps the unoccluded blue corner at (${x},${y}) after fill()`,
+        );
+      }
+      // Compare every visible blue pixel with this environment's native
+      // adapter, not just presence at a few corners or an error threshold.
+      a.observe("blueCoverage", blueAlphaPixels(scene));
       a.observe("pathSurvives", true);
     },
   },
