@@ -71,6 +71,80 @@ function makeRecord(): LossRecord {
 export const cases: CaseDefinition[] = [
   {
     ...base,
+    id: "lifecycle.loss.before-dom-event",
+    requirements: ["LIFE-02", "LIFE-03", "ACC-05"],
+    async run(a) {
+      const order: string[] = [];
+      const { context, canvas, target, gl, hooks } = await makeCompat(8, 6, {
+        onContextLost: () => order.push("lost"),
+        onContextRestored: () => order.push("restored"),
+      });
+      try {
+        const extension = gl.getExtension("WEBGL_lose_context");
+        if (!extension) return a.skip("WEBGL_lose_context-unavailable");
+        const source = document.createElement("canvas");
+        source.width = source.height = 2;
+        const native = source.getContext("2d");
+        if (!native) throw new Error("native source context unavailable");
+        native.fillStyle = "#ff0000";
+        native.fillRect(0, 0, 2, 2);
+        context.drawImage(source, 0, 0);
+        await present(hooks);
+
+        extension.loseContext();
+        a.assert(gl.isContextLost(), "physical loss is already observable");
+        a.assert(order.length === 0, "the DOM loss event has not fired yet");
+        const attempts = [
+          capture(() => context.drawImage(source, 0, 0)),
+          capture(() => context.fillRect(0, 0, 2, 2)),
+          capture(() => context.strokeRect(0, 0, 2, 2)),
+          capture(() => context.clearRect(0, 0, 2, 2)),
+          capture(() => {
+            canvas.width = 4;
+          }),
+        ];
+        a.assert(
+          attempts.every((result) => result === "ok"),
+          `drawing and resize before notification stay silent: ${attempts.join(",")}`,
+        );
+        a.assert(canvas.width === 8, "the lost resize is never queued");
+        a.assert(order.length === 0, "public calls do not notify early");
+        await waitFor(
+          () => order.length === 1,
+          "real loss notification",
+          10000,
+        );
+        a.assert(order[0] === "lost", "real loss still notifies once");
+
+        extension.restoreContext();
+        await waitFor(
+          () => order.length === 2,
+          "real restoration notification",
+          10000,
+        );
+        a.assert(
+          order.join(",") === "lost,restored",
+          "notifications keep order",
+        );
+        a.assert(canvas.width === 8, "restoration does not replay the resize");
+        a.assert(sceneState(hooks).cleared, "restoration starts transparent");
+        context.drawImage(source, 0, 0);
+        await present(hooks);
+        a.assert(
+          pixelAt(hooks.readScene(), 0, 0)[0] === 255,
+          "redraw succeeds",
+        );
+        a.observe("attempts", attempts);
+        a.observe("order", order);
+        a.observe("restoredSize", [canvas.width, canvas.height]);
+        void target;
+      } finally {
+        canvas.dispose();
+      }
+    },
+  },
+  {
+    ...base,
     id: "LIFE-02.loss-before-present",
     kind: "combined",
     requirements: ["LIFE-02", "CAN-05"],

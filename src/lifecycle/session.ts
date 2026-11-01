@@ -86,6 +86,7 @@ export function createSession(parts: SessionParts): CanvasSession {
   const { device, raster, state, path, lifecycle } = parts;
   const eventTarget = asEventTarget(parts.target);
   let disposed = false;
+  let lossNotified = false;
 
   const onLost = (event: ContextEvent): void => {
     // Native restoration is only allowed when the loss is handled; the library
@@ -119,17 +120,19 @@ export function createSession(parts: SessionParts): CanvasSession {
       ]);
     },
     notifyLost(): void {
-      if (disposed || device.status !== "active") return;
+      if (disposed || lossNotified || device.status === "disposed") return;
       device.lose();
+      lossNotified = true;
       drain([() => lifecycle.lost()]);
       parts.onContextLost?.();
     },
     notifyRestored(): void {
-      if (disposed || device.status !== "lost") return;
+      if (disposed || !lossNotified || device.status !== "lost") return;
       // Rebuilds the programs and the transparent scene, advances the
       // generation, cancels stale submissions and schedules the clearing
       // present before any caller redraw joins the same checkpoint.
       device.restore();
+      lossNotified = false;
       drain([
         // Clip snapshots belong to the lost generation, including the ones
         // held by the save stack; a restored context starts with no clip.

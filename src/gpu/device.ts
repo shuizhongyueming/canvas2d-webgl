@@ -274,7 +274,15 @@ class SceneDevice implements GPUDevice {
   private destinationTexture: WebGLTexture | null = null;
   private destinationMode: 0 | 1 | 2 = 0;
   generation = 0;
-  status: "active" | "lost" | "disposed" = "active";
+  private lifecycleStatus: GPUDevice["status"] = "active";
+  get status(): GPUDevice["status"] {
+    // The physical context can disappear before webglcontextlost is delivered.
+    // Public drawing/resize guards must already pause in that interval, while
+    // resource cleanup and notifications still belong to the actual event.
+    return this.lifecycleStatus === "active" && this.gl.isContextLost()
+      ? "lost"
+      : this.lifecycleStatus;
+  }
   width: number;
   height: number;
 
@@ -976,7 +984,9 @@ class SceneDevice implements GPUDevice {
   }
 
   lose(): void {
-    if (this.status !== "active") return;
+    // status may already report a physical loss; cleanup still runs once when
+    // the session receives the event, using the recorded lifecycle state.
+    if (this.lifecycleStatus !== "active") return;
     const generation = this.generation;
     this.presenterQueue.invalidate(generation);
     this.registry.invalidateGeneration(generation);
@@ -984,7 +994,7 @@ class SceneDevice implements GPUDevice {
     this.scene = null;
     this.deleteGpuObjects();
     this.generation = generation + 1;
-    this.status = "lost";
+    this.lifecycleStatus = "lost";
   }
 
   restore(): void {
@@ -1012,7 +1022,7 @@ class SceneDevice implements GPUDevice {
       throw failure;
     }
     this.generation += 1;
-    this.status = "active";
+    this.lifecycleStatus = "active";
     // A restored context starts from the platform defaults, so the full
     // baseline is re-established rather than only the scene bindings.
     this.establishBaseline();
@@ -1023,7 +1033,7 @@ class SceneDevice implements GPUDevice {
     if (this.status === "disposed") return;
     this.presenterQueue.invalidate(this.generation);
     this.generation += 1;
-    this.status = "disposed";
+    this.lifecycleStatus = "disposed";
     this.owner.releaseAll();
   }
 

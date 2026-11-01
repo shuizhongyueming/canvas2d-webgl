@@ -243,6 +243,27 @@ test("restoration before a loss is ignored", () => {
   assert.deepEqual(events, []);
 });
 
+test("physical loss observed before its event still notifies once per cycle", () => {
+  const { device, lifecycle, events, session } = setup();
+  let losses = 0;
+  lifecycle.register({ lost: () => losses++ });
+  // Device status may already observe gl.isContextLost() before the DOM event.
+  device.status = "lost";
+  session.notifyRestored();
+  assert.equal(device.restoreCalls, 0, "no restore before a loss notification");
+  session.notifyLost();
+  session.notifyLost();
+  assert.equal(device.loseCalls, 1);
+  assert.equal(losses, 1);
+  assert.deepEqual(events, ["lost"]);
+  session.notifyRestored();
+  device.status = "lost";
+  session.notifyLost();
+  assert.equal(device.loseCalls, 2);
+  assert.equal(losses, 2);
+  assert.deepEqual(events, ["lost", "restored", "lost"]);
+});
+
 test("dispose removes library listeners and drains exactly once", () => {
   const { device, raster, lifecycle, target, events, session } = setup();
   const disposed = [];
