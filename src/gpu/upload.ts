@@ -9,7 +9,7 @@ export interface SourcePixels {
   readonly width: number;
   readonly height: number;
   /** Present for DOM-backed sources; absent for owned typed-array bitmaps. */
-  readonly element?: NativeCanvas | HTMLImageElement;
+  readonly element?: NativeCanvas | HTMLImageElement | ImageData;
   /** Present for owned typed-array bitmaps (straight sRGB, like RasterSource). */
   readonly data?: Uint8ClampedArray;
 }
@@ -28,7 +28,7 @@ export function sourcePixels(source: TextureSource): SourcePixels {
     return {
       width: source.pixelWidth,
       height: source.pixelHeight,
-      element: source.canvas,
+      element: source.imageData ?? source.canvas,
     };
   if (isPatternBitmap(source))
     return {

@@ -135,6 +135,8 @@ export interface ResourceLease {
 export interface RasterSource {
   readonly kind: "raster";
   readonly canvas: NativeCanvas;
+  /** Owned straight-alpha native readback, when available. Never reused or mutated. */
+  readonly imageData?: ImageData;
   readonly bounds: Bounds;
   readonly pixelWidth: number;
   readonly pixelHeight: number;
@@ -169,7 +171,11 @@ export interface GPUDevice {
   readonly status: "active" | "lost" | "disposed";
   readonly width: number;
   readonly height: number;
-  /** Read/upload native sources now, never defer them until present. No ownership transfer. */
+  /**
+   * Capture native source pixels now, before caller mutation/release. Bounded
+   * GPU batches may wait until present; internal readback flushes them first.
+   * No ownership transfer of caller sources.
+   */
   draw(operation: DrawOperation): void;
   /** Internal only; scheduler calls this, no public flush. */
   present(generation: number): void;
