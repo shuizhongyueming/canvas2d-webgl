@@ -38,9 +38,16 @@ export interface RasterizerOptions {
 
 interface Asset {
   readonly canvas: NativeCanvas;
+  readonly imageData?: ImageData;
+  readonly dispose?: () => void;
   readonly bounds: Bounds;
   readonly pixelWidth: number;
   readonly pixelHeight: number;
+}
+
+function destroyAsset(asset: Asset): void {
+  if (asset.dispose) asset.dispose();
+  else destroyCanvas(asset.canvas);
 }
 
 function paintKey(paint: Paint): string {
@@ -138,13 +145,15 @@ class NativeRasterizer implements Rasterizer {
       return this.#toSource(
         this.#ownLease(emptyAsset(this.#options.createCanvas)),
       );
-    const { canvas, ctx } = this.#createAsset(bounds);
-    try {
+    this.#validateAsset(bounds);
+    let pixels: ImageData;
+    {
       const scene = this.#scene();
       const stage = this.#stageContext(
         scene.width,
         scene.height,
         mode === "stroke" ? "drawing" : "readback",
+        bounds,
       );
       stage.ctx.setTransform(...state.transform);
       if (mode === "clear") stage.ctx.fillStyle = "#ffffff";
@@ -163,24 +172,17 @@ class NativeRasterizer implements Rasterizer {
         stage.ctx.lineJoin = state.lineJoin;
         stage.ctx.strokeRect(x, y, width, height);
       } else stage.ctx.fillRect(x, y, width, height);
-      ctx.putImageData(
-        stage.ctx.getImageData(bounds.x, bounds.y, bounds.width, bounds.height),
-        0,
-        0,
+      pixels = stage.ctx.getImageData(
+        bounds.x,
+        bounds.y,
+        bounds.width,
+        bounds.height,
       );
-    } catch (error) {
-      destroyCanvas(canvas);
-      throw error;
     }
-    const asset = {
-      canvas,
-      bounds,
-      pixelWidth: bounds.width,
-      pixelHeight: bounds.height,
-    };
+    const asset = this.#pixelAsset(bounds, pixels);
     return this.#toSource(
       this.#cache.store(key, asset, bounds.width * bounds.height, (a) =>
-        destroyCanvas(a.canvas),
+        destroyAsset(a),
       ) ?? this.#ownLease(asset),
     );
   }
@@ -206,7 +208,7 @@ class NativeRasterizer implements Rasterizer {
     const asset = this.#renderPath(path, state, mode);
     const lease =
       this.#cache.store(key, asset, asset.pixelWidth * asset.pixelHeight, (a) =>
-        destroyCanvas(a.canvas),
+        destroyAsset(a),
       ) ?? this.#ownLease(asset);
     return this.#toSource(lease);
   }
@@ -239,7 +241,7 @@ class NativeRasterizer implements Rasterizer {
     const asset = this.#renderText(text, x, y, state, mode);
     const lease =
       this.#cache.store(key, asset, asset.pixelWidth * asset.pixelHeight, (a) =>
-        destroyCanvas(a.canvas),
+        destroyAsset(a),
       ) ?? this.#ownLease(asset);
     return this.#toSource(lease);
   }
@@ -270,7 +272,7 @@ class NativeRasterizer implements Rasterizer {
     const asset = this.#renderClip(path, rule, bounds, parent);
     const lease =
       this.#cache.store(key, asset, asset.pixelWidth * asset.pixelHeight, (a) =>
-        destroyCanvas(a.canvas),
+        destroyAsset(a),
       ) ?? this.#ownLease(asset);
     return this.#toSource(lease);
   }
@@ -336,6 +338,7 @@ class NativeRasterizer implements Rasterizer {
     width: number,
     height: number,
     usage: "readback" | "drawing" = "readback",
+    window: Bounds = { x: 0, y: 0, width, height },
   ): { canvas: NativeCanvas; ctx: Native2DContext } {
     let stage = usage === "drawing" ? this.#drawingStage : this.#stage;
     if (!stage) {
@@ -364,7 +367,10 @@ class NativeRasterizer implements Rasterizer {
     }
     const { canvas, context } = stage;
     context.setTransform(1, 0, 0, 1, 0, 0);
-    context.clearRect(0, 0, canvas.width, canvas.height);
+    // Only this window is copied out. Clear it before every use, including
+    // when a previous draw left pixels outside its own readback window.
+    // Keep the scene origin and extent unchanged for native coverage.
+    context.clearRect(window.x, window.y, window.width, window.height);
     return { canvas, ctx: context };
   }
 
@@ -430,7 +436,7 @@ class NativeRasterizer implements Rasterizer {
       release: () => {
         if (released) return;
         released = true;
-        destroyCanvas(asset.canvas);
+        destroyAsset(asset);
       },
     };
   }
@@ -439,7 +445,10 @@ class NativeRasterizer implements Rasterizer {
     const asset = lease.value;
     return {
       kind: "raster",
-      canvas: asset.canvas,
+      get canvas() {
+        return asset.canvas;
+      },
+      imageData: asset.imageData,
       bounds: asset.bounds,
       pixelWidth: asset.pixelWidth,
       pixelHeight: asset.pixelHeight,
@@ -449,7 +458,7 @@ class NativeRasterizer implements Rasterizer {
     };
   }
 
-  #createAsset(bounds: Bounds): { canvas: NativeCanvas; ctx: Native2DContext } {
+  #validateAsset(bounds: Bounds): void {
     const limit =
       this.#options.maxTextureDimension ?? DEFAULT_MAX_TEXTURE_DIMENSION;
     if (bounds.width > limit || bounds.height > limit)
@@ -457,6 +466,39 @@ class NativeRasterizer implements Rasterizer {
         ERROR_CODES.RESOURCE_LIMIT,
         `raster asset ${bounds.width}x${bounds.height} exceeds ${limit}`,
       );
+  }
+
+  /** Upload readback directly; native test consumers can still request a bitmap. */
+  #pixelAsset(bounds: Bounds, imageData: ImageData): Asset {
+    let materialized: NativeCanvas | null = null;
+    const create = () => this.#createAsset(bounds);
+    return {
+      get canvas() {
+        if (!materialized) {
+          const { canvas, ctx } = create();
+          try {
+            ctx.putImageData(imageData, 0, 0);
+          } catch (failure) {
+            destroyCanvas(canvas);
+            throw failure;
+          }
+          materialized = canvas;
+        }
+        return materialized;
+      },
+      imageData,
+      bounds,
+      pixelWidth: bounds.width,
+      pixelHeight: bounds.height,
+      dispose() {
+        if (materialized) destroyCanvas(materialized);
+        materialized = null;
+      },
+    };
+  }
+
+  #createAsset(bounds: Bounds): { canvas: NativeCanvas; ctx: Native2DContext } {
+    this.#validateAsset(bounds);
     const canvas = this.#options.createCanvas(bounds.width, bounds.height);
     // The asset receives the stage readback that #renderPath copies out of
     // getImageData, so it must share the stage's readback-optimized context
@@ -484,13 +526,18 @@ class NativeRasterizer implements Rasterizer {
         : 1;
     const bounds = alignOutset(geometry, margin, this.#scene());
     if (!bounds) return emptyAsset(this.#options.createCanvas);
-    const { canvas, ctx } = this.#createAsset(bounds);
-    try {
+    this.#validateAsset(bounds);
+    {
       // Paint at the exact scene position with the recorded transforms
       // verbatim, then crop the coverage window; translating the geometry into
       // a tight canvas would rasterize curves differently than the native scene.
       const scene = this.#scene();
-      const stage = this.#stageContext(scene.width, scene.height);
+      const stage = this.#stageContext(
+        scene.width,
+        scene.height,
+        "readback",
+        bounds,
+      );
       replayPath(stage.ctx, path, 0, 0);
       const lastTransform = path.commands[path.commands.length - 1]?.transform;
       if (
@@ -510,21 +557,11 @@ class NativeRasterizer implements Rasterizer {
         applyPaint(stage.ctx, state.fill, "fill", this.#patternSource);
         stage.ctx.fill();
       }
-      ctx.putImageData(
+      return this.#pixelAsset(
+        bounds,
         stage.ctx.getImageData(bounds.x, bounds.y, bounds.width, bounds.height),
-        0,
-        0,
       );
-    } catch (error) {
-      destroyCanvas(canvas);
-      throw error;
     }
-    return {
-      canvas,
-      bounds,
-      pixelWidth: bounds.width,
-      pixelHeight: bounds.height,
-    };
   }
 
   #renderText(
@@ -625,6 +662,8 @@ class NativeRasterizer implements Rasterizer {
         const stage = this.#stageContext(
           bounds.x + bounds.width,
           bounds.y + bounds.height,
+          "readback",
+          bounds,
         );
         stage.ctx.setTransform(...state.transform);
         stage.ctx.font = state.font;
@@ -669,8 +708,8 @@ class NativeRasterizer implements Rasterizer {
   ): Asset {
     const aligned = alignOutset(bounds, 0, this.#scene());
     if (!aligned) return emptyAsset(this.#options.createCanvas);
-    const { canvas, ctx } = this.#createAsset(aligned);
-    try {
+    this.#validateAsset(aligned);
+    {
       // Same scene-position rule as #renderPath: the mask must match the
       // native clip coverage byte for byte, so curves are never re-rasterized
       // at a translated origin.
@@ -700,26 +739,16 @@ class NativeRasterizer implements Rasterizer {
       } finally {
         stage.ctx.restore();
       }
-      ctx.putImageData(
+      return this.#pixelAsset(
+        aligned,
         stage.ctx.getImageData(
           aligned.x,
           aligned.y,
           aligned.width,
           aligned.height,
         ),
-        0,
-        0,
       );
-    } catch (error) {
-      destroyCanvas(canvas);
-      throw error;
     }
-    return {
-      canvas,
-      bounds: aligned,
-      pixelWidth: aligned.width,
-      pixelHeight: aligned.height,
-    };
   }
 
   #clipChain(parent: ClipSnapshot | null): ClipSnapshot[] {

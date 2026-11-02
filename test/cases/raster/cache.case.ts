@@ -173,9 +173,16 @@ function run(a: CaseAdapter): void {
   const evictRecorder = new PathRecorder();
   for (const dx of [0, 70, 120]) {
     triangle(evictRecorder, dx);
-    evictLab.rasterizer.path(evictRecorder.snapshot(), red, "fill").release();
+    const source = evictLab.rasterizer.path(
+      evictRecorder.snapshot(),
+      red,
+      "fill",
+    );
+    // Native consumers request materialization; GPU-only consumers skip it.
+    void source.canvas;
+    source.release();
   }
-  const [oldest, stage, ...rest] = evictLab.created;
+  const [stage, oldest, ...rest] = evictLab.created;
   a.assert(
     evictLab.created.length === 4,
     "three distinct assets share one staging canvas",
@@ -202,6 +209,7 @@ function run(a: CaseAdapter): void {
   lab.rasterizer.clearCache();
   const countBefore = lab.created.length;
   const regenerated = lab.rasterizer.path(snapshotAgain, red, "fill");
+  void regenerated.canvas;
   a.assert(
     lab.created.length === countBefore + 1,
     "clearCache forces re-rasterization",
@@ -218,9 +226,10 @@ function run(a: CaseAdapter): void {
     red,
     "fill",
   );
+  const oversizedBitmap = oversized.canvas;
   oversized.release();
   a.assert(
-    tinyLab.created[0] !== undefined && tinyLab.created[0].width === 0,
+    oversizedBitmap.width === 0,
     "uncacheable asset is destroyed on release",
   );
   tinyLab.rasterizer.dispose();

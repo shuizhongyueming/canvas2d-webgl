@@ -111,3 +111,34 @@ test("waiters resolve only after the present has run", async () => {
   await presenter.whenPresented(0).then(() => log.push("waiter"));
   assert.deepEqual(log, ["present", "waiter"]);
 });
+
+test("a failed commit rejects all waiters and exposes the original error", async () => {
+  const queued = [];
+  const original = globalThis.queueMicrotask;
+  globalThis.queueMicrotask = (callback) => queued.push(callback);
+  const failure = Object.assign(Error("upload failed"), {
+    code: "initialization-failed",
+  });
+  try {
+    const presenter = createPresenter({
+      currentGeneration: () => 1,
+      present() {
+        throw failure;
+      },
+    });
+    presenter.request(1);
+    const waiting = settle(presenter.whenPresented(1));
+    assert.throws(queued.shift(), (error) => error === failure);
+    assert.deepEqual(await waiting, {
+      settled: "rejected",
+      code: "initialization-failed",
+    });
+    assert.deepEqual(await settle(presenter.whenPresented(1)), {
+      settled: "rejected",
+      code: "initialization-failed",
+    });
+    assert.equal(queued.length, 0);
+  } finally {
+    globalThis.queueMicrotask = original;
+  }
+});
