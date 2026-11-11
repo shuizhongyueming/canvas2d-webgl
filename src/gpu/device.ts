@@ -39,8 +39,13 @@ import {
 } from "./scene.js";
 import { isRasterSource, sourcePixels, uploadSourceTexture } from "./upload.js";
 import { createTestHooks, type SceneTestHooks } from "./hooks.js";
+import { TextureStream, type StreamedTexture } from "./stream.js";
+import { RasterBatch } from "./raster-batch.js";
+import { TextureCache } from "./texture-cache.js";
+import type { OffscreenFactory } from "../canvas/offscreen.js";
 
 export interface SceneRendererOptions {
+  createCanvas?: OffscreenFactory;
   /** Test-only fault injection: fail right after the named creation step. */
   failAfter?: "context" | "attributes" | "programs" | "scene";
 }
@@ -118,8 +123,9 @@ varying vec2 v_uv;
 uniform sampler2D u_texture;
 uniform float u_alpha;
 uniform float u_brightness;
+uniform vec4 u_uv_clamp;
 void main() {
-  vec4 color = texture2D(u_texture, v_uv);
+  vec4 color = texture2D(u_texture, clamp(v_uv, u_uv_clamp.xy, u_uv_clamp.zw));
   // The filter applies to the source before the global alpha multiply; in
   // premultiplied space the brightness transfer is a scale clamped at alpha.
   vec3 filtered = min(color.rgb * u_brightness, vec3(color.a));
@@ -168,6 +174,7 @@ interface TexturedProgram extends CoverageProgram {
   readonly uResolution: WebGLUniformLocation;
   readonly uTexture: WebGLUniformLocation;
   readonly uAlpha: WebGLUniformLocation;
+  readonly uUvClamp: WebGLUniformLocation;
   readonly uBrightness: WebGLUniformLocation;
 }
 
@@ -205,6 +212,7 @@ function makeTexturedProgram(gl: WebGLRenderingContext): TexturedProgram {
     const uResolution = gl.getUniformLocation(program, "u_resolution");
     const uTexture = gl.getUniformLocation(program, "u_texture");
     const uAlpha = gl.getUniformLocation(program, "u_alpha");
+    const uUvClamp = gl.getUniformLocation(program, "u_uv_clamp");
     const uBrightness = gl.getUniformLocation(program, "u_brightness");
     if (
       aPosition < 0 ||
@@ -212,6 +220,7 @@ function makeTexturedProgram(gl: WebGLRenderingContext): TexturedProgram {
       !uResolution ||
       !uTexture ||
       !uAlpha ||
+      !uUvClamp ||
       !uBrightness
     )
       throw createCompatError(
@@ -225,6 +234,7 @@ function makeTexturedProgram(gl: WebGLRenderingContext): TexturedProgram {
       uResolution,
       uTexture,
       uAlpha,
+      uUvClamp,
       uBrightness,
       ...coverageUniforms(gl, program),
     };
@@ -260,6 +270,12 @@ class SceneDevice implements GPUDevice {
   private readonly target: TargetCanvas;
   private readonly maxTextureSize: number;
   private readonly registry: LeaseRegistry<WebGLTexture>;
+  private readonly uploads: TextureStream;
+  private readonly maskUploads: TextureStream;
+  private readonly textureCache: TextureCache;
+  private streaming = false;
+  private readonly rasterBatch: RasterBatch;
+  private readonly batching: boolean;
   private readonly presenterQueue: ScheduledPresenter;
   private readonly owner: ResourceOwner;
   private readonly blendFactors: Record<CompositeMode, [number, number]>;
@@ -273,6 +289,7 @@ class SceneDevice implements GPUDevice {
   private clipLease: ResourceLease | null = null;
   private cachedClip: ClipSnapshot | null = null;
   private cachedClipDepth = 0;
+  private cachedClipTexture: WebGLTexture | null = null;
   private destinationTexture: WebGLTexture | null = null;
   private destinationMode: 0 | 1 | 2 = 0;
   generation = 0;
@@ -293,10 +310,19 @@ class SceneDevice implements GPUDevice {
     gl: WebGLRenderingContext,
     maxTextureSize: number,
     owner: ResourceOwner,
+    createCanvas?: OffscreenFactory,
   ) {
     this.target = target;
     this.gl = gl;
     this.maxTextureSize = maxTextureSize;
+    this.uploads = new TextureStream(gl, maxTextureSize);
+    this.maskUploads = new TextureStream(gl, maxTextureSize, false);
+    this.textureCache = new TextureCache(gl, maxTextureSize);
+    this.rasterBatch = new RasterBatch(
+      Math.min(2048, maxTextureSize),
+      createCanvas,
+    );
+    this.batching = !!createCanvas;
     this.owner = owner;
     this.width = target.width;
     this.height = target.height;
@@ -386,6 +412,10 @@ class SceneDevice implements GPUDevice {
 
   /** Idempotent teardown shared by dispose, loss, and init rollback. */
   shutdown(): void {
+    this.rasterBatch.dispose();
+    this.uploads.clear();
+    this.maskUploads.clear();
+    this.textureCache.clear();
     this.releaseClip();
     this.registry.releaseAll();
     destroySceneFramebuffer(this.gl, this.scene);
@@ -488,12 +518,17 @@ class SceneDevice implements GPUDevice {
     this.clipLease = null;
     this.cachedClip = null;
     this.cachedClipDepth = 0;
+    this.cachedClipTexture = null;
   }
 
   /** Reuse native effective coverage for consecutive draws in one submission. */
   private beginClip(clip: ClipSnapshot | null): number {
-    if (clip && clip === this.cachedClip && this.clipLease) {
-      this.clipTexture = this.registry.payload(this.clipLease.handle) ?? null;
+    if (clip && clip === this.cachedClip) {
+      this.clipTexture =
+        this.cachedClipTexture ??
+        (this.clipLease
+          ? (this.registry.payload(this.clipLease.handle) ?? null)
+          : null);
       if (this.clipTexture) return this.cachedClipDepth;
     }
     this.releaseClip();
@@ -525,6 +560,13 @@ class SceneDevice implements GPUDevice {
           ERROR_CODES.CONTRACT,
           "effective clip mask must span the scene",
         );
+      if (this.batching) {
+        const streamed = this.maskUploads.upload(mask);
+        this.clipTexture = this.cachedClipTexture = streamed.texture;
+        this.cachedClip = clip;
+        this.cachedClipDepth = depth;
+        return depth;
+      }
       const lease = this.acquireTexture(mask);
       const texture = this.registry.payload(lease.handle);
       if (!texture) {
@@ -701,6 +743,7 @@ class SceneDevice implements GPUDevice {
     target: "scene" | "display",
     brightness: number,
     stencil = false,
+    uvClamp: readonly [number, number, number, number] = [0, 0, 1, 1],
   ): void {
     const { scene, textured, positionBuffer, uvBuffer } = this.requireObjects();
     const gl = this.gl;
@@ -718,6 +761,7 @@ class SceneDevice implements GPUDevice {
     gl.uniform2f(textured.uResolution, this.width, this.height);
     gl.uniform1f(textured.uAlpha, alpha);
     gl.uniform1f(textured.uBrightness, brightness);
+    gl.uniform4f(textured.uUvClamp, ...uvClamp);
     this.bindCoverage(textured, target === "scene");
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(
@@ -739,7 +783,10 @@ class SceneDevice implements GPUDevice {
     gl.disableVertexAttribArray(textured.aUv);
   }
 
-  private texturedGeometry(source: RasterSource | ImageDrawSource): {
+  private texturedGeometry(
+    source: RasterSource | ImageDrawSource,
+    extent?: { width: number; height: number },
+  ): {
     corners: number[];
     uvs: number[];
   } {
@@ -747,11 +794,20 @@ class SceneDevice implements GPUDevice {
       const { x, y, width, height } = source.bounds;
       return {
         corners: [x, y, x + width, y, x, y + height, x + width, y + height],
-        uvs: [0, 0, 1, 0, 0, 1, 1, 1],
+        uvs: [
+          0,
+          0,
+          source.pixelWidth / (extent?.width ?? source.pixelWidth),
+          0,
+          0,
+          source.pixelHeight / (extent?.height ?? source.pixelHeight),
+          source.pixelWidth / (extent?.width ?? source.pixelWidth),
+          source.pixelHeight / (extent?.height ?? source.pixelHeight),
+        ],
       };
     }
     const corners = rectCorners(source.destinationRect, source.transform);
-    const { width, height } = sourcePixels(source.image);
+    const { width, height } = extent ?? sourcePixels(source.image);
     const {
       x,
       y,
@@ -765,7 +821,128 @@ class SceneDevice implements GPUDevice {
     return { corners, uvs: [u0, v0, u1, v0, u0, v1, u1, v1] };
   }
 
+  private flushRasterBatch(): void {
+    const batch = this.rasterBatch.take();
+    if (!batch) return;
+    const streamed = batch.source ? this.uploads.upload(batch.source) : null;
+    this.streaming ||= !!streamed;
+    for (const tile of batch.tiles) {
+      if (!tile.region || !tile.sampling || !streamed) {
+        this.drawOperation(tile.operation);
+        continue;
+      }
+      const region = tile.region,
+        sampling = tile.sampling;
+      const x0 = sampling.x / streamed.width,
+        y0 = sampling.y / streamed.height;
+      const x1 = (sampling.x + sampling.width) / streamed.width,
+        y1 = (sampling.y + sampling.height) / streamed.height;
+      this.drawOperation(tile.operation, {
+        ...streamed,
+        uvs: [x0, y0, x1, y0, x0, y1, x1, y1],
+        clamp: [
+          (region.x + 0.5) / streamed.width,
+          (region.y + 0.5) / streamed.height,
+          (region.x + region.width - 0.5) / streamed.width,
+          (region.y + region.height - 0.5) / streamed.height,
+        ],
+        linear: tile.linear,
+      });
+    }
+  }
+
   draw(operation: DrawOperation): void {
+    if (this.status === "disposed")
+      throw createCompatError(ERROR_CODES.DISPOSED, "device is disposed");
+    if (this.status === "lost") return;
+    if (operation.generation !== this.generation)
+      throw createCompatError(ERROR_CODES.CONTRACT, "stale draw operation");
+    const source = operation.source;
+    if (!this.batching) {
+      this.drawOperation(operation);
+      this.presenterQueue.request(this.generation);
+      return;
+    }
+    let depth = 0;
+    for (let clip = operation.clip; clip; clip = clip.parent) {
+      if (++depth > MAX_CLIP_DEPTH)
+        throw createCompatError(
+          ERROR_CODES.RESOURCE_LIMIT,
+          "clip nesting exceeds limit",
+        );
+      if (typeof clip.mask !== "function")
+        throw createCompatError(
+          ERROR_CODES.CONTRACT,
+          "clip has no mask provider",
+        );
+    }
+    if (
+      depth >= MAX_CLIP_DEPTH &&
+      operation.kind === "draw" &&
+      operation.state.composite === "source-in" &&
+      source.kind !== "empty"
+    )
+      throw createCompatError(
+        ERROR_CODES.RESOURCE_LIMIT,
+        "source-in exceeds clip depth limit",
+      );
+    if (this.rasterBatch.count >= 256) this.flushRasterBatch();
+    if (operation.kind === "draw" && source.kind === "raster") {
+      if (!source.imageData) {
+        if (source.bounds.width <= 0 || source.bounds.height <= 0) {
+          this.presenterQueue.request(this.generation);
+          return;
+        }
+        if (!this.rasterBatch.appendImage(operation)) {
+          this.flushRasterBatch();
+          if (!this.rasterBatch.appendImage(operation)) {
+            // Cache uploads also query GL status. Preserve any prior streamed
+            // upload failure before that query can consume its error flag.
+            this.uploads.check();
+            const cached = this.textureCache.acquire(source);
+            try {
+              this.drawOperation(operation, cached);
+            } finally {
+              if (!cached.retained) this.gl.deleteTexture(cached.texture);
+            }
+          }
+        }
+      } else if (!this.rasterBatch.append(operation, source.imageData)) {
+        this.flushRasterBatch();
+        if (!this.rasterBatch.append(operation, source.imageData))
+          this.drawOperation(operation);
+      }
+    } else if (operation.kind === "draw" && source.kind === "image") {
+      const pixels = sourcePixels(source.image);
+      if (
+        pixels.width > this.maxTextureSize ||
+        pixels.height > this.maxTextureSize
+      )
+        throw createCompatError(
+          ERROR_CODES.RESOURCE_LIMIT,
+          "source exceeds MAX_TEXTURE_SIZE",
+        );
+      if (!this.rasterBatch.appendImage(operation)) {
+        this.flushRasterBatch();
+        if (!this.rasterBatch.appendImage(operation))
+          this.drawOperation(operation);
+      }
+    } else if (
+      operation.kind === "draw" &&
+      (source.kind === "rect" || source.kind === "empty")
+    ) {
+      this.rasterBatch.appendOperation(operation);
+    } else {
+      this.flushRasterBatch();
+      this.drawOperation(operation);
+    }
+    this.presenterQueue.request(this.generation);
+  }
+
+  private drawOperation(
+    operation: DrawOperation,
+    atlas?: StreamedTexture & { uvs: number[]; linear?: boolean },
+  ): void {
     if (this.status === "disposed")
       throw createCompatError(ERROR_CODES.DISPOSED, "device is disposed");
     if (this.status === "lost") return;
@@ -869,15 +1046,27 @@ class SceneDevice implements GPUDevice {
           );
       } else {
         const upload = source.kind === "raster" ? source : source.image;
-        const lease = this.acquireTexture(upload);
-        try {
-          const texture = this.registry.payload(lease.handle);
-          if (!texture)
-            throw createCompatError(
-              ERROR_CODES.CONTRACT,
-              "uploaded texture is missing",
+        const streamed = atlas ?? this.uploads.upload(upload);
+        this.streaming ||= !atlas;
+        {
+          const { texture } = streamed;
+          if (atlas || source.kind === "raster") {
+            this.gl.activeTexture(this.gl.TEXTURE0);
+            this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
+            const filter = atlas?.linear ? this.gl.LINEAR : this.gl.NEAREST;
+            this.gl.texParameteri(
+              this.gl.TEXTURE_2D,
+              this.gl.TEXTURE_MIN_FILTER,
+              filter,
             );
-          const { corners, uvs } = this.texturedGeometry(source);
+            this.gl.texParameteri(
+              this.gl.TEXTURE_2D,
+              this.gl.TEXTURE_MAG_FILTER,
+              filter,
+            );
+          }
+          const { corners, uvs } = this.texturedGeometry(source, streamed);
+          if (atlas) uvs.splice(0, uvs.length, ...atlas.uvs);
           if (operation.state.composite === "source-in")
             this.compositeSourceIn(
               corners,
@@ -891,6 +1080,7 @@ class SceneDevice implements GPUDevice {
                   "scene",
                   brightness,
                   stencil,
+                  streamed.clamp,
                 ),
               clipDepth,
             );
@@ -904,6 +1094,8 @@ class SceneDevice implements GPUDevice {
                 "replace",
                 "scene",
                 brightness,
+                false,
+                streamed.clamp,
               ),
             );
           else
@@ -915,9 +1107,9 @@ class SceneDevice implements GPUDevice {
               operation.state.composite,
               "scene",
               brightness,
+              false,
+              streamed.clamp,
             );
-        } finally {
-          lease.release();
         }
       }
     } catch (failure) {
@@ -925,14 +1117,17 @@ class SceneDevice implements GPUDevice {
       throw failure;
     } finally {
       this.clipTexture = null;
-      if (clipDepth > 0) this.resetStencil();
+      // Soft clips only sample a coverage texture. They never write stencil;
+      // the stencil-based source-in path restores its own state in finally.
     }
-    this.presenterQueue.request(this.generation);
   }
 
   present(generation: number): void {
     if (this.status !== "active") return;
     if (generation !== this.generation) return;
+    this.flushRasterBatch();
+    if (this.streaming) this.uploads.check();
+    this.maskUploads.check();
     this.releaseClip();
     const { scene } = this.requireObjects();
     this.presentCount += 1;
@@ -996,6 +1191,10 @@ class SceneDevice implements GPUDevice {
     this.presenterQueue.invalidate(generation);
     this.releaseClip();
     this.registry.invalidateGeneration(generation);
+    this.rasterBatch.clear();
+    this.uploads.clear();
+    this.maskUploads.clear();
+    this.textureCache.clear();
     destroySceneFramebuffer(this.gl, this.scene);
     this.scene = scene;
     this.width = width;
@@ -1013,6 +1212,10 @@ class SceneDevice implements GPUDevice {
     this.presenterQueue.invalidate(generation);
     this.releaseClip();
     this.registry.invalidateGeneration(generation);
+    this.rasterBatch.dispose();
+    this.uploads.clear();
+    this.maskUploads.clear();
+    this.textureCache.clear();
     destroySceneFramebuffer(this.gl, this.scene);
     this.scene = null;
     this.deleteGpuObjects();
@@ -1090,6 +1293,9 @@ class SceneDevice implements GPUDevice {
         ERROR_CODES.CAPABILITY,
         "no live scene during context loss",
       );
+    this.flushRasterBatch();
+    if (this.streaming) this.uploads.check();
+    this.maskUploads.check();
     const { scene } = this.requireObjects();
     const gl = this.gl;
     gl.bindFramebuffer(gl.FRAMEBUFFER, scene.framebuffer);
@@ -1115,6 +1321,9 @@ class SceneDevice implements GPUDevice {
     const counts = this.registry.counts();
     return {
       textures: counts.resources,
+      uploadTextures: this.uploads.count,
+      maskUploadTextures: this.maskUploads.count,
+      cachedRasterTextures: this.textureCache.size,
       textureLeases: counts.leases,
       sceneFramebuffers: this.scene ? 1 : 0,
       programs: (this.solid ? 1 : 0) + (this.textured ? 1 : 0),
@@ -1160,7 +1369,13 @@ export function createSceneRenderer(
       );
     validateSceneSize(target.width, target.height, maxTextureSize);
     const owner = createResourceOwner();
-    const device = new SceneDevice(target, gl, maxTextureSize, owner);
+    const device = new SceneDevice(
+      target,
+      gl,
+      maxTextureSize,
+      owner,
+      options.createCanvas,
+    );
     device.createGpuObjects();
     cleanups.push(() => device.shutdown());
     if (options.failAfter === "programs")

@@ -11,6 +11,7 @@ import {
   makeLab,
   makeState,
   referenceContext,
+  sourcePixels,
 } from "./helpers.js";
 
 async function run(a: CaseAdapter): Promise<void> {
@@ -247,5 +248,66 @@ export const cases: CaseDefinition[] = [
     seed: 1,
     fonts: [],
     run,
+  },
+  {
+    id: "raster.path-fill.pixel-upload",
+    requirements: ["REN-01"],
+    kind: "semantic",
+    width: 200,
+    height: 200,
+    seed: 1,
+    fonts: [],
+    run(a) {
+      const lab = makeLab();
+      const recorder = new PathRecorder();
+      recorder.begin();
+      recorder.moveTo(20.5, 20, IDENTITY);
+      recorder.lineTo(150, 30, IDENTITY);
+      recorder.lineTo(80, 160, IDENTITY);
+      recorder.closePath(IDENTITY);
+      const reference = referenceContext();
+      reference.fillStyle = "rgba(204,26,51,1)";
+      reference.beginPath();
+      reference.moveTo(20.5, 20);
+      reference.lineTo(150, 30);
+      reference.lineTo(80, 160);
+      reference.closePath();
+      reference.fill();
+      const source = lab.rasterizer.path(
+        recorder.snapshot(),
+        makeState(),
+        "fill",
+      );
+      const stage = lab.created[0];
+      a.assert(
+        lab.created.length === 1 && source.imageData !== undefined,
+        "path captures a local pixel buffer without allocating a bitmap",
+      );
+      const overwrite = lab.rasterizer.rect(
+        0,
+        0,
+        200,
+        200,
+        makeState(),
+        "fill",
+      );
+      overwrite.release();
+      const pixels = sourcePixels(source);
+      a.assert(
+        lab.created.length === 2 && source.canvas !== stage,
+        "path coverage owns a native snapshot independent of the shared stage",
+      );
+      a.assert(
+        source.imageData !== undefined,
+        "path retains captured pixels after subsequent stage drawing",
+      );
+      compareAsset(a, reference, source, "path:pixel-upload");
+      const x = Math.floor(20.5 - source.bounds.x);
+      const y = Math.floor(20 - source.bounds.y);
+      const edge = pixels[(y * source.pixelWidth + x) * 4 + 3]!;
+      a.assert(edge > 0 && edge < 255, "direct upload preserves soft edges");
+      source.release();
+      lab.rasterizer.dispose();
+    },
   },
 ];

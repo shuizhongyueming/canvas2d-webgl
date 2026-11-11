@@ -25,6 +25,7 @@ export interface PresenterSource {
 export function createPresenter(source: PresenterSource): ScheduledPresenter {
   let pending: number | undefined;
   let scheduled = false;
+  const failures = new Map<number, Error>();
   const waiters = new Map<
     number,
     Array<{ resolve(): void; reject(error: Error): void }>
@@ -46,8 +47,14 @@ export function createPresenter(source: PresenterSource): ScheduledPresenter {
     if (generation === undefined) return;
     const waiting = takeWaiters(generation);
     if (generation === source.currentGeneration()) {
-      source.present(generation);
-      for (const waiter of waiting) waiter.resolve();
+      try {
+        source.present(generation);
+        for (const waiter of waiting) waiter.resolve();
+      } catch (failure) {
+        failures.set(generation, failure as Error);
+        for (const waiter of waiting) waiter.reject(failure as Error);
+        throw failure;
+      }
     } else {
       for (const waiter of waiting) waiter.reject(invalidated(generation));
     }
@@ -55,6 +62,7 @@ export function createPresenter(source: PresenterSource): ScheduledPresenter {
   return {
     request(generation) {
       if (generation !== source.currentGeneration()) return;
+      failures.delete(generation);
       pending = generation;
       if (!scheduled) {
         scheduled = true;
@@ -62,6 +70,7 @@ export function createPresenter(source: PresenterSource): ScheduledPresenter {
       }
     },
     invalidate(generation) {
+      failures.delete(generation);
       if (pending === generation) pending = undefined;
       for (const waiter of takeWaiters(generation))
         waiter.reject(invalidated(generation));
@@ -69,6 +78,8 @@ export function createPresenter(source: PresenterSource): ScheduledPresenter {
     whenPresented(generation) {
       if (generation !== source.currentGeneration())
         return Promise.reject(invalidated(generation));
+      if (failures.has(generation))
+        return Promise.reject(failures.get(generation));
       if (pending !== generation) return Promise.resolve();
       return new Promise((resolve, reject) => {
         const waiting = waiters.get(generation) ?? [];

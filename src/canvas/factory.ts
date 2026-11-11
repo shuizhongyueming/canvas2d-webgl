@@ -104,7 +104,9 @@ export function createCompatCanvas<T extends TargetCanvas>(
   validateOffscreenFactory(offscreenFactory, targetCanvas);
   const cleanups: Array<() => void> = [];
   try {
-    const renderer = createSceneRenderer(targetCanvas);
+    const renderer = createSceneRenderer(targetCanvas, {
+      createCanvas: offscreenFactory,
+    });
     cleanups.push(() => renderer.device.dispose());
     const { device, presenter, resources, hooks } = renderer;
     const state = createStateStore({
