@@ -896,8 +896,15 @@ class SceneDevice implements GPUDevice {
         if (!this.rasterBatch.appendImage(operation)) {
           this.flushRasterBatch();
           if (!this.rasterBatch.appendImage(operation)) {
+            // Cache uploads also query GL status. Preserve any prior streamed
+            // upload failure before that query can consume its error flag.
+            this.uploads.check();
             const cached = this.textureCache.acquire(source);
-            this.drawOperation(operation, cached);
+            try {
+              this.drawOperation(operation, cached);
+            } finally {
+              if (!cached.retained) this.gl.deleteTexture(cached.texture);
+            }
           }
         }
       } else if (!this.rasterBatch.append(operation, source.imageData)) {
