@@ -76,4 +76,74 @@ export const cases: CaseDefinition[] = [
     fonts: [],
     run,
   },
+  {
+    id: "raster.clip.pixel-upload",
+    requirements: ["REN-01"],
+    kind: "semantic",
+    width: 200,
+    height: 200,
+    seed: 1,
+    fonts: [],
+    run(a) {
+      const lab = makeLab();
+      const recorder = new PathRecorder();
+      recorder.begin();
+      recorder.rect(20.5, 20, 100, 100, IDENTITY);
+      recorder.rect(50, 50, 60, 60, IDENTITY);
+      recorder.moveTo(180, 60, IDENTITY);
+      recorder.arc(160, 60, 20, 0, Math.PI * 2, false, IDENTITY);
+      const reference = referenceContext();
+      reference.beginPath();
+      reference.rect(20.5, 20, 100, 100);
+      reference.rect(50, 50, 60, 60);
+      reference.moveTo(180, 60);
+      reference.arc(160, 60, 20, 0, Math.PI * 2);
+      reference.fillStyle = "#ffffff";
+      reference.clip("evenodd");
+      reference.fillRect(0, 0, SCENE.width, SCENE.height);
+      const mask = lab.rasterizer.clip(recorder.snapshot(), "evenodd", {
+        x: 0,
+        y: 0,
+        width: SCENE.width,
+        height: SCENE.height,
+      });
+      a.assert(
+        lab.created.length === 1,
+        "clip captures a pixel buffer without eagerly allocating a bitmap",
+      );
+      const recorder2 = new PathRecorder();
+      recorder2.rect(0, 0, 10, 10, IDENTITY);
+      const next = lab.rasterizer.clip(recorder2.snapshot(), "nonzero", {
+        x: 0,
+        y: 0,
+        width: SCENE.width,
+        height: SCENE.height,
+      });
+      a.assert(
+        mask.canvas !== next.canvas,
+        "later clip drawing cannot overwrite the first mask",
+      );
+      next.release();
+      const pixels = sourcePixels(mask);
+      a.assert(
+        mask.imageData !== undefined,
+        "clip retains captured pixels after the shared stage is reused",
+      );
+      compareAsset(a, reference, mask, "clip:pixel-upload");
+      const outside = pixels[(10 * SCENE.width + 10) * 4 + 3];
+      const ring = pixels[(30 * SCENE.width + 30) * 4 + 3];
+      const hole = pixels[(60 * SCENE.width + 60) * 4 + 3];
+      a.assert(
+        outside === 0 && ring === 255 && hole === 0,
+        "direct native upload preserves evenodd coverage",
+      );
+      const edge = pixels[(30 * SCENE.width + 20) * 4 + 3]!;
+      a.assert(
+        edge > 0 && edge < 255,
+        "direct native upload preserves soft clip edges",
+      );
+      mask.release();
+      lab.rasterizer.dispose();
+    },
+  },
 ];

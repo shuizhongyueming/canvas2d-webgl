@@ -41,6 +41,7 @@ import { isRasterSource, sourcePixels, uploadSourceTexture } from "./upload.js";
 import { createTestHooks, type SceneTestHooks } from "./hooks.js";
 import { TextureStream, type StreamedTexture } from "./stream.js";
 import { RasterBatch } from "./raster-batch.js";
+import { TextureCache } from "./texture-cache.js";
 import type { OffscreenFactory } from "../canvas/offscreen.js";
 
 export interface SceneRendererOptions {
@@ -271,6 +272,8 @@ class SceneDevice implements GPUDevice {
   private readonly registry: LeaseRegistry<WebGLTexture>;
   private readonly uploads: TextureStream;
   private readonly maskUploads: TextureStream;
+  private readonly textureCache: TextureCache;
+  private streaming = false;
   private readonly rasterBatch: RasterBatch;
   private readonly batching: boolean;
   private readonly presenterQueue: ScheduledPresenter;
@@ -314,6 +317,7 @@ class SceneDevice implements GPUDevice {
     this.maxTextureSize = maxTextureSize;
     this.uploads = new TextureStream(gl, maxTextureSize);
     this.maskUploads = new TextureStream(gl, maxTextureSize, false);
+    this.textureCache = new TextureCache(gl, maxTextureSize);
     this.rasterBatch = new RasterBatch(
       Math.min(2048, maxTextureSize),
       createCanvas,
@@ -411,6 +415,7 @@ class SceneDevice implements GPUDevice {
     this.rasterBatch.dispose();
     this.uploads.clear();
     this.maskUploads.clear();
+    this.textureCache.clear();
     this.releaseClip();
     this.registry.releaseAll();
     destroySceneFramebuffer(this.gl, this.scene);
@@ -820,6 +825,7 @@ class SceneDevice implements GPUDevice {
     const batch = this.rasterBatch.take();
     if (!batch) return;
     const streamed = batch.source ? this.uploads.upload(batch.source) : null;
+    this.streaming ||= !!streamed;
     for (const tile of batch.tiles) {
       if (!tile.region || !tile.sampling || !streamed) {
         this.drawOperation(tile.operation);
@@ -881,12 +887,20 @@ class SceneDevice implements GPUDevice {
         "source-in exceeds clip depth limit",
       );
     if (this.rasterBatch.count >= 256) this.flushRasterBatch();
-    if (
-      operation.kind === "draw" &&
-      source.kind === "raster" &&
-      source.imageData
-    ) {
-      if (!this.rasterBatch.append(operation, source.imageData)) {
+    if (operation.kind === "draw" && source.kind === "raster") {
+      if (!source.imageData) {
+        if (source.bounds.width <= 0 || source.bounds.height <= 0) {
+          this.presenterQueue.request(this.generation);
+          return;
+        }
+        if (!this.rasterBatch.appendImage(operation)) {
+          this.flushRasterBatch();
+          if (!this.rasterBatch.appendImage(operation)) {
+            const cached = this.textureCache.acquire(source);
+            this.drawOperation(operation, cached);
+          }
+        }
+      } else if (!this.rasterBatch.append(operation, source.imageData)) {
         this.flushRasterBatch();
         if (!this.rasterBatch.append(operation, source.imageData))
           this.drawOperation(operation);
@@ -1026,12 +1040,13 @@ class SceneDevice implements GPUDevice {
       } else {
         const upload = source.kind === "raster" ? source : source.image;
         const streamed = atlas ?? this.uploads.upload(upload);
+        this.streaming ||= !atlas;
         {
           const { texture } = streamed;
-          if (atlas) {
+          if (atlas || source.kind === "raster") {
             this.gl.activeTexture(this.gl.TEXTURE0);
             this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
-            const filter = atlas.linear ? this.gl.LINEAR : this.gl.NEAREST;
+            const filter = atlas?.linear ? this.gl.LINEAR : this.gl.NEAREST;
             this.gl.texParameteri(
               this.gl.TEXTURE_2D,
               this.gl.TEXTURE_MIN_FILTER,
@@ -1095,7 +1110,8 @@ class SceneDevice implements GPUDevice {
       throw failure;
     } finally {
       this.clipTexture = null;
-      if (clipDepth > 0) this.resetStencil();
+      // Soft clips only sample a coverage texture. They never write stencil;
+      // the stencil-based source-in path restores its own state in finally.
     }
   }
 
@@ -1103,7 +1119,7 @@ class SceneDevice implements GPUDevice {
     if (this.status !== "active") return;
     if (generation !== this.generation) return;
     this.flushRasterBatch();
-    this.uploads.check();
+    if (this.streaming) this.uploads.check();
     this.maskUploads.check();
     this.releaseClip();
     const { scene } = this.requireObjects();
@@ -1171,6 +1187,7 @@ class SceneDevice implements GPUDevice {
     this.rasterBatch.clear();
     this.uploads.clear();
     this.maskUploads.clear();
+    this.textureCache.clear();
     destroySceneFramebuffer(this.gl, this.scene);
     this.scene = scene;
     this.width = width;
@@ -1191,6 +1208,7 @@ class SceneDevice implements GPUDevice {
     this.rasterBatch.dispose();
     this.uploads.clear();
     this.maskUploads.clear();
+    this.textureCache.clear();
     destroySceneFramebuffer(this.gl, this.scene);
     this.scene = null;
     this.deleteGpuObjects();
@@ -1269,7 +1287,7 @@ class SceneDevice implements GPUDevice {
         "no live scene during context loss",
       );
     this.flushRasterBatch();
-    this.uploads.check();
+    if (this.streaming) this.uploads.check();
     this.maskUploads.check();
     const { scene } = this.requireObjects();
     const gl = this.gl;
@@ -1298,6 +1316,7 @@ class SceneDevice implements GPUDevice {
       textures: counts.resources,
       uploadTextures: this.uploads.count,
       maskUploadTextures: this.maskUploads.count,
+      cachedRasterTextures: this.textureCache.size,
       textureLeases: counts.leases,
       sceneFramebuffers: this.scene ? 1 : 0,
       programs: (this.solid ? 1 : 0) + (this.textured ? 1 : 0),

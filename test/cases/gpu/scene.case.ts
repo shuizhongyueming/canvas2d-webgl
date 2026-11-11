@@ -27,6 +27,97 @@ function pixelIs(
 
 export const cases: CaseDefinition[] = [
   {
+    id: "gpu.scene.raster-texture-cache",
+    requirements: ["REN-02", "LIFE-01", "LIFE-02"],
+    kind: "semantic",
+    width: 32,
+    height: 32,
+    seed: 1,
+    fonts: [],
+    async run(a) {
+      const { gl, device, hooks } = await makeRenderer(4, 4, {
+        createCanvas(width, height) {
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          return canvas;
+        },
+      });
+      const original = gl.texImage2D.bind(gl);
+      const originalSubImage = gl.texSubImage2D.bind(gl);
+      let uploads = 0;
+      gl.texImage2D = ((...args: unknown[]) => {
+        if (args.length === 6) uploads += 1;
+        return (original as (...args: unknown[]) => void).apply(gl, args);
+      }) as WebGLRenderingContext["texImage2D"];
+      gl.texSubImage2D = ((...args: unknown[]) => {
+        uploads += 1;
+        return (originalSubImage as (...args: unknown[]) => void).apply(
+          gl,
+          args,
+        );
+      }) as WebGLRenderingContext["texSubImage2D"];
+      try {
+        const source = makeRasterSource(
+          4,
+          4,
+          { x: 0, y: 0, width: 4, height: 4 },
+          (context) => {
+            context.fillStyle = "#ff0000";
+            context.fillRect(0, 0, 4, 4);
+          },
+        );
+        device.draw(rasterDraw(device.generation, source));
+        device.draw(rasterDraw(device.generation, source));
+        a.assert(gl.getError() === gl.NO_ERROR, "cached draw has no GL error");
+        // The device consumes native bitmaps synchronously. Releasing the
+        // source before present must not lose what the batch already captured.
+        source.canvas.width = source.canvas.height = 0;
+        const captured = hooks.readScene();
+        a.assert(
+          gl.getError() === gl.NO_ERROR,
+          "bitmap release does not affect the captured batch",
+        );
+        a.assert(
+          uploads === 1,
+          `repeated immutable rasters share one batch upload (got ${uploads})`,
+        );
+        a.assert(
+          pixelIs(pixelAt(captured, 1, 1), [255, 0, 0, 255]),
+          "captured batch remains valid after native bitmap release",
+        );
+        device.resize(4, 4);
+        source.canvas.width = source.canvas.height = 4;
+        const context = source.canvas.getContext("2d")!;
+        context.fillStyle = "#ff0000";
+        context.fillRect(0, 0, 4, 4);
+        device.draw(rasterDraw(device.generation, source));
+        const resized = hooks.readScene();
+        a.assert(uploads === 2, "resize reuploads the captured raster");
+        a.assert(
+          pixelIs(pixelAt(resized, 1, 1), [255, 0, 0, 255]),
+          "resized batch renders the captured source",
+        );
+        device.lose();
+        device.restore();
+        device.draw(rasterDraw(device.generation, source));
+        const restored = hooks.readScene();
+        a.assert(
+          uploads === 3,
+          "context restoration reuploads the immutable raster",
+        );
+        a.assert(
+          pixelIs(pixelAt(restored, 1, 1), [255, 0, 0, 255]),
+          "restored texture renders the captured source",
+        );
+      } finally {
+        gl.texImage2D = original;
+        gl.texSubImage2D = originalSubImage;
+        device.dispose();
+      }
+    },
+  },
+  {
     id: "gpu.scene.clear-and-alpha",
     requirements: ["REN-01"],
     kind: "semantic",

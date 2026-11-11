@@ -127,6 +127,100 @@ function run(a: CaseAdapter): void {
 
 export const cases: CaseDefinition[] = [
   {
+    id: "raster.path-stroke.miter-outset",
+    requirements: ["REN-01"],
+    kind: "semantic",
+    width: 200,
+    height: 200,
+    seed: 1,
+    fonts: [],
+    run(a) {
+      const lab = makeLab();
+      for (const transform of [
+        IDENTITY,
+        [1.3, 0.2, -0.4, 0.8, 0, 0] as const,
+      ]) {
+        for (const offset of [2.2, 4.2, 8]) {
+          const reference = referenceContext();
+          reference.beginPath();
+          reference.moveTo(80, 100 - offset);
+          reference.lineTo(120, 100);
+          reference.lineTo(80, 100 + offset);
+          reference.setTransform(
+            transform[0],
+            transform[1],
+            transform[2],
+            transform[3],
+            transform[4],
+            transform[5],
+          );
+          reference.strokeStyle = "rgba(26,64,191,1)";
+          reference.lineWidth = 4;
+          reference.lineJoin = "miter";
+          reference.stroke();
+          const recorder = new PathRecorder();
+          recorder.moveTo(80, 100 - offset, IDENTITY);
+          recorder.lineTo(120, 100, IDENTITY);
+          recorder.lineTo(80, 100 + offset, IDENTITY);
+          const source = lab.rasterizer.path(
+            recorder.snapshot(),
+            makeState({ transform, lineWidth: 4 }),
+            "stroke",
+          );
+          compareAsset(a, reference, source, `miter-${offset}-${transform}`);
+          a.assert(
+            source.pixelWidth < 150 && source.pixelHeight < 125,
+            "miter outset uses the half-width radius and retains the complete stroke",
+          );
+          source.release();
+        }
+      }
+      lab.rasterizer.dispose();
+    },
+  },
+  {
+    id: "raster.path-stroke.compact-outsets",
+    requirements: ["REN-01"],
+    kind: "semantic",
+    width: 200,
+    height: 200,
+    seed: 1,
+    fonts: [],
+    run(a) {
+      const lab = makeLab();
+      for (const lineJoin of ["round", "miter"] as const) {
+        for (const lineCap of ["butt", "round"] as const) {
+          const reference = referenceContext();
+          reference.strokeStyle = "rgba(26,64,191,1)";
+          reference.lineJoin = lineJoin;
+          reference.lineCap = lineCap;
+          reference.lineWidth = 12;
+          reference.beginPath();
+          reference.moveTo(80, 90);
+          if (lineJoin === "round") reference.lineTo(100, 70);
+          reference.lineTo(120, 90);
+          reference.stroke();
+          const recorder = new PathRecorder();
+          recorder.moveTo(80, 90, IDENTITY);
+          if (lineJoin === "round") recorder.lineTo(100, 70, IDENTITY);
+          recorder.lineTo(120, 90, IDENTITY);
+          const source = lab.rasterizer.path(
+            recorder.snapshot(),
+            makeState({ lineJoin, lineCap, lineWidth: 12 }),
+            "stroke",
+          );
+          compareAsset(a, reference, source, `${lineJoin}-${lineCap}`);
+          a.assert(
+            source.pixelWidth < 80 && source.pixelHeight < 60,
+            "round joins and isolated lines do not reserve a miter-sized transparent border",
+          );
+          source.release();
+        }
+      }
+      lab.rasterizer.dispose();
+    },
+  },
+  {
     id: "raster.path-stroke.geometry",
     requirements: ["REN-01"],
     kind: "semantic",

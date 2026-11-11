@@ -61,6 +61,19 @@ function strokeKey(state: DrawState): string {
   return `${state.lineWidth}|${state.lineCap}|${state.lineJoin}`;
 }
 
+/** Single-segment subpaths cannot form a miter, regardless of lineJoin. */
+function hasStrokeJoin(path: PathSnapshot): boolean {
+  let segment = false;
+  for (const command of path.commands) {
+    if (command.op === "moveTo") segment = false;
+    else if (command.op === "lineTo") {
+      if (segment) return true;
+      segment = true;
+    } else return true;
+  }
+  return false;
+}
+
 function emptyAsset(createCanvas: RasterizerOptions["createCanvas"]): Asset {
   const canvas = createCanvas(1, 1);
   return {
@@ -506,10 +519,15 @@ class NativeRasterizer implements Rasterizer {
     // canvases on different raster paths and shifts partially covered pixels
     // by a byte or two. This is a configuration hint, not a guarantee of
     // identical bytes across platforms or drivers.
-    return {
-      canvas,
-      ctx: context2d(canvas, { willReadFrequently: true }),
-    };
+    try {
+      return {
+        canvas,
+        ctx: context2d(canvas, { willReadFrequently: true }),
+      };
+    } catch (failure) {
+      destroyCanvas(canvas);
+      throw failure;
+    }
   }
 
   #renderPath(
@@ -519,9 +537,16 @@ class NativeRasterizer implements Rasterizer {
   ): Asset {
     const geometry = pathGeometryBounds(path);
     if (!geometry) return emptyAsset(this.#options.createCanvas);
+    // Stroke reach is measured from the centerline: round caps/joins need
+    // half the width. Miter length is limited by the full stroke width;
+    // half of that reach plus a half-width guard is conservative here.
     const margin =
       mode === "stroke"
-        ? scaleBound(state.transform) * state.lineWidth * (MITER_LIMIT + 0.5) +
+        ? scaleBound(state.transform) *
+            state.lineWidth *
+            (state.lineJoin === "round" || !hasStrokeJoin(path)
+              ? 0.5
+              : (MITER_LIMIT + 1) * 0.5) +
           2
         : 1;
     const bounds = alignOutset(geometry, margin, this.#scene());
@@ -557,6 +582,9 @@ class NativeRasterizer implements Rasterizer {
         applyPaint(stage.ctx, state.fill, "fill", this.#patternSource);
         stage.ctx.fill();
       }
+      // Keep the older cropped-pixel upload path during performance recovery.
+      // Copying this scene-sized stage into a new canvas for every small path
+      // is slower in the controlled Chromium game benchmark.
       return this.#pixelAsset(
         bounds,
         stage.ctx.getImageData(bounds.x, bounds.y, bounds.width, bounds.height),

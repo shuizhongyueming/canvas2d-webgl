@@ -69,6 +69,29 @@ export class RasterBatch {
     return region;
   }
 
+  private atlas(): { canvas: NativeCanvas; context: Native2DContext } {
+    if (this.context) return { canvas: this.canvas!, context: this.context };
+    // Paths and clips arrive as captured CPU pixels during recovery. Keep
+    // mixed bitmap/pixel assembly on the same raster path, then upload the
+    // completed atlas once instead of promoting each putImageData to the GPU.
+    const { canvas, context } = this.stage(this.size, this.size, true);
+    try {
+      if (this.pixels)
+        context.putImageData(
+          new ImageData(this.pixels, this.size, this.size),
+          0,
+          0,
+        );
+    } catch (failure) {
+      destroyCanvas(canvas);
+      throw failure;
+    }
+    this.canvas = canvas;
+    this.context = context;
+    this.pixels = null;
+    return { canvas, context };
+  }
+
   append(operation: DrawOperation, image: ImageData): boolean {
     const region = this.reserve(image.width, image.height);
     if (!region) return false;
@@ -92,8 +115,10 @@ export class RasterBatch {
   }
 
   appendImage(operation: DrawOperation): boolean {
-    if (!this.createCanvas || operation.source.kind !== "image") return false;
     const source = operation.source;
+    if (!this.createCanvas) return false;
+    if (source.kind === "raster") return this.appendNativeSnapshot(operation);
+    if (source.kind !== "image") return false;
     const { width, height } = sourcePixels(source.image);
     // One neighbor on each side preserves full-source bilinear filtering.
     const x = Math.max(0, Math.floor(source.sourceRect.x) - 1);
@@ -133,25 +158,9 @@ export class RasterBatch {
     }
     const region = this.reserve(right - x, bottom - y);
     if (!region) return false;
-    if (!this.context) {
-      const { canvas, context } = this.stage(this.size, this.size, false);
-      try {
-        if (this.pixels)
-          context.putImageData(
-            new ImageData(this.pixels, this.size, this.size),
-            0,
-            0,
-          );
-      } catch (failure) {
-        destroyCanvas(canvas);
-        throw failure;
-      }
-      this.canvas = canvas;
-      this.context = context;
-      this.pixels = null;
-    }
-    this.context.clearRect(region.x, region.y, region.width, region.height);
-    this.context.drawImage(
+    const { context } = this.atlas();
+    context.clearRect(region.x, region.y, region.width, region.height);
+    context.drawImage(
       source.image as CanvasImageSource,
       x,
       y,
@@ -172,6 +181,44 @@ export class RasterBatch {
         width: source.sourceRect.width,
         height: source.sourceRect.height,
       },
+    });
+    return true;
+  }
+
+  /**
+   * Pack a native raster snapshot into the atlas. These assets are internal,
+   * pixel-aligned uploads: no taint check and no bilinear border are needed.
+   * Batching them keeps every draw in call order without one texture upload
+   * per path.
+   */
+  private appendNativeSnapshot(operation: DrawOperation): boolean {
+    const source = operation.source;
+    if (source.kind !== "raster" || source.imageData) return false;
+    if (source.bounds.width <= 0 || source.bounds.height <= 0) return false;
+    const width = source.pixelWidth;
+    const height = source.pixelHeight;
+    if (width < 1 || height < 1 || width > this.size || height > this.size)
+      return false;
+    const region = this.reserve(width, height);
+    if (!region) return false;
+    const { context } = this.atlas();
+    context.clearRect(region.x, region.y, region.width, region.height);
+    context.drawImage(
+      source.canvas as CanvasImageSource,
+      0,
+      0,
+      width,
+      height,
+      region.x,
+      region.y,
+      width,
+      height,
+    );
+    this.tiles.push({
+      operation,
+      region,
+      linear: false,
+      sampling: region,
     });
     return true;
   }
