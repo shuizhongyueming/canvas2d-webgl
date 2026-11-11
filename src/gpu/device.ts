@@ -271,6 +271,8 @@ class SceneDevice implements GPUDevice {
   private presentCount = 0;
   private clipTexture: WebGLTexture | null = null;
   private clipLease: ResourceLease | null = null;
+  private cachedClip: ClipSnapshot | null = null;
+  private cachedClipDepth = 0;
   private destinationTexture: WebGLTexture | null = null;
   private destinationMode: 0 | 1 | 2 = 0;
   generation = 0;
@@ -384,6 +386,7 @@ class SceneDevice implements GPUDevice {
 
   /** Idempotent teardown shared by dispose, loss, and init rollback. */
   shutdown(): void {
+    this.releaseClip();
     this.registry.releaseAll();
     destroySceneFramebuffer(this.gl, this.scene);
     this.scene = null;
@@ -478,8 +481,22 @@ class SceneDevice implements GPUDevice {
     gl.clear(gl.STENCIL_BUFFER_BIT);
   }
 
-  /** Upload the native effective clip once, preserving fractional coverage. */
+  /** One immutable internal mask at most; never cache external drawImage sources. */
+  private releaseClip(): void {
+    this.clipTexture = null;
+    this.clipLease?.release();
+    this.clipLease = null;
+    this.cachedClip = null;
+    this.cachedClipDepth = 0;
+  }
+
+  /** Reuse native effective coverage for consecutive draws in one submission. */
   private beginClip(clip: ClipSnapshot | null): number {
+    if (clip && clip === this.cachedClip && this.clipLease) {
+      this.clipTexture = this.registry.payload(this.clipLease.handle) ?? null;
+      if (this.clipTexture) return this.cachedClipDepth;
+    }
+    this.releaseClip();
     if (!clip) return 0;
     let depth = 0;
     for (let level: ClipSnapshot | null = clip; level; level = level.parent) {
@@ -519,6 +536,8 @@ class SceneDevice implements GPUDevice {
       }
       this.clipLease = lease;
       this.clipTexture = texture;
+      this.cachedClip = clip;
+      this.cachedClipDepth = depth;
     } finally {
       mask.release();
     }
@@ -901,10 +920,11 @@ class SceneDevice implements GPUDevice {
           lease.release();
         }
       }
+    } catch (failure) {
+      this.releaseClip();
+      throw failure;
     } finally {
       this.clipTexture = null;
-      this.clipLease?.release();
-      this.clipLease = null;
       if (clipDepth > 0) this.resetStencil();
     }
     this.presenterQueue.request(this.generation);
@@ -913,6 +933,7 @@ class SceneDevice implements GPUDevice {
   present(generation: number): void {
     if (this.status !== "active") return;
     if (generation !== this.generation) return;
+    this.releaseClip();
     const { scene } = this.requireObjects();
     this.presentCount += 1;
     // The scene texture stores device-top at v=1 (draws flip y into GL space),
@@ -973,6 +994,7 @@ class SceneDevice implements GPUDevice {
     }
     const generation = this.generation;
     this.presenterQueue.invalidate(generation);
+    this.releaseClip();
     this.registry.invalidateGeneration(generation);
     destroySceneFramebuffer(this.gl, this.scene);
     this.scene = scene;
@@ -989,6 +1011,7 @@ class SceneDevice implements GPUDevice {
     if (this.lifecycleStatus !== "active") return;
     const generation = this.generation;
     this.presenterQueue.invalidate(generation);
+    this.releaseClip();
     this.registry.invalidateGeneration(generation);
     destroySceneFramebuffer(this.gl, this.scene);
     this.scene = null;

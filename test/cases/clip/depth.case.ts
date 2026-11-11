@@ -92,12 +92,12 @@ export const cases: CaseDefinition[] = [
           "255 nested clips still draw through every level",
         );
         a.observe("deepestOpacity", pixelAt(scene, 1, 1));
-        // Every mask texture lease must be released within the draw.
+        // One mask can be retained across consecutive draws until present.
         const counts = renderer.hooks.resourceCounts();
         a.observe("texturesAfterDeepest", counts.textures);
         a.assert(
-          counts.textures === 0,
-          "clip mask textures are released after the draw",
+          counts.textures === 1,
+          "only one clip mask texture is retained after the draw",
         );
         // One level beyond the representable values fails explicitly instead
         // of wrapping the stencil counter.
